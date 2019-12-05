@@ -137,8 +137,8 @@ SET(HEADERS
 #    include/tsid/config.hpp
 #    include/tsid/deprecation.hpp
 #    include/consim/utils/statistics.hpp
-#    include/consim/utils/stop-watch.hpp
-#    include/consim/utils/Stdafx.hh
+    include/consim/utils/stop-watch.hpp
+    include/consim/utils/Stdafx.hh
 #    ${${PROJECT_NAME}_MATH_HEADERS}
 #    ${${PROJECT_NAME}_SOLVERS_HEADERS}
 #    ${${PROJECT_NAME}_ROBOTS_HEADERS}

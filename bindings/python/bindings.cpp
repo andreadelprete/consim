@@ -13,7 +13,7 @@
 #include <eigenpy/eigenpy.hpp>
 
 #include "consim/simulator.hpp"
-
+#include "consim/utils/stop-watch.hpp"
 
 
 //eigenpy::switchToNumpyMatrix();
@@ -64,6 +64,11 @@ Simulator* build_walking_simulator(
   return sim;
 }
 
+void stop_watch_report(int precision)
+{
+  getProfiler().report_all(precision);
+}
+
 
 namespace bp = boost::python;
 
@@ -85,6 +90,10 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
 
     bp::def("build_walking_simulator", build_walking_simulator,
             "A simple way to create a simulator with floor object and NonlinearSpringDamperContactModel.",
+            bp::return_value_policy<bp::manage_new_object>());
+
+    bp::def("stop_watch_report", stop_watch_report,
+            "Report all the times measured by the shared stop-watch.",
             bp::return_value_policy<bp::manage_new_object>());
 
     bp::class_<Contact>("Contact",

@@ -5,12 +5,15 @@
 from __future__ import print_function
 from copy import deepcopy
 import numpy as np
-from pinocchio.utils import rotate, isapprox, zero
+from pinocchio.utils import  zero
 import pinocchio as se3
 import gepetto.corbaserver
 import time
 import commands
 import os
+
+import eigenpy
+eigenpy.switchToNumpyMatrix()
 
 import conf_solo as conf
 import consim
@@ -19,10 +22,10 @@ import consim
 print("Test solo cpp sim started")
 dt = 1e-3
 ndt = 10
-T = .5
+T = 10.0
 
-kp = 3
-kd = 1
+kp = 10
+kd = 0.05
 
 N = int(T/dt)
 robot = se3.RobotWrapper.BuildFromURDF(conf.urdf, [conf.path, ], se3.JointModelFreeFlyer())
@@ -31,13 +34,9 @@ robot.data = se3.Data(robot.model)
 if not robot.model.check(robot.data):
     print("Python data not consistent with model")
 
-print("build_simple_simulator") 
-print("model parents", [p for p in robot.model.parents])
-
 sim = consim.build_simple_simulator(dt, ndt, robot.model, robot.data,
                                     conf.K[0,0], conf.B[0,0], conf.K[1,1], conf.B[1,1],
                                     conf.mu, conf.mu)
-print("2")
 cpts = []
 for cf in conf.contact_frames:
     if not robot.model.existFrame(cf):
@@ -64,13 +63,16 @@ if(conf.use_viewer):
     robot_display.display(q)
     gui = robot_display.viewer.gui
     gui.addFloor('world/floor')
-    gui.setCameraTransform(0, conf.CAMERA_TRANSFORM)
+    gui.setLightingMode('world/floor', 'OFF')
+#    gui.setCameraTransform(0, conf.CAMERA_TRANSFORM)
 
 print("start simulation")
 DISPLAY_N = int(conf.DISPLAY_T/dt)
+PRINT_N = int(conf.PRINT_T/dt)
 display_counter = DISPLAY_N    
 t = 0.0 
 for it in range(N):
+    t0 = time.time()
     tau[6:,0] = kp*(conf.q0[7:,0] - sim.q[7:,0]) - kd*sim.dq[6:,0]
     sim.step(tau)
     
@@ -78,9 +80,19 @@ for it in range(N):
         display_counter -= 1
         if display_counter == 0: 
             robot_display.display(sim.q)
-            print("Time %.3f"%(t), robot.data.com[0].T)
             display_counter = DISPLAY_N     
+            
+    if(it%PRINT_N==0):
+        print("Time %.3f"%(t))
+        
     t += dt
+    t1 = time.time()
+    if(t1-t0<0.9*dt):
+        time.sleep(dt-t1+t0)
     
 print("end simulation")
 
+for cf in conf.contact_frames:
+    print(cf, 1e3*robot.data.oMf[robot.model.getFrameId(cf)].translation.T, 'mm')
+    
+consim.stop_watch_report(3)

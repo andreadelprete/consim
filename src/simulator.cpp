@@ -18,7 +18,7 @@
 #include "consim/object.hpp"
 #include "consim/contact.hpp"
 #include "consim/simulator.hpp"
-//#include "consim/utils/stop-watch.hpp"
+#include "consim/utils/stop-watch.hpp"
 
 #include <iostream>
 
@@ -27,12 +27,12 @@ namespace consim {
 Simulator::Simulator(float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data):
   dt_(dt), n_integration_steps_(n_integration_steps), model_(&model), data_(&data)
 {
-  std::cout<<"Simulator constructor\n";
   q_.resize(model.nq);
   dq_.resize(model.nv);
   dqMean_.resize(model.nv);
   tau_.resize(model.nv);
-  std::cout<<"End simulator constructor\n";
+  J_.resize(6, model.nv);
+  frame_Jc_.resize(3, model.nv);
 };
 
 
@@ -75,18 +75,18 @@ void Simulator::check_contact_() {
   }
 }
 
-inline Eigen::MatrixXd Simulator::contact_linear_jacobian_(int frame_id)
+inline void Simulator::contact_linear_jacobian_(int frame_id)
 {
-  pinocchio::Data::Matrix6x J(6, model_->nv);
-  J.setZero();
+//  pinocchio::Data::Matrix6x J(6, model_->nv);
+  J_.setZero();
 //  pinocchio::getFrameJacobian<pinocchio::LOCAL>(*model_, *data_, frame_id, J);
-  pinocchio::getFrameJacobian(*model_, *data_, frame_id, pinocchio::LOCAL, J);
+  pinocchio::getFrameJacobian(*model_, *data_, frame_id, pinocchio::LOCAL, J_);
 
   // Rotate the jacobian to have it aligned with the world coordinate frame.
   Eigen::Matrix3d rotation = data_->oMf[frame_id].rotation();
   Eigen::Vector3d translation = Eigen::Vector3d::Zero();
 
-  return (pinocchio::SE3(rotation, translation).toActionMatrix() * J).topRows(3);
+  frame_Jc_ = (pinocchio::SE3(rotation, translation).toActionMatrix() * J_).topRows(3);
 }
 
 void Simulator::compute_contact_forces_and_torques_(const Eigen::VectorXd& dq) {
@@ -102,15 +102,15 @@ void Simulator::compute_contact_forces_and_torques_(const Eigen::VectorXd& dq) {
     // contact model function on the object.
     // TODO: Is there a faster way to compute the contact point velocity than
     //       multiply the jacobian with the generalized velocity from pinocchio?
-    Eigen::MatrixXd frame_Jc = contact_linear_jacobian_(cp->frame_id);
-    cp->v = frame_Jc * dq;
+    contact_linear_jacobian_(cp->frame_id);
+    cp->v = frame_Jc_ * dq;
     // printf("contact point position %f\n", cp->normal(2));
     // printf("contact point velocity %f\n", cp->normvel(2));
     // contact force computation is called in th
     cp->optr->contact_model(*cp);
     // printf("contact point force %f\n", cp->f(2));
 
-    tau_ += frame_Jc.transpose() * cp->f;
+    tau_ += frame_Jc_.transpose() * cp->f;
     // printf("integration force %f\n", tau_(2));
   }
 }
@@ -121,6 +121,7 @@ const Contact& Simulator::get_contact(int index)
 }
 
 void Simulator::step(const Eigen::VectorXd& tau) {
+  getProfiler().start("simulator::step");
   const double sub_dt = dt_ / ((double)n_integration_steps_);
 
   assert(tau.size() == model_->nv);
@@ -132,7 +133,9 @@ void Simulator::step(const Eigen::VectorXd& tau) {
     tau_ += tau;
 
     // Compute the acceloration ddq.
+    getProfiler().start("pinocchio::aba");
     pinocchio::aba(*model_, *data_, q_, dq_, tau_);
+    getProfiler().stop("pinocchio::aba");
 
     // Integrate the system forward in time.
     dqMean_ = dq_ + data_->ddq * .5 * sub_dt;
@@ -145,6 +148,7 @@ void Simulator::step(const Eigen::VectorXd& tau) {
     // on the contact state are consistent with the q, dq and ddq values.
     compute_terms_and_contact_state_();
   }
+  getProfiler().stop("simulator::step");
 }
 
 void Simulator::compute_terms_and_contact_state_()
@@ -153,12 +157,16 @@ void Simulator::compute_terms_and_contact_state_()
 
   // Compute all the terms (mass matrix, jacobians, ...)
   data_->M.fill(0);
+  getProfiler().start("pinocchio::computeAllTerms");
   pinocchio::computeAllTerms(*model_, *data_, q_, dq_);
   pinocchio::updateFramePlacements(*model_, *data_);
+  getProfiler().stop("pinocchio::computeAllTerms");
 
   // Contact handling: Detect contact, compute contact forces, compute resulting torques.
+  getProfiler().start("compute_contact_forces_and_torques");
   check_contact_();
   compute_contact_forces_and_torques_(dq_);
+  getProfiler().stop("compute_contact_forces_and_torques");
 }
 
 void Simulator::reset_state(const Eigen::VectorXd& q, const Eigen::VectorXd& dq, bool reset_contact_state)

@@ -58,7 +58,7 @@ public:
 
 
 private:
-  inline Eigen::MatrixXd contact_linear_jacobian_(int frame_id);
+  inline void contact_linear_jacobian_(int frame_id);
 
   /**
    * Checks the contact points for contacts with the objects. If there is a
@@ -89,6 +89,8 @@ private:
   Eigen::VectorXd joint_friction_;
   bool joint_friction_flag_=0;
 
+  Eigen::MatrixXd frame_Jc_;
+  pinocchio::Data::Matrix6x J_;
 };
 
 }

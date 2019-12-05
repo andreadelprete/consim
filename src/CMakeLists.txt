@@ -40,7 +40,7 @@ SET(${LIBRARY_NAME}_SOURCES
     object.cpp
     simulator.cpp
 #    utils/statistics.cpp
-#    utils/stop-watch.cpp
+    utils/stop-watch.cpp
 #    ${${LIBRARY_NAME}_MATH_SOURCES}
 #    ${${LIBRARY_NAME}_SOLVERS_SOURCES}
 #    ${${LIBRARY_NAME}_ROBOTS_SOURCES}
