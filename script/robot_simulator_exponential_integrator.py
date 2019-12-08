@@ -1,4 +1,5 @@
-from simple_biped.utils.test_LDS_integral import compute_integral_x_T, compute_double_integral_x_T, compute_x_T_and_two_integrals
+from utils_LDS_integral import compute_integral_x_T, compute_double_integral_x_T, compute_x_T_and_two_integrals
+from utils_LDS_integral import compute_x_T
 import pinocchio as se3
 from pinocchio.utils import zero
 import numpy as np
@@ -167,7 +168,26 @@ class RobotSimulator:
         
         return self.f
         
-    def step(self, u, dt = None, use_exponential_integrator=True):
+    def solve_dense_expo_system(self, U, K, B, a, x0, dt):
+        n = U.shape[0]
+        A = matlib.zeros((2*n,2*n))
+        A[:n, n:] = matlib.eye(n)
+#        a = zero(2*n)
+        A[n:,:n] = -U*K
+        A[n:,n:] = -U*B
+#        a[n:,0] = b
+
+#        print "A", A
+        if(self.assume_A_invertible):            
+            int_x, int2_x = compute_double_integral_x_T(A, a, x0, dt,
+                                                        compute_also_integral=True)
+        else:
+            x  = compute_x_T(A, a, x0, dt, invertible_A=False)
+            int_x  = compute_integral_x_T(A, a, x0, dt, invertible_A=False)
+            int2_x = compute_double_integral_x_T(A, a, x0, dt, invertible_A=False)
+        return x, int_x, int2_x
+        
+    def step(self, u, dt = None, use_exponential_integrator=True, use_sparse_solver=1):
         if dt is None: dt = self.dt
         
         if self.first_iter: 
@@ -206,35 +226,95 @@ class RobotSimulator:
             x0 = np.vstack((self.p, self.dp))
             JMinv = np.linalg.solve(M, self.Jc.T).T
             self.Upsilon = self.Jc*JMinv.T
+            b = JMinv*(self.S.T*u-h) +self.dJv + self.Upsilon*K_p0
             self.A[self.nk:,:self.nk] = -self.Upsilon*self.K
             self.A[self.nk:,self.nk:] = -self.Upsilon*self.B
-            b = JMinv*(self.S.T*u-h) +self.dJv + self.Upsilon*K_p0
-            self.a[self.nk:,0] = b
-
-            if(self.assume_A_invertible):            
-                int_x, int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt,
-                                                            compute_also_integral=True)
-            else:                                            
-                int_x  = compute_integral_x_T(self.A, self.a, x0, dt, invertible_A=False)
-                int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt,
-                                                     invertible_A=False)
-#                x, int_x, int2_x = compute_x_T_and_two_integrals(self.A, self.a, x0, dt)
             
-            n = self.A.shape[0]
-            C = matlib.zeros((n+1, n+1))
-            C[0    :n,     0:n]       = self.A
-            C[0    :n,     n]         = self.a
-            z = matlib.zeros((n+1,1))
-            z[:n,0] = x0
-            z[-1,0] = 1.0
-            e_TC = expm(dt/self.ndt_force*C)
-            for i in range(self.ndt_force):
-                self.f_log[:,i] = self.K*self.p0 + self.D * z[:n,0]
-                z = e_TC*z
+            if(use_sparse_solver):
+                D_x = zero(self.nk)
+                D_int_x = zero(self.nk)
+                D_int2_x = zero(self.nk)
+                dx0 = self.A*x0
+                
+                Ux = self.Upsilon[0::3,0::3]
+#                print 0, "U", Ux
+                Kx = self.K[0::3, 0::3]
+                Bx = self.B[0::3, 0::3]
+                ax = dx0[0::3, 0] 
+#                print 'x', x0.T
+#                print 'Ux\n', Ux
+#                print 'dx(0)', ax.T
+                ax -= np.vstack((self.dp[0::3,0], -Ux*Kx*self.p[0::3,0] -Ux*Bx*self.dp[0::3,0]))
+#                print 'dx0-diag', ax.T
+                ax[4:,0] += b[0::3, 0]
+                x0x = np.vstack((self.p[0::3,0], self.dp[0::3,0]))
+                x, int_x, int2_x = self.solve_dense_expo_system(Ux, Kx, Bx, ax, x0x, dt)
+#                print 0, 'x', x.T
+                D_x[0::3,0] = np.hstack((-Kx, -Bx)) * x
+                D_int_x[0::3,0] = np.hstack((-Kx, -Bx)) * int_x
+                D_int2_x[0::3,0] = np.hstack((-Kx, -Bx)) * int2_x
+                
+                for i in range(4):
+                    ii = 3*i+1
+                    Ux = self.Upsilon[ii:ii+2,ii:ii+2]
+#                    print i, "U", Ux
+                    Kx = self.K[ii:ii+2, ii:ii+2]
+                    Bx = self.B[ii:ii+2, ii:ii+2]
+                    ax = zero(4)
+                    ax[:2,0] = dx0[ii:ii+2, 0] 
+                    ax[2:,0] = dx0[self.nk+ii:self.nk+ii+2, 0]
+                    ax -= np.vstack((self.dp[ii:ii+2,0], -Ux*Kx*self.p[ii:ii+2,0] -Ux*Bx*self.dp[ii:ii+2,0]))
+                    ax[2:,0] += b[ii:ii+2, 0]                                         
+                    x0x = np.vstack((self.p[ii:ii+2,0], self.dp[ii:ii+2,0]))
+                    x, int_x, int2_x = self.solve_dense_expo_system(Ux, Kx, Bx, ax, x0x, dt)
+#                    print ii, 'x', x.T
+                    D_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) * x
+                    D_int_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) * int_x
+                    D_int2_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) * int2_x
+#                print "1 D_x", (K_p0+D_x).T
+                
+            else:
+                self.a[self.nk:,0] = b
+    
+                if(self.assume_A_invertible):            
+                    int_x, int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt,
+                                                                compute_also_integral=True)
+                else:
+                    # DEBUG
+#                    x  = compute_x_T(self.A, self.a, x0, dt, invertible_A=False)                   
+#                    print "2 D_x", (K_p0+self.D*x).T
+    #                print 'x', x.T
+                    
+                    int_x  = compute_integral_x_T(self.A, self.a, x0, dt, invertible_A=False)
+                    int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt,
+                                                         invertible_A=False)
+    #                x, int_x, int2_x = compute_x_T_and_two_integrals(self.A, self.a, x0, dt)
+                
+#                print "1 D_int_x", D_int_x.T
+#                print "2 D_int_X", (self.D * int_x).T
+#                print "1 D_int2_x", D_int2_x.T
+#                print "2 D_int2_x", (self.D * int2_x).T
+                D_int_x = self.D * int_x
+                D_int2_x = self.D * int2_x
+                
+        #            n = self.A.shape[0]
+        #            C = matlib.zeros((n+1, n+1))
+        #            C[0    :n,     0:n]       = self.A
+        #            C[0    :n,     n]         = self.a
+        #            z = matlib.zeros((n+1,1))
+        #            z[:n,0] = x0
+        #            z[-1,0] = 1.0
+        #            e_TC = expm(dt/self.ndt_force*C)
+        #            for i in range(self.ndt_force):
+        #                self.f_log[:,i] = K_p0 + self.D * z[:n,0]
+        #                z = e_TC*z
             
-            Minv_JT_D = JMinv.T*self.D
-            v_mean = self.v + 0.5*dt*dv_bar + Minv_JT_D*int2_x/dt
-            dv_mean = dv_bar + Minv_JT_D*int_x/dt
+#            print "2 D_int_x", D_int_x.T
+#            print "2 D_int2_x", D_int2_x.T
+            
+#            Minv_JT_D = JMinv.T*self.D
+            v_mean = self.v + 0.5*dt*dv_bar + JMinv.T*D_int2_x/dt
+            dv_mean = dv_bar + JMinv.T*D_int_x/dt
             self.v += dt*dv_mean
             self.q  = se3.integrate(self.model, self.q, v_mean*dt)
             self.dv = dv_mean
@@ -249,14 +329,15 @@ class RobotSimulator:
         self.first_iter = True
         
         
-    def simulate(self, u, dt=0.001, ndt=1, use_exponential_integrator=True):
+    def simulate(self, u, dt=0.001, ndt=1, use_exponential_integrator=True,
+                 use_sparse_solver=True):
         ''' Perform ndt steps, each lasting dt/ndt seconds '''
 #        time_start = time.time()
         
         for i in range(ndt):
             if(not use_exponential_integrator):
                 self.f_log[:,i] = self.f
-            self.q, self.v = self.step(u, dt/ndt, use_exponential_integrator)
+            self.q, self.v = self.step(u, dt/ndt, use_exponential_integrator, use_sparse_solver)
             
                    
         if(self.conf.use_viewer):

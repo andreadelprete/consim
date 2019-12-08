@@ -1,6 +1,6 @@
 from robot_simulator_exponential_integrator import RobotSimulator
 from tsid_quadruped import TsidQuadruped
-import conf_solo as conf
+import conf_solo_py as conf
 import simple_biped.utils.plot_utils as plut
 
 import pinocchio as se3
@@ -16,16 +16,25 @@ print " Test Exponential Integrator with Quadruped Robot ".center(conf.LINE_WIDT
 print "".center(conf.LINE_WIDTH,'#'), '\n'
 
 simu_params_standard = {
-    'name': 'standard',
+    'name': 'euler',
     'use_exp_int': 0,
-    'ndt': 20
+    'ndt': 20,
+    'sparse': 0
     }
 simu_params_exp_int = {
-    'name': 'exp_int',
+    'name': 'exp',
     'use_exp_int': 1,
-    'ndt': 1
+    'ndt': 1,
+    'sparse': 0
     }
-SIMU_PARAMS = [simu_params_standard, simu_params_exp_int]
+simu_params_exp_int_sparse = {
+    'name': 'exp sparse',
+    'use_exp_int': 1,
+    'ndt': 1,
+    'sparse': 1
+    }
+SIMU_PARAMS = [simu_params_exp_int, simu_params_exp_int_sparse]
+#SIMU_PARAMS = [simu_params_exp_int]
 #USE_EXPONENTIAL_INTEGRATOR = [0, 1]
 ASSUME_A_INVERTIBLE = 0
 USE_CONTROLLER = 1
@@ -34,7 +43,7 @@ active_contact_frames = ['BL_contact', 'BR_contact', 'FL_contact', 'FR_contact']
 ndt_force = simu_params_standard['ndt']
 dt = 0.001                      # controller time step
 #ndt = 1                       # number of simulation steps per controller step
-T = 1.0
+T = 1
 
 offset     = np.matrix([0.0, -0.0, 0.0]).T
 amp        = np.matrix([0.0, 0.0, 0.05]).T
@@ -94,7 +103,8 @@ def run_simulation(q, v, simu_params):
     #        robot.computeAllTerms(invdyn.data(), q, v)
             u = -0.01*conf.kp_posture*v[6:,0]
             
-        q, v, f_i = simu.simulate(u, dt, simu_params['ndt'], simu_params['use_exp_int']) 
+        q, v, f_i = simu.simulate(u, dt, simu_params['ndt'], simu_params['use_exp_int'],
+                                  simu_params['sparse']) 
         if(i+1<N_SIMULATION): f[:,i+1] = f_i.A1
         f_log[:,i*ndt_force:(i+1)*ndt_force] = simu.f_log
         dv = simu.dv
@@ -138,26 +148,38 @@ for simu_params in SIMU_PARAMS:
 tt = np.arange(0.0, N_SIMULATION*dt, dt)
 tt_log = np.arange(0.0, N_SIMULATION*dt, dt/ndt_force)
 
+PLOT_UPSILON = 0
+if(PLOT_UPSILON):
+    np.set_printoptions(precision=2, linewidth=200, suppress=True)
+    plt.matshow(simu.Upsilon)
+    plt.colorbar()
+    
+    U = simu.Upsilon.copy()
+    for i in range(U.shape[0]):
+        U[i,:] /= U[i,i]
+    print U
+    plt.show()
+
 (ff, ax) = plut.create_empty_figure(2,2)
 ax = ax.reshape(4)
-for (name,f) in forces_log.iteritems():
+for (name,f) in forces.iteritems():
     for i in range(4):
-        ax[i].plot(tt_log, f[2+3*i,:].squeeze(), '--',   label=name+' '+str(i))
+        ax[i].plot(tt, f[2+3*i,:].squeeze(), '--',   label=name+' '+str(i))
         ax[i].set_xlabel('Time [s]')
         ax[i].set_ylabel('Force Z [N]')
     leg = ax[0].legend()
     leg.get_frame().set_alpha(0.5)
     
-for ((name,f),(nname,f_log)) in zip(forces.iteritems(), forces_log.iteritems()):
-    (ff, ax) = plut.create_empty_figure(2,2)
-    ax = ax.reshape(4)
-    for i in range(4):
-        ax[i].plot(tt, f[2+3*i,:].squeeze(), '--',   label=name+' '+str(i))
-        ax[i].plot(tt_log, f_log[2+3*i,:].squeeze(), '--',   label=name+' '+str(i))
-        ax[i].set_xlabel('Time [s]')
-        ax[i].set_ylabel('Force Z [N]')
-    leg = ax[0].legend()
-    leg.get_frame().set_alpha(0.5)
+#for ((name,f),(nname,f_log)) in zip(forces.iteritems(), forces_log.iteritems()):
+#    (ff, ax) = plut.create_empty_figure(2,2)
+#    ax = ax.reshape(4)
+#    for i in range(4):
+#        ax[i].plot(tt, f[2+3*i,:].squeeze(), '--',   label=name+' '+str(i))
+##        ax[i].plot(tt_log, f_log[2+3*i,:].squeeze(), '--',   label=name+' '+str(i))
+#        ax[i].set_xlabel('Time [s]')
+#        ax[i].set_ylabel('Force Z [N]')
+#    leg = ax[0].legend()
+#    leg.get_frame().set_alpha(0.5)
     
 #(ff, ax) = plut.create_empty_figure(3,1)
 #for i in range(3):
