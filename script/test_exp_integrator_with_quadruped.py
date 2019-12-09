@@ -1,7 +1,7 @@
 from robot_simulator_exponential_integrator import RobotSimulator
 from tsid_quadruped import TsidQuadruped
 import conf_solo_py as conf
-import simple_biped.utils.plot_utils as plut
+import utils.plot_utils as plut
 
 import pinocchio as se3
 import numpy as np
@@ -33,7 +33,7 @@ simu_params_exp_int_sparse = {
     'ndt': 1,
     'sparse': 1
     }
-SIMU_PARAMS = [simu_params_exp_int, simu_params_exp_int_sparse]
+SIMU_PARAMS = [simu_params_exp_int]
 #SIMU_PARAMS = [simu_params_exp_int]
 #USE_EXPONENTIAL_INTEGRATOR = [0, 1]
 ASSUME_A_INVERTIBLE = 0

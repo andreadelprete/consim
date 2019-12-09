@@ -187,6 +187,49 @@ class RobotSimulator:
             int2_x = compute_double_integral_x_T(A, a, x0, dt, invertible_A=False)
         return x, int_x, int2_x
         
+    def solve_sparse_exp(self, x0, b, dt):
+        D_x = zero(self.nk)
+        D_int_x = zero(self.nk)
+        D_int2_x = zero(self.nk)
+        dx0 = self.A*x0
+        
+        # normalize rows of Upsilon
+        U = self.Upsilon.copy()
+        for i in range(U.shape[0]):
+            U[i,:] /= U[i,i]
+            
+        done = False
+        left = range(self.nk)
+        while not done:
+            # find elements have at least 10% effect of current item derivative (compared to element itself)
+#            print "Analyze row", left[0]
+            ii = np.where(U[left[0],:].A1>0.1)[0]
+#            print "Processing group of elements:", ii
+            
+            k = ii.shape[0]
+            Ux = self.Upsilon[ii,:][:,ii]
+            Kx = self.K[ii,:][:,ii]
+            Bx = self.B[ii,:][:,ii]
+            ax = zero(2*k)
+            ax[:k] = dx0[ii]
+            ax[k:] = dx0[self.nk+ii]
+            ax -= np.vstack((self.dp[ii], -Ux*Kx*self.p[ii] -Ux*Bx*self.dp[ii]))
+            ax[k:] += b[ii]
+            x0x = np.vstack((self.p[ii], self.dp[ii]))
+            x, int_x, int2_x = self.solve_dense_expo_system(Ux, Kx, Bx, ax, x0x, dt)
+            Dx = np.hstack((-Kx, -Bx))
+            D_x[ii]      = Dx * x
+            D_int_x[ii]  = Dx * int_x
+            D_int2_x[ii] = Dx * int2_x
+            
+            for i in ii:
+                left.remove(i)
+
+            if len(left)==0:
+                done = True
+        
+        return D_x, D_int_x, D_int2_x
+        
     def step(self, u, dt = None, use_exponential_integrator=True, use_sparse_solver=1):
         if dt is None: dt = self.dt
         
@@ -231,47 +274,39 @@ class RobotSimulator:
             self.A[self.nk:,self.nk:] = -self.Upsilon*self.B
             
             if(use_sparse_solver):
-                D_x = zero(self.nk)
-                D_int_x = zero(self.nk)
-                D_int2_x = zero(self.nk)
-                dx0 = self.A*x0
-                
-                Ux = self.Upsilon[0::3,0::3]
-#                print 0, "U", Ux
-                Kx = self.K[0::3, 0::3]
-                Bx = self.B[0::3, 0::3]
-                ax = dx0[0::3, 0] 
-#                print 'x', x0.T
-#                print 'Ux\n', Ux
-#                print 'dx(0)', ax.T
-                ax -= np.vstack((self.dp[0::3,0], -Ux*Kx*self.p[0::3,0] -Ux*Bx*self.dp[0::3,0]))
-#                print 'dx0-diag', ax.T
-                ax[4:,0] += b[0::3, 0]
-                x0x = np.vstack((self.p[0::3,0], self.dp[0::3,0]))
-                x, int_x, int2_x = self.solve_dense_expo_system(Ux, Kx, Bx, ax, x0x, dt)
-#                print 0, 'x', x.T
-                D_x[0::3,0] = np.hstack((-Kx, -Bx)) * x
-                D_int_x[0::3,0] = np.hstack((-Kx, -Bx)) * int_x
-                D_int2_x[0::3,0] = np.hstack((-Kx, -Bx)) * int2_x
-                
-                for i in range(4):
-                    ii = 3*i+1
-                    Ux = self.Upsilon[ii:ii+2,ii:ii+2]
-#                    print i, "U", Ux
-                    Kx = self.K[ii:ii+2, ii:ii+2]
-                    Bx = self.B[ii:ii+2, ii:ii+2]
-                    ax = zero(4)
-                    ax[:2,0] = dx0[ii:ii+2, 0] 
-                    ax[2:,0] = dx0[self.nk+ii:self.nk+ii+2, 0]
-                    ax -= np.vstack((self.dp[ii:ii+2,0], -Ux*Kx*self.p[ii:ii+2,0] -Ux*Bx*self.dp[ii:ii+2,0]))
-                    ax[2:,0] += b[ii:ii+2, 0]                                         
-                    x0x = np.vstack((self.p[ii:ii+2,0], self.dp[ii:ii+2,0]))
-                    x, int_x, int2_x = self.solve_dense_expo_system(Ux, Kx, Bx, ax, x0x, dt)
-#                    print ii, 'x', x.T
-                    D_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) * x
-                    D_int_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) * int_x
-                    D_int2_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) * int2_x
-#                print "1 D_x", (K_p0+D_x).T
+                D_x, D_int_x, D_int2_x = self.solve_sparse_exp(x0, b, dt)
+#                D_x = zero(self.nk)
+#                D_int_x = zero(self.nk)
+#                D_int2_x = zero(self.nk)
+#                dx0 = self.A*x0
+#                
+#                Ux = self.Upsilon[0::3,0::3]
+#                Kx = self.K[0::3, 0::3]
+#                Bx = self.B[0::3, 0::3]
+#                ax = dx0[0::3, 0] 
+#                ax -= np.vstack((self.dp[0::3,0], -Ux*Kx*self.p[0::3,0] -Ux*Bx*self.dp[0::3,0]))
+#                ax[4:,0] += b[0::3, 0]
+#                x0x = np.vstack((self.p[0::3,0], self.dp[0::3,0]))
+#                x, int_x, int2_x = self.solve_dense_expo_system(Ux, Kx, Bx, ax, x0x, dt)
+#                D_x[0::3,0] = np.hstack((-Kx, -Bx)) * x
+#                D_int_x[0::3,0] = np.hstack((-Kx, -Bx)) * int_x
+#                D_int2_x[0::3,0] = np.hstack((-Kx, -Bx)) * int2_x
+#                
+#                for i in range(4):
+#                    ii = 3*i+1
+#                    Ux = self.Upsilon[ii:ii+2,ii:ii+2]
+#                    Kx = self.K[ii:ii+2, ii:ii+2]
+#                    Bx = self.B[ii:ii+2, ii:ii+2]
+#                    ax = zero(4)
+#                    ax[:2,0] = dx0[ii:ii+2, 0] 
+#                    ax[2:,0] = dx0[self.nk+ii:self.nk+ii+2, 0]
+#                    ax -= np.vstack((self.dp[ii:ii+2,0], -Ux*Kx*self.p[ii:ii+2,0] -Ux*Bx*self.dp[ii:ii+2,0]))
+#                    ax[2:,0] += b[ii:ii+2, 0]                                         
+#                    x0x = np.vstack((self.p[ii:ii+2,0], self.dp[ii:ii+2,0]))
+#                    x, int_x, int2_x = self.solve_dense_expo_system(Ux, Kx, Bx, ax, x0x, dt)
+#                    D_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) * x
+#                    D_int_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) * int_x
+#                    D_int2_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) * int2_x
                 
             else:
                 self.a[self.nk:,0] = b
@@ -279,40 +314,27 @@ class RobotSimulator:
                 if(self.assume_A_invertible):            
                     int_x, int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt,
                                                                 compute_also_integral=True)
-                else:
-                    # DEBUG
-#                    x  = compute_x_T(self.A, self.a, x0, dt, invertible_A=False)                   
-#                    print "2 D_x", (K_p0+self.D*x).T
-    #                print 'x', x.T
-                    
+                else:                    
                     int_x  = compute_integral_x_T(self.A, self.a, x0, dt, invertible_A=False)
                     int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt,
                                                          invertible_A=False)
     #                x, int_x, int2_x = compute_x_T_and_two_integrals(self.A, self.a, x0, dt)
                 
-#                print "1 D_int_x", D_int_x.T
-#                print "2 D_int_X", (self.D * int_x).T
-#                print "1 D_int2_x", D_int2_x.T
-#                print "2 D_int2_x", (self.D * int2_x).T
                 D_int_x = self.D * int_x
                 D_int2_x = self.D * int2_x
                 
-        #            n = self.A.shape[0]
-        #            C = matlib.zeros((n+1, n+1))
-        #            C[0    :n,     0:n]       = self.A
-        #            C[0    :n,     n]         = self.a
-        #            z = matlib.zeros((n+1,1))
-        #            z[:n,0] = x0
-        #            z[-1,0] = 1.0
-        #            e_TC = expm(dt/self.ndt_force*C)
-        #            for i in range(self.ndt_force):
-        #                self.f_log[:,i] = K_p0 + self.D * z[:n,0]
-        #                z = e_TC*z
-            
-#            print "2 D_int_x", D_int_x.T
-#            print "2 D_int2_x", D_int2_x.T
-            
-#            Minv_JT_D = JMinv.T*self.D
+                n = self.A.shape[0]
+                C = matlib.zeros((n+1, n+1))
+                C[0    :n,     0:n]       = self.A
+                C[0    :n,     n]         = self.a
+                z = matlib.zeros((n+1,1))
+                z[:n,0] = x0
+                z[-1,0] = 1.0
+                e_TC = expm(dt/self.ndt_force*C)
+                for i in range(self.ndt_force):
+                    self.f_log[:,i] = K_p0 + self.D * z[:n,0]
+                    z = e_TC*z
+                        
             v_mean = self.v + 0.5*dt*dv_bar + JMinv.T*D_int2_x/dt
             dv_mean = dv_bar + JMinv.T*D_int_x/dt
             self.v += dt*dv_mean
