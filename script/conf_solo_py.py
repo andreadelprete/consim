@@ -17,7 +17,7 @@ LINE_WIDTH = 60
 mu = 0.3                            # friction coefficient
 fMin = 1.0                          # minimum normal force
 fMax = 1000.0                       # maximum normal force
-contact_frames = ['BL_contact', 'BR_contact', 'FL_contact', 'FR_contact']
+contact_frames = ['HL_FOOT', 'HR_FOOT', 'FL_FOOT', 'FR_FOOT']
 contact_normal = np.matrix([0., 0., 1.]).T   # direction of the normal to the contact surface
 K = 1e5*np.asmatrix(np.diagflat([1., 1., 1.]))
 B = 3e2*np.asmatrix(np.diagflat([1., 1., 1.]))
@@ -37,17 +37,13 @@ T = 2.0
 amp        = np.matrix([0.0, 0.02, 0.0]).T
 two_pi_f   = 2*np.pi*np.matrix([0.0, .6, 0.0]).T
 
-#filename = str(os.path.dirname(os.path.abspath(__file__)))
-#path = filename + '/../models'
-path = '/home/student/devel/src/tsid/models'
-urdf = path + '/quadruped/urdf/quadruped.urdf'
 q0 = np.matrix([[0., 0., 0.223, 0., 0., 0., 1., 
                  -0.8,  1.6, -0.8, 1.6, 
                  -0.8,  1.6, -0.8, 1.6]]).T
 
 use_viewer = 1
-CAMERA_TRANSFORM = [2.0044965744018555, 0.9386290907859802, 0.9415794014930725, 
-                    0.3012915551662445, 0.49565795063972473, 0.6749107837677002, 0.45611628890037537]
+CAMERA_TRANSFORM = [1.0910934209823608, -1.4611519575119019, 0.9074661731719971, 
+                    0.5040678381919861, 0.17712827026844025, 0.24428671598434448, 0.8092374205589294]
 
 SPHERE_RADIUS = 0.03
 REF_SPHERE_RADIUS = 0.03

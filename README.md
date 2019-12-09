@@ -3,16 +3,25 @@
 CONSIM is C++ library for simulation of rigid multi-body dynamics with contacts, based on [Pinocchio](https://github.com/stack-of-tasks/pinocchio).
 
 ## Dependencies
+For the cpp code:
 * boost (unit_test_framework)
 * eigen3
 * [pinocchio](https://github.com/stack-of-tasks/pinocchio)
 
+For the python code:
+* [gepetto-viewer-corba](https://github.com/Gepetto/gepetto-viewer-corba)
+* [example-robot-data](https://github.com/Gepetto/example-robot-data)
+* [tsid](https://github.com/stack-of-tasks/tsid)
+    
+## Installation
+First you need to install all dependencies.
 To install eigen3 on Ubuntu you can use apt-get:
   `sudo apt-get install libeigen3-dev`
 
 To install [pinocchio](https://github.com/stack-of-tasks/pinocchio) follow the instruction on its website.
 
-## Installation
+To install example-robot-data:
+   `sudo apt install robotpkg-py27-example-robot-data`
 
     cd $DEVEL/openrobots/src/
     git clone --recursive git@github.com:andreadelprete/consim.git
@@ -35,5 +44,9 @@ or, on Ubuntu, you can use apt-get:
      
 For testing the python bindings, you can run the unit test scripts in the `script` folder, for instance:
 
-    ipython script/test_consim.py
-    
+    ipython script/test_solo_cpp_sim.py
+
+To test the python version of the simulator (with matrix exponential) you can run:
+
+    python scripts/test_exp_integrator_with_quadruped.py
+        

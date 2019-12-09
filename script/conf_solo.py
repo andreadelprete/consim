@@ -15,8 +15,9 @@ LINE_WIDTH = 60
 #dt = 0.002                      # controller time step
 
 mu = 0.3                            # friction coefficient
-contact_frames = ['BL_contact', 'BR_contact', 'FL_contact', 'FR_contact']
-contact_frames += ['BL_upperleg', 'BL_shank', 'BR_upperleg', 'BR_shank', 'FL_upperleg', 'FL_shank', 'FR_upperleg', 'FR_shank']
+contact_frames = ['HL_FOOT', 'HR_FOOT', 'FL_FOOT', 'FR_FOOT']
+contact_frames += ['FL_UPPER_LEG', 'FL_LOWER_LEG', 'FR_UPPER_LEG', 'FR_LOWER_LEG', 
+                   'HL_UPPER_LEG', 'HL_LOWER_LEG', 'HR_UPPER_LEG', 'HR_LOWER_LEG']
 #contact_normal = np.matrix([0., 0., 1.]).T   # direction of the normal to the contact surface
 K = 1e5*np.asmatrix(np.diagflat([1., 1., 1.]))
 B = 3e2*np.asmatrix(np.diagflat([1., 1., 1.]))
@@ -26,12 +27,12 @@ DISPLAY_T = 0.01                 # update robot configuration in viwewer every D
 
 #filename = str(os.path.dirname(os.path.abspath(__file__)))
 #path = filename + '/../models'
-path = '/home/student/devel/src/tsid/models'
-urdf = path + '/quadruped/urdf/quadruped.urdf'
-q0 = np.matrix([[0., 0., 0.223, 0., 0., 0., 1., 
+#path = '/home/student/devel/src/tsid/models'
+#urdf = path + '/quadruped/urdf/quadruped.urdf'
+q0 = np.array([0., 0., 0.223, 0., 0., 0., 1., 
                  -0.8,  1.6, -0.8, 1.6, 
-                 -0.8,  1.6, -0.8, 1.6]]).T
+                 -0.8,  1.6, -0.8, 1.6]).T
 
 use_viewer = 1
-CAMERA_TRANSFORM = [2.0044965744018555, 0.9386290907859802, 0.9415794014930725, 
-                    0.3012915551662445, 0.49565795063972473, 0.6749107837677002, 0.45611628890037537]
+CAMERA_TRANSFORM = [1.0910934209823608, -1.4611519575119019, 0.9074661731719971, 
+                    0.5040678381919861, 0.17712827026844025, 0.24428671598434448, 0.8092374205589294]

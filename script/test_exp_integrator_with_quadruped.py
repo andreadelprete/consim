@@ -1,13 +1,17 @@
 from robot_simulator_exponential_integrator import RobotSimulator
 from tsid_quadruped import TsidQuadruped
 import conf_solo_py as conf
+from example_robot_data.robots_loader import loadSolo
 import utils.plot_utils as plut
 
-import pinocchio as se3
 import numpy as np
 import numpy.matlib as matlib
 from numpy import nan
 from numpy.linalg import norm as norm
+
+import pinocchio as se3
+se3.setNumpyType(np.matrix)
+
 import time
 import matplotlib.pyplot as plt
 
@@ -33,16 +37,11 @@ simu_params_exp_int_sparse = {
     'ndt': 1,
     'sparse': 1
     }
-SIMU_PARAMS = [simu_params_exp_int]
-#SIMU_PARAMS = [simu_params_exp_int]
-#USE_EXPONENTIAL_INTEGRATOR = [0, 1]
+SIMU_PARAMS = [simu_params_standard, simu_params_exp_int]
 ASSUME_A_INVERTIBLE = 0
 USE_CONTROLLER = 1
-#active_contact_frames = ['BR_contact', 'FL_contact']
-active_contact_frames = ['BL_contact', 'BR_contact', 'FL_contact', 'FR_contact']
 ndt_force = simu_params_standard['ndt']
 dt = 0.001                      # controller time step
-#ndt = 1                       # number of simulation steps per controller step
 T = 1
 
 offset     = np.matrix([0.0, -0.0, 0.0]).T
@@ -53,15 +52,17 @@ N_SIMULATION = int(T/dt)        # number of time steps simulated
 PRINT_N = int(conf.PRINT_T/dt)
 DISPLAY_N = int(conf.DISPLAY_T/dt)
 
-simu = RobotSimulator(conf, se3.JointModelFreeFlyer())
+solo = loadSolo()
+
+simu = RobotSimulator(conf, solo, se3.JointModelFreeFlyer())
 simu.assume_A_invertible = ASSUME_A_INVERTIBLE
 simu.ndt_force =  ndt_force
 q0,v0 = np.copy(simu.q), np.copy(simu.v)
 
-for name in active_contact_frames:
+for name in conf.contact_frames:
     simu.add_contact(name, conf.contact_normal, conf.K, conf.B)
 
-invdyn = TsidQuadruped(conf, q0)
+invdyn = TsidQuadruped(conf, solo, q0, viewer=False)
 robot = invdyn.robot
 
 com_pos = matlib.empty((3, N_SIMULATION))*nan
@@ -80,8 +81,8 @@ def run_simulation(q, v, simu_params):
     simu.init(q0, v0)
     t = 0.0
     time_start = time.time()
-    f = np.zeros((3*len(active_contact_frames), N_SIMULATION))
-    f_log = np.zeros((3*len(active_contact_frames), N_SIMULATION*ndt_force))
+    f = np.zeros((3*len(conf.contact_frames), N_SIMULATION))
+    f_log = np.zeros((3*len(conf.contact_frames), N_SIMULATION*ndt_force))
     for i in range(0, N_SIMULATION):
         
         if(USE_CONTROLLER):
@@ -175,7 +176,7 @@ for (name,f) in forces.iteritems():
 #    ax = ax.reshape(4)
 #    for i in range(4):
 #        ax[i].plot(tt, f[2+3*i,:].squeeze(), '--',   label=name+' '+str(i))
-##        ax[i].plot(tt_log, f_log[2+3*i,:].squeeze(), '--',   label=name+' '+str(i))
+#        ax[i].plot(tt_log, f_log[2+3*i,:].squeeze(), '--',   label=name+' '+str(i))
 #        ax[i].set_xlabel('Time [s]')
 #        ax[i].set_ylabel('Force Z [N]')
 #    leg = ax[0].legend()
@@ -189,7 +190,7 @@ for (name,f) in forces.iteritems():
 #    ax[i].set_ylabel('CoM [m]')
 #    leg = ax[i].legend()
 #    leg.get_frame().set_alpha(0.5)
-
+#
 #(f, ax) = plut.create_empty_figure(3,1)
 #for i in range(3):
 #    ax[i].plot(tt, com_vel[i,:].A1, label='CoM Vel '+str(i))

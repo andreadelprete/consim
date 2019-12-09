@@ -16,22 +16,35 @@ class TsidQuadruped:
         - Regularization task for contact forces
     '''
     
-    def __init__(self, conf, q0=None, viewer=True):
+    def __init__(self, conf, robot, q0=None, viewer=True):
         self.conf = conf
-        vector = se3.StdVec_StdString()
-        vector.extend(item for item in conf.path)
-        self.robot = tsid.RobotWrapper(conf.urdf, vector, se3.JointModelFreeFlyer(), False)
-        robot = self.robot
-        self.model = robot.model()
+        self.robot = tsid.RobotWrapper(robot.model, False)
         
         if q0 is None:
-            tmp_robot = se3.RobotWrapper.BuildFromURDF(conf.urdf, [conf.path, ], se3.JointModelFreeFlyer())
-            q = tmp_robot.model.neutralConfiguration
+            q = robot.model.neutralConfiguration
         else :
             q = np.copy(q0)
 #        q = se3.getNeutralConfiguration(robot.model(), conf.srdf, False)
 #        q = robot.model().referenceConfigurations["half_sitting"]
         v = np.matrix(np.zeros(robot.nv)).T
+                
+        # for gepetto viewer
+        if(viewer):
+            self.robot_display = robot #se3.RobotWrapper.BuildFromURDF(conf.urdf, [conf.path, ], se3.JointModelFreeFlyer())
+            l = commands.getstatusoutput("ps aux |grep 'gepetto-gui'|grep -v 'grep'|wc -l")
+            if int(l[1]) == 0:
+                os.system('gepetto-gui &')
+            time.sleep(1)
+            gepetto.corbaserver.Client()
+            self.robot_display.initViewer(loadModel=True)
+            self.robot_display.displayCollisions(False)
+            self.robot_display.displayVisuals(True)
+            self.robot_display.display(q)
+            self.gui = self.robot_display.viewer.gui
+            self.gui.setCameraTransform(0, conf.CAMERA_TRANSFORM)
+            
+        robot = self.robot
+        self.model = robot.model()
         
         assert [robot.model().existFrame(name) for name in conf.contact_frames]
         
@@ -105,20 +118,6 @@ class TsidQuadruped:
         self.contacts_active = {}
         for name in conf.contact_frames: self.contacts_active[name] = True
         
-        # for gepetto viewer
-        if(viewer):
-            self.robot_display = se3.RobotWrapper.BuildFromURDF(conf.urdf, [conf.path, ], se3.JointModelFreeFlyer())
-            l = commands.getstatusoutput("ps aux |grep 'gepetto-gui'|grep -v 'grep'|wc -l")
-            if int(l[1]) == 0:
-                os.system('gepetto-gui &')
-            time.sleep(1)
-            gepetto.corbaserver.Client()
-            self.robot_display.initDisplay(loadModel=True)
-            self.robot_display.displayCollisions(False)
-            self.robot_display.displayVisuals(True)
-            self.robot_display.display(q)
-            self.gui = self.robot_display.viewer.gui
-            self.gui.setCameraTransform(0, conf.CAMERA_TRANSFORM)
         
     def integrate_dv(self, q, v, dv, dt):
         v_mean = v + 0.5*dt*dv

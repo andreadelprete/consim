@@ -75,10 +75,10 @@ class RobotSimulator:
     PRINT_N = 500                   # print every PRINT_N time steps
     DISPLAY_N = 10                  # update robot configuration in viwewer every DISPLAY_N time steps
 
-    def __init__(self, conf, root_joint=None):
+    def __init__(self, conf, robot, root_joint=None):
         self.conf = conf
         self.assume_A_invertible = False
-        self.robot = se3.RobotWrapper.BuildFromURDF(conf.urdf, [conf.path, ], se3.JointModelFreeFlyer())
+        self.robot = robot #se3.RobotWrapper.BuildFromURDF(conf.urdf, [conf.path, ], se3.JointModelFreeFlyer())
         self.model = self.robot.model
         self.data = self.robot.data
         self.t = 0.0
@@ -96,18 +96,20 @@ class RobotSimulator:
         
         # for gepetto viewer
         if(conf.use_viewer):
-            self.robot_display = se3.RobotWrapper.BuildFromURDF(conf.urdf, [conf.path, ], se3.JointModelFreeFlyer())
+            self.robot_display = robot #se3.RobotWrapper.BuildFromURDF(conf.urdf, [conf.path, ], se3.JointModelFreeFlyer())
             l = commands.getstatusoutput("ps aux |grep 'gepetto-gui'|grep -v 'grep'|wc -l")
             if int(l[1]) == 0:
                 os.system('gepetto-gui &')
             time.sleep(1)
             gepetto.corbaserver.Client()
             self.robot_display.initViewer(loadModel=True)
+            self.robot_display.viewer.gui.createSceneWithFloor('world')
             self.robot_display.displayCollisions(False)
             self.robot_display.displayVisuals(True)
             self.robot_display.display(self.q)
             self.gui = self.robot_display.viewer.gui
             self.gui.setCameraTransform(0, conf.CAMERA_TRANSFORM)
+            self.gui.setLightingMode('world/floor', 'OFF')
 
     def init(self, q0, v0=None, reset_contact_positions=False):
         self.first_iter = True
