@@ -15,13 +15,11 @@ For the python code:
     
 ## Installation
 First you need to install all dependencies.
-To install eigen3 on Ubuntu you can use apt-get:
-  `sudo apt-get install libeigen3-dev`
+To install [pinocchio](https://github.com/stack-of-tasks/pinocchio) and the other dependencies you can follow the instruction on the associated website, or you can install them
+via apt:
+   `sudo apt install robotpkg-py27-example-robot-data robotpkg-collada-dom robotpkg-gepetto-viewer robotpkg-gepetto-viewer-corba robotpkg-hpp-fcl+doc robotpkg-osg-dae robotpkg-py27-pinocchio`
 
-To install [pinocchio](https://github.com/stack-of-tasks/pinocchio) follow the instruction on its website.
-
-To install example-robot-data:
-   `sudo apt install robotpkg-py27-example-robot-data`
+To build this library
 
     cd $DEVEL/openrobots/src/
     git clone --recursive git@github.com:andreadelprete/consim.git
