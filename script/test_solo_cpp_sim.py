@@ -12,7 +12,7 @@ import pinocchio as se3
 
 import gepetto.corbaserver
 import time
-import commands
+import subprocess
 import os
 
 #import eigenpy
@@ -55,7 +55,7 @@ sim.reset_state(q, dq, True)
 
 if(conf.use_viewer):
     robot_display = robot #se3.RobotWrapper.BuildFromURDF(conf.urdf, [conf.path, ], se3.JointModelFreeFlyer())
-    l = commands.getstatusoutput("ps aux |grep 'gepetto-gui'|grep -v 'grep'|wc -l")
+    l = subprocess.getstatusoutput("ps aux |grep 'gepetto-gui'|grep -v 'grep'|wc -l")
     if int(l[1]) == 0:
         os.system('gepetto-gui &')
     time.sleep(1)
@@ -93,7 +93,7 @@ for it in range(N):
     t1 = time.time()
     if(t1-t0<0.9*dt):
         time.sleep(dt-t1+t0)
-    
+
 print("end simulation")
 
 for cf in conf.contact_frames:

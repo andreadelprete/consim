@@ -165,7 +165,7 @@ IF(BUILD_PYTHON_INTERFACE)
   ADD_SUBDIRECTORY(bindings)
 ENDIF(BUILD_PYTHON_INTERFACE)
 # --- UNIT TESTS ---------------------------------------------------------------
-ADD_SUBDIRECTORY(unittest)
+#ADD_SUBDIRECTORY(unittest)
 
 # --- PACKAGING ----------------------------------------------------------------
 PKG_CONFIG_APPEND_LIBS(${PROJECT_NAME})
