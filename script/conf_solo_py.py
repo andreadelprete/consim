@@ -38,6 +38,7 @@ T = 2.0
 amp = np.matrix([0.0, 0.02, 0.0]).T
 two_pi_f = 2*np.pi*np.matrix([0.0, .6, 0.0]).T
 
+# Starting resting joint position
 q0 = np.matrix([[0., 0., 0.223, 0., 0., 0., 1.,
                  -0.8,  1.6, -0.8, 1.6,
                  -0.8,  1.6, -0.8, 1.6]]).T

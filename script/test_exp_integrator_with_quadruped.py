@@ -101,10 +101,10 @@ def run_simulation(q, v, simu_params):
                 break
 
             u = invdyn.formulation.getActuatorForces(sol)
-#            dv_des = invdyn.formulation.getAccelerations(sol)
+            #            dv_des = invdyn.formulation.getAccelerations(sol)
         else:
             invdyn.formulation.computeProblemData(t, q, v)
-    #        robot.computeAllTerms(invdyn.data(), q, v)
+            #        robot.computeAllTerms(invdyn.data(), q, v)
             u = -0.01*conf.kp_posture*v[6:, 0]
 
         q, v, f_i = simu.simulate(u, dt, simu_params['ndt'],

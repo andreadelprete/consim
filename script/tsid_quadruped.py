@@ -59,7 +59,7 @@ class TsidQuadruped:
         for i, name in enumerate(conf.contact_frames):
             contacts[i] = tsid.ContactPoint(name, robot, name, conf.contact_normal, conf.mu, conf.fMin, conf.fMax)
             contacts[i].setKp(conf.kp_contact * matlib.ones(3).T)
-            contacts[i].setKd(2.0 * np.sqrt(conf.kp_contact) * matl ib.ones(3).T)
+            contacts[i].setKd(2.0 * np.sqrt(conf.kp_contact) * matlib.ones(3).T)
             self.contact_ids[name] = robot.model().getFrameId(name)
             H_ref = robot.framePosition(data, robot.model().getFrameId(name))
             contacts[i].setReference(H_ref)

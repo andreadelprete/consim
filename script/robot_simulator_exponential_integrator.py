@@ -29,18 +29,18 @@ class Contact:
     def reset_contact_position(self):
         # Initial (0-load) position of the spring
         self.p0 = self.data.oMf[self.frame_id].translation.copy()
-#        print 'Contact %s p0='%(self.frame_name), self.p0.T
+        #        print 'Contact %s p0='%(self.frame_name), self.p0.T
         self.in_contact = True
 
     def compute_force(self):
         M = self.data.oMf[self.frame_id]
         self.p = M.translation
         delta_p = self.p0 - self.p
-#        print 'Contact %s p='%(self.frame_name), M.translation.T
-#        print 'Contact %s delta_p='%(self.frame_name), delta_p.T
+        #        print 'Contact %s p='%(self.frame_name), M.translation.T
+        #        print 'Contact %s delta_p='%(self.frame_name), delta_p.T
 
         R = se3.SE3(M.rotation, 0*M.translation)
-#        v_local = self.model.frames[self.frame_id].placement.inverse()*self.data.v[self.joint_id]
+        #        v_local = self.model.frames[self.frame_id].placement.inverse()*self.data.v[self.joint_id]
         v_local = se3.getFrameVelocity(self.model, self.data, self.frame_id)
         v_world = (R.act(v_local)).linear
 
@@ -49,22 +49,22 @@ class Contact:
         dJv_local.linear += np.cross(v_local.angular, v_local.linear, axis=0)
         dJv_world = (R.act(dJv_local)).linear
 
-#        if(delta_p.T * self.normal < -1e-6):
-#            self.f = zero(3)
-#            self.v = zero(3)
-#            self.dJv = zero(3)
-# print 'Contact %s delta_p*Normal='%(self.frame_name), delta_p.T*self.normal
-#            if(self.in_contact):
-#                self.in_contact = False
-#                print "\nINFO: contact %s broken!"%(self.frame_name), delta_p.T, self.normal.T
-#        else:
-#            if(not self.in_contact):
-#                self.in_contact = True
-#                print "\nINFO: contact %s made!"%(self.frame_name)
-        self.f = self.K*delta_p - self.B*v_world
+        #        if(delta_p.T * self.normal < -1e-6):
+        #            self.lanbda = zero(3)
+        #            self.v = zero(3)
+        #            self.dJv = zero(3)
+        # print 'Contact %s delta_p*Normal='%(self.frame_name), delta_p.T*self.normal
+        #            if(self.in_contact):
+        #                self.in_contact = False
+        #                print "\nINFO: contact %s broken!"%(self.frame_name), delta_p.T, self.normal.T
+        #        else:
+        #            if(not self.in_contact):
+        #                self.in_contact = True
+        #                print "\nINFO: contact %s made!"%(self.frame_name)
+        self.lanbda = self.K*delta_p - self.B*v_world
         self.v = v_world
         self.dJv = dJv_world
-        return self.f
+        return self.lanbda
 
     def getJacobianWorldFrame(self):
         #        se3.framesForwardKinematics(self.model,self.data,q)
@@ -80,6 +80,7 @@ class RobotSimulator:
     # update robot configuration in viwewer every DISPLAY_N time steps
     DISPLAY_N = 10
 
+    # Class constructor
     def __init__(self, conf, robot, root_joint=None):
         self.conf = conf
         self.assume_A_invertible = False
@@ -89,18 +90,19 @@ class RobotSimulator:
         self.data = self.robot.data
         self.t = 0.0
         self.ndt_force = 1  # number of contact force samples for each time step
-        self.f = zero(0)
+        self.lanbda = zero(0)  # Contact forces, should be lambda but it's a Python keyword
         self.f_log = matlib.zeros((self.ndt_force, 0))
-        nv = self.model.nv
-        if root_joint is None:
+        nv = self.model.nv  # Dimension of joint velocities vector
+        if root_joint is None:  # Basically if we have a floating base
             na = nv
         else:
-            na = nv-6
+            na = nv-6  # Remove 6 non-actuated velocities
+        # Matrix S used as filter of vetor of inputs U
         self.S = np.hstack((matlib.zeros((na, nv-na)), matlib.eye(na, na)))
         self.contacts = []
         self.display_counter = self.DISPLAY_N
         self.init(conf.q0, None, True)
-#        self.init(self.robot.model.neutralConfiguration, None, True)
+        #        self.init(self.robot.model.neutralConfiguration, None, True)
 
         # for gepetto viewer
         if(conf.use_viewer):
@@ -120,6 +122,7 @@ class RobotSimulator:
             self.gui.setCameraTransform(0, conf.CAMERA_TRANSFORM)
             self.gui.setLightingMode('world/floor', 'OFF')
 
+    # Re-initialize the simulator
     def init(self, q0, v0=None, reset_contact_positions=False):
         self.first_iter = True
         self.q = q0.copy()
@@ -141,12 +144,13 @@ class RobotSimulator:
 
         self.compute_forces(compute_data=True)
 
+    # Adds a contact, resets all quantities
     def add_contact(self, frame_name, normal, K, B):
         c = Contact(self.model, self.data, frame_name, normal, K, B)
         self.contacts += [c]
         self.nc = len(self.contacts)
         self.nk = 3*self.nc
-        self.f = zero(self.nk)
+        self.lanbda = zero(self.nk)
         self.f_log = matlib.zeros((self.nk, self.ndt_force))
         self.Jc = matlib.zeros((self.nk, self.model.nv))
         self.K = matlib.zeros((self.nk, self.nk))
@@ -176,21 +180,21 @@ class RobotSimulator:
 
         i = 0
         for c in self.contacts:
-            self.f[i:i+3, 0] = c.compute_force()
+            self.lanbda[i:i+3, 0] = c.compute_force()
             i += 3
 
-        return self.f
+        return self.lanbda
 
     def solve_dense_expo_system(self, U, K, B, a, x0, dt):
         n = U.shape[0]
         A = matlib.zeros((2*n, 2*n))
         A[:n, n:] = matlib.eye(n)
-#        a = zero(2*n)
+        #        a = zero(2*n)
         A[n:, :n] = -U*K
         A[n:, n:] = -U*B
-#        a[n:,0] = b
+        #        a[n:,0] = b
 
-#        print "A", A
+        #        print "A", A
         if(self.assume_A_invertible):
             int_x, int2_x = compute_double_integral_x_T(A, a, x0, dt, compute_also_integral=True)
         else:
@@ -216,7 +220,7 @@ class RobotSimulator:
             # find elements have at least 10% effect of current item derivative (compared to element itself)
             #            print "Analyze row", left[0]
             ii = np.where(U[left[0], :].A1 > 0.1)[0]
-#            print "Processing group of elements:", ii
+            #            print "Processing group of elements:", ii
 
             k = ii.shape[0]
             Ux = self.Upsilon[ii, :][:, ii]
@@ -265,7 +269,7 @@ class RobotSimulator:
             i += 3
 
         if(not use_exponential_integrator):
-            self.dv = np.linalg.solve(M, self.S.T*u - h + self.Jc.T*self.f)  # use last forces
+            self.dv = np.linalg.solve(M, self.S.T*u - h + self.Jc.T*self.lanbda)  # use last forces
             v_mean = self.v + 0.5*dt*self.dv
             self.v += self.dv*dt
             self.q = se3.integrate(self.model, self.q, v_mean*dt)
@@ -274,7 +278,7 @@ class RobotSimulator:
             dv_bar = np.linalg.solve(M, self.S.T*u - h + self.Jc.T*K_p0)
             i = 0
             for c in self.contacts:
-                self.f[i:i+3, 0] = c.compute_force()
+                self.lanbda[i:i+3, 0] = c.compute_force()
                 self.p[i:i+3, 0] = c.p
                 self.dp[i:i+3, 0] = c.v
                 self.dJv[i:i+3, 0] = c.dJv
@@ -288,38 +292,38 @@ class RobotSimulator:
 
             if(use_sparse_solver):
                 D_x, D_int_x, D_int2_x = self.solve_sparse_exp(x0, b, dt)
-#                D_x = zero(self.nk)
-#                D_int_x = zero(self.nk)
-#                D_int2_x = zero(self.nk)
-#                dx0 = self.A*x0
-#
-#                Ux = self.Upsilon[0::3,0::3]
-#                Kx = self.K[0::3, 0::3]
-#                Bx = self.B[0::3, 0::3]
-#                ax = dx0[0::3, 0]
-#                ax -= np.vstack((self.dp[0::3,0], -Ux*Kx*self.p[0::3,0] -Ux*Bx*self.dp[0::3,0]))
-#                ax[4:,0] += b[0::3, 0]
-#                x0x = np.vstack((self.p[0::3,0], self.dp[0::3,0]))
-#                x, int_x, int2_x = self.solve_dense_expo_system(Ux, Kx, Bx, ax, x0x, dt)
-#                D_x[0::3,0] = np.hstack((-Kx, -Bx)) * x
-#                D_int_x[0::3,0] = np.hstack((-Kx, -Bx)) * int_x
-#                D_int2_x[0::3,0] = np.hstack((-Kx, -Bx)) * int2_x
-#
-#                for i in range(4):
-#                    ii = 3*i+1
-#                    Ux = self.Upsilon[ii:ii+2,ii:ii+2]
-#                    Kx = self.K[ii:ii+2, ii:ii+2]
-#                    Bx = self.B[ii:ii+2, ii:ii+2]
-#                    ax = zero(4)
-#                    ax[:2,0] = dx0[ii:ii+2, 0]
-#                    ax[2:,0] = dx0[self.nk+ii:self.nk+ii+2, 0]
-#                    ax -= np.vstack((self.dp[ii:ii+2,0], -Ux*Kx*self.p[ii:ii+2,0] -Ux*Bx*self.dp[ii:ii+2,0]))
-#                    ax[2:,0] += b[ii:ii+2, 0]
-#                    x0x = np.vstack((self.p[ii:ii+2,0], self.dp[ii:ii+2,0]))
-#                    x, int_x, int2_x = self.solve_dense_expo_system(Ux, Kx, Bx, ax, x0x, dt)
-#                    D_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) * x
-#                    D_int_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) * int_x
-#                    D_int2_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) * int2_x
+            #                D_x = zero(self.nk)
+            #                D_int_x = zero(self.nk)
+            #                D_int2_x = zero(self.nk)
+            #                dx0 = self.A*x0
+            #
+            #                Ux = self.Upsilon[0::3,0::3]
+            #                Kx = self.K[0::3, 0::3]
+            #                Bx = self.B[0::3, 0::3]
+            #                ax = dx0[0::3, 0]
+            #                ax -= np.vstack((self.dp[0::3,0], -Ux*Kx*self.p[0::3,0] -Ux*Bx*self.dp[0::3,0]))
+            #                ax[4:,0] += b[0::3, 0]
+            #                x0x = np.vstack((self.p[0::3,0], self.dp[0::3,0]))
+            #                x, int_x, int2_x = self.solve_dense_expo_system(Ux, Kx, Bx, ax, x0x, dt)
+            #                D_x[0::3,0] = np.hstack((-Kx, -Bx)) * x
+            #                D_int_x[0::3,0] = np.hstack((-Kx, -Bx)) * int_x
+            #                D_int2_x[0::3,0] = np.hstack((-Kx, -Bx)) * int2_x
+            #
+            #                for i in range(4):
+            #                    ii = 3*i+1
+            #                    Ux = self.Upsilon[ii:ii+2,ii:ii+2]
+            #                    Kx = self.K[ii:ii+2, ii:ii+2]
+            #                    Bx = self.B[ii:ii+2, ii:ii+2]
+            #                    ax = zero(4)
+            #                    ax[:2,0] = dx0[ii:ii+2, 0]
+            #                    ax[2:,0] = dx0[self.nk+ii:self.nk+ii+2, 0]
+            #                    ax -= np.vstack((self.dp[ii:ii+2,0], -Ux*Kx*self.p[ii:ii+2,0] -Ux*Bx*self.dp[ii:ii+2,0]))
+            #                    ax[2:,0] += b[ii:ii+2, 0]
+            #                    x0x = np.vstack((self.p[ii:ii+2,0], self.dp[ii:ii+2,0]))
+            #                    x, int_x, int2_x = self.solve_dense_expo_system(Ux, Kx, Bx, ax, x0x, dt)
+            #                    D_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) * x
+            #                    D_int_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) * int_x
+            #                    D_int2_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) * int2_x
 
             else:
                 self.a[self.nk:, 0] = b
@@ -330,7 +334,7 @@ class RobotSimulator:
                     int_x = compute_integral_x_T(
                         self.A, self.a, x0, dt, invertible_A=False)
                     int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt, invertible_A=False)
-    #                x, int_x, int2_x = compute_x_T_and_two_integrals(self.A, self.a, x0, dt)
+                    #                x, int_x, int2_x = compute_x_T_and_two_integrals(self.A, self.a, x0, dt)
 
                 D_int_x = self.D * int_x
                 D_int2_x = self.D * int2_x
@@ -363,11 +367,11 @@ class RobotSimulator:
 
     def simulate(self, u, dt=0.001, ndt=1, use_exponential_integrator=True, use_sparse_solver=True):
         ''' Perform ndt steps, each lasting dt/ndt seconds '''
-#        time_start = time.time()
+        #        time_start = time.time()
 
         for i in range(ndt):
             if(not use_exponential_integrator):
-                self.f_log[:, i] = self.f
+                self.f_log[:, i] = self.lanbda
             self.q, self.v = self.step(u, dt/ndt, use_exponential_integrator, use_sparse_solver)
 
         if(self.conf.use_viewer):
@@ -376,7 +380,7 @@ class RobotSimulator:
                 self.robot_display.display(self.q)
                 self.display_counter = self.DISPLAY_N
 
-#        time_spent = time.time() - time_start
-#        if(time_spent < dt): time.sleep(dt-time_spent)
+        #        time_spent = time.time() - time_start
+        #        if(time_spent < dt): time.sleep(dt-time_spent)
 
-        return self.q, self.v, self.f
+        return self.q, self.v, self.lanbda
