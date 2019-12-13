@@ -91,15 +91,13 @@ def run_simulation(q, v, simu_params):
         if(USE_CONTROLLER):
             sampleCom.pos(offset + np.multiply(amp, matlib.sin(two_pi_f*t)))
             sampleCom.vel(np.multiply(two_pi_f_amp, matlib.cos(two_pi_f*t)))
-            sampleCom.acc(np.multiply(
-                two_pi_f_squared_amp, -matlib.sin(two_pi_f*t)))
+            sampleCom.acc(np.multiply(two_pi_f_squared_amp, -matlib.sin(two_pi_f*t)))
             invdyn.comTask.setReference(sampleCom)
 
             HQPData = invdyn.formulation.computeProblemData(t, q, v)
             sol = invdyn.solver.solve(HQPData)
             if(sol.status != 0):
-                print("[%d] QP problem could not be solved! Error code:" %
-                      (i), sol.status)
+                print("[%d] QP problem could not be solved! Error code:" % (i), sol.status)
                 break
 
             u = invdyn.formulation.getActuatorForces(sol)
@@ -132,12 +130,11 @@ def run_simulation(q, v, simu_params):
                 print("\tDesired normal forces: ")
                 for contact in invdyn.contacts:
                     if invdyn.formulation.checkContact(contact.name, sol):
-                        f_des = invdyn.formulation.getContactForce(
-                            contact.name, sol)
+                        f_des = invdyn.formulation.getContactForce(contact.name, sol)
                         print("%4.1f" % (contact.getNormalForce(f_des)))
 
-                print("\n\ttracking err %s: %.3f" % (invdyn.comTask.name.ljust(
-                    20, '.'),       norm(invdyn.comTask.position_error, 2)))
+                print("\n\ttracking err %s: %.3f" % (invdyn.comTask.name.ljust(20, '.'),
+                                                     norm(invdyn.comTask.position_error, 2)))
                 print("\t||v||: %.3f\t ||dv||: %.3f" % (norm(v, 2), norm(dv)))
 
         t += dt

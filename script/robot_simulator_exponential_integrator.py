@@ -45,8 +45,7 @@ class Contact:
         v_world = (R.act(v_local)).linear
 
         # Doubt: should I use classic or spatial acceleration here?!
-        dJv_local = se3.getFrameAcceleration(
-            self.model, self.data, self.frame_id)
+        dJv_local = se3.getFrameAcceleration(self.model, self.data, self.frame_id)
         dJv_local.linear += np.cross(v_local.angular, v_local.linear, axis=0)
         dJv_world = (R.act(dJv_local)).linear
 
@@ -71,8 +70,7 @@ class Contact:
         #        se3.framesForwardKinematics(self.model,self.data,q)
         M = self.data.oMf[self.frame_id]
         R = se3.SE3(M.rotation, 0*M.translation)
-        J_local = se3.getFrameJacobian(
-            self.model, self.data, self.frame_id, se3.ReferenceFrame.LOCAL)
+        J_local = se3.getFrameJacobian(self.model, self.data, self.frame_id, se3.ReferenceFrame.LOCAL)
         self.J = (R.action * J_local)[:3, :]
         return self.J
 
@@ -108,8 +106,7 @@ class RobotSimulator:
         if(conf.use_viewer):
             # se3.RobotWrapper.BuildFromURDF(conf.urdf, [conf.path, ], se3.JointModelFreeFlyer())
             self.robot_display = robot
-            prompt = subprocess.getstatusoutput(
-                "ps aux |grep 'gepetto-gui'|grep -v 'grep'|wc -l")
+            prompt = subprocess.getstatusoutput("ps aux |grep 'gepetto-gui'|grep -v 'grep'|wc -l")
             if int(prompt[1]) == 0:
                 os.system('gepetto-gui &')
             time.sleep(1)
@@ -195,13 +192,11 @@ class RobotSimulator:
 
 #        print "A", A
         if(self.assume_A_invertible):
-            int_x, int2_x = compute_double_integral_x_T(A, a, x0, dt,
-                                                        compute_also_integral=True)
+            int_x, int2_x = compute_double_integral_x_T(A, a, x0, dt, compute_also_integral=True)
         else:
             x = compute_x_T(A, a, x0, dt, invertible_A=False)
             int_x = compute_integral_x_T(A, a, x0, dt, invertible_A=False)
-            int2_x = compute_double_integral_x_T(
-                A, a, x0, dt, invertible_A=False)
+            int2_x = compute_double_integral_x_T(A, a, x0, dt, invertible_A=False)
         return x, int_x, int2_x
 
     def solve_sparse_exp(self, x0, b, dt):
@@ -230,12 +225,10 @@ class RobotSimulator:
             ax = zero(2*k)
             ax[:k] = dx0[ii]
             ax[k:] = dx0[self.nk+ii]
-            ax -= np.vstack((self.dp[ii], -Ux*Kx *
-                             self.p[ii] - Ux*Bx*self.dp[ii]))
+            ax -= np.vstack((self.dp[ii], -Ux*Kx * self.p[ii] - Ux*Bx*self.dp[ii]))
             ax[k:] += b[ii]
             x0x = np.vstack((self.p[ii], self.dp[ii]))
-            x, int_x, int2_x = self.solve_dense_expo_system(
-                Ux, Kx, Bx, ax, x0x, dt)
+            x, int_x, int2_x = self.solve_dense_expo_system(Ux, Kx, Bx, ax, x0x, dt)
             Dx = np.hstack((-Kx, -Bx))
             D_x[ii] = Dx * x
             D_int_x[ii] = Dx * int_x
@@ -272,8 +265,7 @@ class RobotSimulator:
             i += 3
 
         if(not use_exponential_integrator):
-            self.dv = np.linalg.solve(
-                M, self.S.T*u - h + self.Jc.T*self.f)  # use last forces
+            self.dv = np.linalg.solve(M, self.S.T*u - h + self.Jc.T*self.f)  # use last forces
             v_mean = self.v + 0.5*dt*self.dv
             self.v += self.dv*dt
             self.q = se3.integrate(self.model, self.q, v_mean*dt)
@@ -333,13 +325,11 @@ class RobotSimulator:
                 self.a[self.nk:, 0] = b
 
                 if(self.assume_A_invertible):
-                    int_x, int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt,
-                                                                compute_also_integral=True)
+                    int_x, int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt, compute_also_integral=True)
                 else:
                     int_x = compute_integral_x_T(
                         self.A, self.a, x0, dt, invertible_A=False)
-                    int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt,
-                                                         invertible_A=False)
+                    int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt, invertible_A=False)
     #                x, int_x, int2_x = compute_x_T_and_two_integrals(self.A, self.a, x0, dt)
 
                 D_int_x = self.D * int_x
@@ -371,16 +361,14 @@ class RobotSimulator:
     def reset(self):
         self.first_iter = True
 
-    def simulate(self, u, dt=0.001, ndt=1, use_exponential_integrator=True,
-                 use_sparse_solver=True):
+    def simulate(self, u, dt=0.001, ndt=1, use_exponential_integrator=True, use_sparse_solver=True):
         ''' Perform ndt steps, each lasting dt/ndt seconds '''
 #        time_start = time.time()
 
         for i in range(ndt):
             if(not use_exponential_integrator):
                 self.f_log[:, i] = self.f
-            self.q, self.v = self.step(
-                u, dt/ndt, use_exponential_integrator, use_sparse_solver)
+            self.q, self.v = self.step(u, dt/ndt, use_exponential_integrator, use_sparse_solver)
 
         if(self.conf.use_viewer):
             self.display_counter -= 1

@@ -53,11 +53,10 @@ robot.forwardKinematics(q)
 sim.reset_state(q, dq, True)
 
 if(conf.use_viewer):
-    # se3.RobotWrapper.BuildFromURDF(conf.urdf, ù
+    # se3.RobotWrapper.BuildFromURDF(conf.urdf,
     # [conf.path, ], se3.JointModelFreeFlyer())
     robot_display = robot
-    prompt = subprocess.getstatusoutput(
-        "ps aux |grep 'gepetto-gui'|grep -v 'grep'|wc -l")
+    prompt = subprocess.getstatusoutput("ps aux |grep 'gepetto-gui'|grep -v 'grep'|wc -l")
     if int(prompt[1]) == 0:
         os.system('gepetto-gui &')
     time.sleep(1)
@@ -99,7 +98,6 @@ for it in range(N):
 print("end simulation")
 
 for cf in conf.contact_frames:
-    print(
-        cf, 1e3*robot.data.oMf[robot.model.getFrameId(cf)].translation.T, 'mm')
+    print(cf, 1e3*robot.data.oMf[robot.model.getFrameId(cf)].translation.T, 'mm')
 
 consim.stop_watch_report(3)

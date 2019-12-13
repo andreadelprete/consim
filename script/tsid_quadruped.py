@@ -32,8 +32,7 @@ class TsidQuadruped:
         if(viewer):
             # se3.RobotWrapper.BuildFromURDF(conf.urdf, [conf.path, ], se3.JointModelFreeFlyer())
             self.robot_display = robot
-            prompt = subprocess.getstatusoutput(
-                "ps aux |grep 'gepetto-gui'|grep -v 'grep'|wc -l")
+            prompt = subprocess.getstatusoutput("ps aux |grep 'gepetto-gui'|grep -v 'grep'|wc -l")
             if int(prompt[1]) == 0:
                 os.system('gepetto-gui &')
             time.sleep(1)
@@ -58,11 +57,9 @@ class TsidQuadruped:
         contacts = len(conf.contact_frames)*[None]
         self.contact_ids = {}
         for i, name in enumerate(conf.contact_frames):
-            contacts[i] = tsid.ContactPoint(name, robot, name, conf.contact_normal,
-                                            conf.mu, conf.fMin, conf.fMax)
+            contacts[i] = tsid.ContactPoint(name, robot, name, conf.contact_normal, conf.mu, conf.fMin, conf.fMax)
             contacts[i].setKp(conf.kp_contact * matlib.ones(3).T)
-            contacts[i].setKd(2.0 * np.sqrt(conf.kp_contact)
-                              * matlib.ones(3).T)
+            contacts[i].setKd(2.0 * np.sqrt(conf.kp_contact) * matl ib.ones(3).T)
             self.contact_ids[name] = robot.model().getFrameId(name)
             H_ref = robot.framePosition(data, robot.model().getFrameId(name))
             contacts[i].setReference(H_ref)
@@ -84,8 +81,7 @@ class TsidQuadruped:
 
         postureTask = tsid.TaskJointPosture("task-posture", robot)
         postureTask.setKp(conf.kp_posture * matlib.ones(robot.nv-6).T)
-        postureTask.setKd(2.0 * np.sqrt(conf.kp_posture)
-                          * matlib.ones(robot.nv-6).T)
+        postureTask.setKd(2.0 * np.sqrt(conf.kp_posture) * matlib.ones(robot.nv-6).T)
         formulation.addMotionTask(postureTask, conf.w_posture, 1, 0.0)
 
 #        self.leftFootTask = tsid.TaskSE3Equality("task-left-foot", self.robot, self.conf.lf_frame_name)
@@ -141,10 +137,8 @@ class TsidQuadruped:
 
     def add_contact(self, name, transition_time=0.0):
         #        self.formulation.removeTask(self.rightFootTask.name, 0.0)
-        H_ref = self.robot.position(
-            self.formulation.data(), self.contact_ids[name])
+        H_ref = self.robot.position(self.formulation.data(), self.contact_ids[name])
         self.contacts[name].setReference(H_ref)
-        self.formulation.addRigidContact(
-            self.contacts[name], self.conf.w_forceRef)
+        self.formulation.addRigidContact(self.contacts[name], self.conf.w_forceRef)
 
         self.contacts_active[name] = True
