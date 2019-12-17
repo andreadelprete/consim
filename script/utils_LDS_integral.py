@@ -6,7 +6,6 @@ Given x(0) and T I want to compute:
 - The integral of x(t) for t in [0, T]
 - The double integral of x(t) for t in [0, T]
 '''
-# from __future__ import print
 from __future__ import print_function
 from scipy.sparse.linalg.matfuncs import _ExpmPadeHelper, _ell, _solve_P_Q
 import numpy as np
@@ -70,8 +69,7 @@ def expm_times_v(A, v, use_exact_onenorm="auto", verbose=False):
         res = X.dot(res)
     return res
 
-
-def compute_x_T(A, a, x0, T, dt=None, invertible_A=True):
+def compute_x_T(A, a, x0, T, dt=None, invertible_A=False):
     if(dt is not None):
         N = int(T/dt)
         x = matlib.copy(x0)
@@ -99,7 +97,7 @@ def compute_x_T(A, a, x0, T, dt=None, invertible_A=True):
     return x_T
 
 
-def compute_integral_x_T(A, a, x0, T, dt=None, invertible_A=True):
+def compute_integral_x_T(A, a, x0, T, dt=None, invertible_A=False):
     if(dt is not None):
         N = int(T/dt)
         int_x = dt*x0
@@ -131,7 +129,7 @@ def compute_integral_x_T(A, a, x0, T, dt=None, invertible_A=True):
 #
 
 
-def compute_double_integral_x_T(A, a, x0, T, dt=None, compute_also_integral=False, invertible_A=True):
+def compute_double_integral_x_T(A, a, x0, T, dt=None, compute_also_integral=False, invertible_A=False):
     if(dt is not None):
         N = int(T/dt)
         int2_x = matlib.zeros_like(x0)

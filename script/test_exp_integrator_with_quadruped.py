@@ -23,7 +23,7 @@ print("".center(conf.LINE_WIDTH, '#'), '\n')
 simu_params_standard = {
     'name': 'euler',
     'use_exp_int': 0,
-    'ndt': 20,
+    'ndt': 100,
     'sparse': 0
 }
 simu_params_exp_int = {
@@ -40,10 +40,10 @@ simu_params_exp_int_sparse = {
 }
 SIMU_PARAMS = [simu_params_standard, simu_params_exp_int]
 ASSUME_A_INVERTIBLE = 0
-USE_CONTROLLER = 1
+USE_CONTROLLER = 0
 ndt_force = simu_params_standard['ndt']
-dt = 0.001                      # controller time step
-T = 1
+dt = 0.005                      # controller time step
+T = 0.5
 
 offset = np.matrix([0.0, -0.0, 0.0]).T
 amp = np.matrix([0.0, 0.0, 0.05]).T
@@ -58,7 +58,7 @@ solo = loadSolo()
 simu = RobotSimulator(conf, solo, se3.JointModelFreeFlyer())
 simu.assume_A_invertible = ASSUME_A_INVERTIBLE
 simu.ndt_force = ndt_force
-q0, v0 = np.copy(simu.q), np.copy(simu.v)
+q0, v0 = np.asmatrix(matlib.copy(simu.q)), np.asmatrix(matlib.copy(simu.v))
 
 for name in conf.contact_frames:
     simu.add_contact(name, conf.contact_normal, conf.K, conf.B)
@@ -105,7 +105,7 @@ def run_simulation(q, v, simu_params):
         else:
             invdyn.formulation.computeProblemData(t, q, v)
             #        robot.computeAllTerms(invdyn.data(), q, v)
-            u = -0.01*conf.kp_posture*v[6:, 0]
+            u = -0.03*conf.kp_posture*v[6:, 0]
 
         q, v, f_i = simu.simulate(u, dt, simu_params['ndt'],
                                   simu_params['use_exp_int'],
