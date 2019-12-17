@@ -60,7 +60,7 @@ mpl.rcParams['figure.figsize'] = 23, 18  # 12, 9 #
 def create_empty_figure(nRows=1, nCols=1, spinesPos=None, sharex=True):
     f, ax = plt.subplots(nRows, nCols, sharex=sharex)
     mngr = plt.get_current_fig_manager()
-    mngr.window.setGeometry(50, 50, 1080, 720)
+#    mngr.window.setGeometry(50, 50, 1080, 720)
 
     if(spinesPos is not None):
         if(nRows*nCols > 1):

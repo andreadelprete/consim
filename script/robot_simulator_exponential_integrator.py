@@ -231,7 +231,7 @@ class RobotSimulator:
 #            ii = np.array([left[0]])
 #            ii = np.array([left[0], left[1], left[2]])
 #            ii = np.array(left)
-            if debug: print "Select elements:", ii, "which give %.1f %% coverage"%(1e2*np.sum(U[left[0],ii]))
+            if debug: print("Select elements:", ii, "which give %.1f %% coverage"%(1e2*np.sum(U[left[0],ii])))
             
             k = ii.shape[0]
             Ux = self.Upsilon[ii, :][:, ii]
@@ -253,7 +253,7 @@ class RobotSimulator:
                 for i in ii:
                     left.remove(i)
             except:
-                print "\nU\n", U
+                print("\nU\n", U)
                 raise
 
             if len(left) == 0:
