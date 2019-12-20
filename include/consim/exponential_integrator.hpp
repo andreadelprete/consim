@@ -9,6 +9,6 @@ namespace consim{
 
         private:
             ~ExponentialIntegrator(){};
-    };
+    }; // class ExponentialIntegrator
 
 } // namespace consim

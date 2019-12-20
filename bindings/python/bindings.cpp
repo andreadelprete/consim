@@ -1,10 +1,3 @@
-/*
- * binding.cpp
- *
- *  Created on: Oct 10, 2018
- *      Author: jviereck
- */
-
 #include <pinocchio/bindings/python/multibody/data.hpp>
 #include <pinocchio/bindings/python/multibody/model.hpp>
 #include <pinocchio/fwd.hpp>
@@ -26,8 +19,7 @@ Simulator* build_simple_simulator(
     double static_friction_spring_coeff, double static_friction_damping_spring_coeff,
     double static_friction_coeff, double dynamic_friction_coeff)
 {
-  DampedSpringStaticFrictionContactModel* contact_model = new
-    DampedSpringStaticFrictionContactModel(
+  LinearPenaltyContactModel *contact_model = new LinearPenaltyContactModel(
       normal_spring_const, normal_damping_coeff, static_friction_spring_coeff,
       static_friction_damping_spring_coeff, static_friction_coeff, dynamic_friction_coeff);
 
@@ -38,26 +30,6 @@ Simulator* build_simple_simulator(
     std::cout<<"[build_simple_simulator] Data is not consistent with specified model\n";
     data = pinocchio::Data(model);
   }
-  Simulator* sim = new Simulator(dt, n_integration_steps, model, data);
-  sim->add_object(*obj);
-
-  return sim;
-}
-
-
-Simulator* build_walking_simulator(
-    float dt, int n_integration_steps, pinocchio::Model& model, pinocchio::Data& data,
-    double spring_stiffness_coeff_, double spring_damping_coeff_,
-    double static_friction_coeff_, double dynamic_friction_coeff_,
-    double maximum_penetration_, bool enable_friction_cone_)
-{
-  NonlinearSpringDamperContactModel* contact_model = new
-    NonlinearSpringDamperContactModel(
-      spring_stiffness_coeff_, spring_damping_coeff_, static_friction_coeff_,
-      dynamic_friction_coeff_, maximum_penetration_, enable_friction_cone_);
-
-  Object* obj = new FloorObject("Floor", *contact_model);
-
   Simulator* sim = new Simulator(dt, n_integration_steps, model, data);
   sim->add_object(*obj);
 
@@ -85,11 +57,7 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
     eigenpy::enableEigenPy();
 
     bp::def("build_simple_simulator", build_simple_simulator,
-            "A simple way to create a simulator with floor object and DampedSpringStaticFrictionContactModel.",
-            bp::return_value_policy<bp::manage_new_object>());
-
-    bp::def("build_walking_simulator", build_walking_simulator,
-            "A simple way to create a simulator with floor object and NonlinearSpringDamperContactModel.",
+            "A simple way to create a simulator with floor object and LinearPenaltyContactModel.",
             bp::return_value_policy<bp::manage_new_object>());
 
     bp::def("stop_watch_report", stop_watch_report,
