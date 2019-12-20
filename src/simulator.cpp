@@ -1,10 +1,3 @@
-/*
- * simulator.cpp
- *
- *  Created on: March 09, 2018
- *      Author: jvierck
- */
-
 #include <pinocchio/spatial/se3.hpp>
 #include <pinocchio/multibody/model.hpp>
 #include <pinocchio/algorithm/aba.hpp>
