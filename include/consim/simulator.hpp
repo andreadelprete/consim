@@ -13,14 +13,14 @@ class Simulator {
 public:
   Simulator(float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data);
 
-  const Contact& add_contact_point(int frame_id);
+  const ContactPoint &addContactPoint(int frame_id);
 
-  const Contact& get_contact(int index);
+  const ContactPoint &getContact(int index);
 
   /**
    * Adds an object to the simulator for contact interaction checking.
    */
-  void add_object(Object& obj);
+  void addObject(Object& obj);
 
   /**
    * Convenience method to perform a single dt timestep of the simulation. The
@@ -40,9 +40,9 @@ public:
    * If reset_contact_state is true, all contacts are set to inactive. Otherwise
    * the contact state is left untouched.
    */
-  void reset_state(const Eigen::VectorXd& q, const Eigen::VectorXd& dq, bool reset_contact_state);
+  void resetState(const Eigen::VectorXd& q, const Eigen::VectorXd& dq, bool reset_contact_state);
 
-  void set_joint_friction(const Eigen::VectorXd& joint_friction);
+  void setJointFriction(const Eigen::VectorXd& joint_friction);
 
   /**
    * TODO: The following fields should be private and there should be only
@@ -58,7 +58,7 @@ public:
 
 
 private:
-  inline void contact_linear_jacobian_(int frame_id);
+  inline void contactLinearJacobian_(int frame_id);
 
   /**
    * Checks the contact points for contacts with the objects. If there is a
@@ -67,23 +67,23 @@ private:
    *
    * \returns Returns true if a contact was detected.
    */
-  void check_contact_();
+  void checkContact_();
 
   /**
    * Usually called after detect_contact();
    *
    * Assumes the contact points are assigned to objects already etc.
    */
-  void compute_contact_forces_and_torques_(const Eigen::VectorXd& dq);
+  void computeContactForces(const Eigen::VectorXd &dq);
 
-  void compute_terms_and_contact_state_();
+  void computeContactState_();
 
   const pinocchio::Model* model_;
   pinocchio::Data* data_;
 
   double dt_;
   int n_integration_steps_;
-  std::vector<Contact*> contacts_;
+  std::vector<ContactPoint*> contacts_;
   std::vector<Object*> objects_;
   // joint friction flag and values
   Eigen::VectorXd joint_friction_;

@@ -17,7 +17,7 @@ namespace consim {
 
 class Object;
 
-struct Contact {
+struct ContactPoint {
   int frame_id;
 
   bool active;
@@ -57,8 +57,7 @@ struct Contact {
 
 class ContactModel {
 public:
-  virtual void compute_force(Contact& cp) = 0;
-
+  virtual void computeForce(ContactPoint &cp) = 0;
 };
 
 class LinearPenaltyContactModel: public ContactModel {
@@ -76,7 +75,7 @@ public:
       double static_friction_spring_coeff, double static_friction_damping_spring_coeff,
       double static_friction_coeff, double dynamic_friction_coeff);
 
-  void compute_force(Contact& cp);
+  void computeForce(ContactPoint& cp);
 
 private:
   double normal_spring_const_;

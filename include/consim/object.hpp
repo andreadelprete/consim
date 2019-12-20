@@ -8,8 +8,8 @@ class Object {
 public:
   Object(std::string name, ContactModel& contact_model);
 
-  virtual bool check_contact(Contact& cp) = 0;
-  virtual void contact_model(Contact& cp) = 0;
+  virtual bool checkContact(ContactPoint &cp) = 0;
+  virtual void contactModel(ContactPoint &cp) = 0;
 
 protected:
   std::string name_;
@@ -21,8 +21,8 @@ class FloorObject: public Object
 public:
   FloorObject(std::string name, ContactModel& contact_model): Object(name, contact_model) { };
 
-  bool check_contact(Contact& cp);
-  void contact_model(Contact& cp);
+  bool checkContact(ContactPoint &cp);
+  void contactModel(ContactPoint &cp);
 };
 
 }

@@ -6,7 +6,7 @@ namespace consim {
 Object::Object(std::string name, ContactModel& contact_model):
     name_(name), contact_model_(&contact_model) { }
 
-bool FloorObject::check_contact(Contact& cp)
+bool FloorObject::checkContact(ContactPoint &cp)
 {
   if (cp.x(2) > 0.) {
     return false;
@@ -23,7 +23,7 @@ bool FloorObject::check_contact(Contact& cp)
   return true;
 }
 
-void FloorObject::contact_model(Contact& cp)
+void FloorObject::contactModel(ContactPoint &cp)
 {
   // Compute the normal displacement and velocities.
   // TODO: Move this into a separate method (of the contact object)?
@@ -39,7 +39,7 @@ void FloorObject::contact_model(Contact& cp)
   //       shape.
   cp.viscvel = cp.tanvel;
 
-  contact_model_->compute_force(cp);
+  contact_model_->computeForce(cp);
 }
 
 }

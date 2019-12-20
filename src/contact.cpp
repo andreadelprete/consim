@@ -32,7 +32,7 @@ LinearPenaltyContactModel::LinearPenaltyContactModel(
  *
  * https://git-amd.tuebingen.mpg.de/amd-clmc/locomotion-sl/blob/master/src/SL_objects.c#L1372-1430
  */
-void LinearPenaltyContactModel::compute_force(Contact &cptr)
+void LinearPenaltyContactModel::computeForce(ContactPoint& cptr)
 {
   int i;
   double viscvel;

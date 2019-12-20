@@ -31,7 +31,7 @@ Simulator* build_simple_simulator(
     data = pinocchio::Data(model);
   }
   Simulator* sim = new Simulator(dt, n_integration_steps, model, data);
-  sim->add_object(*obj);
+  sim->addObject(*obj);
 
   return sim;
 }
@@ -64,38 +64,35 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
             "Report all the times measured by the shared stop-watch.",
             bp::return_value_policy<bp::manage_new_object>());
 
-    bp::class_<Contact>("Contact",
-    										"Contact struct")
-				.def_readwrite("active", &Contact::active)
-        .def_readwrite("frame_id", &Contact::frame_id)
-        .def_readwrite("friction_flag", &Contact::friction_flag)
-        .ADD_PROPERTY_RETURN_BY_VALUE("x", &Contact::x)
-        .ADD_PROPERTY_RETURN_BY_VALUE("v", &Contact::v)
-        .ADD_PROPERTY_RETURN_BY_VALUE("x_start", &Contact::x_start)
-        .ADD_PROPERTY_RETURN_BY_VALUE("contact_surface_normal", &Contact::contact_surface_normal)
-        .ADD_PROPERTY_RETURN_BY_VALUE("normal", &Contact::normal)
-        .ADD_PROPERTY_RETURN_BY_VALUE("normvel", &Contact::normvel)
-        .ADD_PROPERTY_RETURN_BY_VALUE("tangent", &Contact::tangent)
-        .ADD_PROPERTY_RETURN_BY_VALUE("tanvel", &Contact::tanvel)
-        .ADD_PROPERTY_RETURN_BY_VALUE("viscvel", &Contact::viscvel)
-        .ADD_PROPERTY_RETURN_BY_VALUE("f", &Contact::f)
-				;
+    bp::class_<ContactPoint>("Contact",
+                             "Contact struct")
+        .def_readwrite("active", &ContactPoint::active)
+        .def_readwrite("frame_id", &ContactPoint::frame_id)
+        .def_readwrite("friction_flag", &ContactPoint::friction_flag)
+        .ADD_PROPERTY_RETURN_BY_VALUE("x", &ContactPoint::x)
+        .ADD_PROPERTY_RETURN_BY_VALUE("v", &ContactPoint::v)
+        .ADD_PROPERTY_RETURN_BY_VALUE("x_start", &ContactPoint::x_start)
+        .ADD_PROPERTY_RETURN_BY_VALUE("contact_surface_normal", &ContactPoint::contact_surface_normal)
+        .ADD_PROPERTY_RETURN_BY_VALUE("normal", &ContactPoint::normal)
+        .ADD_PROPERTY_RETURN_BY_VALUE("normvel", &ContactPoint::normvel)
+        .ADD_PROPERTY_RETURN_BY_VALUE("tangent", &ContactPoint::tangent)
+        .ADD_PROPERTY_RETURN_BY_VALUE("tanvel", &ContactPoint::tanvel)
+        .ADD_PROPERTY_RETURN_BY_VALUE("viscvel", &ContactPoint::viscvel)
+        .ADD_PROPERTY_RETURN_BY_VALUE("f", &ContactPoint::f);
 
     bp::class_<Simulator>("Simulator",
                           "Main simulator class",
-                          bp::init<float, int, pinocchio::Model&, pinocchio::Data&>())
-        .def("add_contact_point", &Simulator::add_contact_point, return_internal_reference<>())
-        .def("get_contact", &Simulator::get_contact, return_internal_reference<>())
+                          bp::init<float, int, pinocchio::Model &, pinocchio::Data &>())
+        .def("add_contact_point", &Simulator::addContactPoint, return_internal_reference<>())
+        .def("get_contact", &Simulator::getContact, return_internal_reference<>())
         .def("step", &Simulator::step)
-        .def("add_object", &Simulator::add_object)
-        .def("reset_state", &Simulator::reset_state)
-        .def("set_joint_friction", &Simulator::set_joint_friction)
+        .def("add_object", &Simulator::addObject)
+        .def("reset_state", &Simulator::resetState)
+        .def("set_joint_friction", &Simulator::setJointFriction)
 
         .ADD_PROPERTY_READONLY_RETURN_BY_VALUE("q", &Simulator::q_)
         .ADD_PROPERTY_READONLY_RETURN_BY_VALUE("dq", &Simulator::dq_)
-        .ADD_PROPERTY_READONLY_RETURN_BY_VALUE("tau", &Simulator::tau_)
-        ;
-
+        .ADD_PROPERTY_READONLY_RETURN_BY_VALUE("tau", &Simulator::tau_);
 }
 //
 //#include <pinocchio/fwd.hpp>
