@@ -61,7 +61,7 @@ public:
 
 };
 
-class DampedSpringStaticFrictionContactModel: public ContactModel {
+class LinearPenaltyContactModel: public ContactModel {
 public:
   /**
    * contact_parms[1] = normal spring coefficient
@@ -71,11 +71,10 @@ public:
    * contact_parms[5] = static friction coefficient (friction cone)
    * contact_parms[6] = dynamic friction coefficient (proportional to normal force)
    */
-  DampedSpringStaticFrictionContactModel(
+  LinearPenaltyContactModel(
       double normal_spring_const, double normal_damping_coeff,
       double static_friction_spring_coeff, double static_friction_damping_spring_coeff,
       double static_friction_coeff, double dynamic_friction_coeff);
-
 
   void compute_force(Contact& cp);
 
@@ -88,27 +87,5 @@ private:
   double dynamic_friction_coeff_;
 };
 
-class NonlinearSpringDamperContactModel: public ContactModel{
-public:
-  /*
-  */
-  NonlinearSpringDamperContactModel(
-    double spring_stiffness_coeff, double spring_damping_coeff,
-    double static_friction_coeff, double dynamic_friction_coeff,
-    double maximum_penetration, bool enable_friction_cone);
-
-  void compute_force(Contact& cp);
-
-
-private:
-  double spring_stiffness_coeff_;
-  double spring_damping_coeff_;
-  double static_friction_coeff_;
-  double dynamic_friction_coeff_;
-  double maximum_penetration_;
-  bool enable_friction_cone_;
-  const double pi_ = std::atan(1.0)*4;
-
-};
 
 }

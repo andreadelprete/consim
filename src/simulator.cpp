@@ -80,13 +80,14 @@ inline void Simulator::contact_linear_jacobian_(int frame_id)
 //  pinocchio::Data::Matrix6x J(6, model_->nv);
   J_.setZero();
 //  pinocchio::getFrameJacobian<pinocchio::LOCAL>(*model_, *data_, frame_id, J);
-  pinocchio::getFrameJacobian(*model_, *data_, frame_id, pinocchio::LOCAL, J_);
+  pinocchio::getFrameJacobian(*model_, *data_, frame_id, pinocchio::LOCAL_WORLD_ALIGNED, J_);
 
   // Rotate the jacobian to have it aligned with the world coordinate frame.
-  Eigen::Matrix3d rotation = data_->oMf[frame_id].rotation();
-  Eigen::Vector3d translation = Eigen::Vector3d::Zero();
+  // Eigen::Matrix3d rotation = data_->oMf[frame_id].rotation();
+  // Eigen::Vector3d translation = Eigen::Vector3d::Zero();
 
-  frame_Jc_ = (pinocchio::SE3(rotation, translation).toActionMatrix() * J_).topRows(3);
+  // frame_Jc_ = (pinocchio::SE3(rotation, translation).toActionMatrix() * J_).topRows(3);
+  frame_Jc_ = J_.topRows(3);
 }
 
 void Simulator::compute_contact_forces_and_torques_(const Eigen::VectorXd& dq) {
