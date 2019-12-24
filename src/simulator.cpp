@@ -18,10 +18,10 @@
 namespace consim {
 
 Simulator::Simulator(float dt, int n_integration_steps, const pinocchio::Model &model,
-                     pinocchio::Data &data, bool expo_integrator, bool sparse_solver) : 
+                     pinocchio::Data &data, bool expo_integrator, bool sparse_solver, bool invertibleA) : 
                      dt_(dt), n_integration_steps_(n_integration_steps),
                      model_(&model), data_(&data), exponentialIntegrator_(expo_integrator),
-                     sparseSolver_(sparse_solver),
+                     sparseSolver_(sparse_solver), invertibleA_(invertibleA),
 
 {
   q_.resize(model.nq);
@@ -152,6 +152,19 @@ void Simulator::step(const Eigen::VectorXd& tau) {
     }
   } // explicit first order euler 
   else{
+    if (sparseSolver_){
+      throw std::runtime_error("Sparse Solver not implemented yet");
+    } // sparse matrix exponential 
+    else{
+      if (invertibleA_){
+        throw std::runtime_error("A cannot be invertible for now");
+
+      } // invertible A
+      else{
+
+      } // noninvertible A
+
+    } //dense matrix exponential 
 
   } // exponential integration
   getProfiler().stop("simulator::step");

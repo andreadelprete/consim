@@ -12,7 +12,7 @@ namespace consim {
 class Simulator {
 public:
   Simulator(float dt, int n_integration_steps, const pinocchio::Model &model, pinocchio::Data &data, bool expo_integrator = false, 
-  bool sparse_solver = false);
+  bool sparse_solver = false, bool invertibleA = false);
 
   const ContactPoint &addContactPoint(int frame_id);
 
@@ -84,6 +84,7 @@ private:
   // Functions to be used in exponential integrator 
   bool exponentialIntegrator_;
   bool sparseSolver_;
+  bool invertibleA_; 
   // computes dJv and stores it in cp 
   void computeJacobianDerivative(ContactPoint &cp);
 
