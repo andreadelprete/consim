@@ -17,8 +17,12 @@
 
 namespace consim {
 
-Simulator::Simulator(float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data):
-  dt_(dt), n_integration_steps_(n_integration_steps), model_(&model), data_(&data)
+Simulator::Simulator(float dt, int n_integration_steps, const pinocchio::Model &model,
+                     pinocchio::Data &data, bool expo_integrator, bool sparse_solver) : 
+                     dt_(dt), n_integration_steps_(n_integration_steps),
+                     model_(&model), data_(&data), exponentialIntegrator_(expo_integrator),
+                     sparseSolver_(sparse_solver),
+
 {
   q_.resize(model.nq);
   dq_.resize(model.nv);
@@ -122,29 +126,34 @@ void Simulator::step(const Eigen::VectorXd& tau) {
   const double sub_dt = dt_ / ((double)n_integration_steps_);
 
   assert(tau.size() == model_->nv);
+  if (!exponentialIntegrator_){
 
-  for (int i = 0; i < n_integration_steps_; i++) {
-    // TODO: Support friction models at the joints.
+    for (int i = 0; i < n_integration_steps_; i++)
+    {
+      // TODO: Support friction models at the joints.
 
-    // Add the user torque;
-    tau_ += tau;
+      // Add the user torque;
+      tau_ += tau;
 
-    // Compute the acceloration ddq.
-    getProfiler().start("pinocchio::aba");
-    pinocchio::aba(*model_, *data_, q_, dq_, tau_);
-    getProfiler().stop("pinocchio::aba");
+      // Compute the acceloration ddq.
+      getProfiler().start("pinocchio::aba");
+      pinocchio::aba(*model_, *data_, q_, dq_, tau_);
+      getProfiler().stop("pinocchio::aba");
 
-    // Integrate the system forward in time.
-    dqMean_ = dq_ + data_->ddq * .5 * sub_dt;
-    q_ = pinocchio::integrate(*model_, q_, dqMean_ * sub_dt);
-    dq_ += data_->ddq * sub_dt;
+      // Integrate the system forward in time.
+      dqMean_ = dq_ + data_->ddq * .5 * sub_dt;
+      q_ = pinocchio::integrate(*model_, q_, dqMean_ * sub_dt);
+      dq_ += data_->ddq * sub_dt;
 
+      // Compute the new data values and contact information after the integration
+      // step. This way, if this method returns, the values computed in data and
+      // on the contact state are consistent with the q, dq and ddq values.
+      computeContactState_();
+    }
+  } // explicit first order euler 
+  else{
 
-    // Compute the new data values and contact information after the integration
-    // step. This way, if this method returns, the values computed in data and
-    // on the contact state are consistent with the q, dq and ddq values.
-    computeContactState_();
-  }
+  } // exponential integration
   getProfiler().stop("simulator::step");
 }
 

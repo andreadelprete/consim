@@ -18,7 +18,7 @@ se3.setNumpyType(np.matrix)
 
 print("".center(conf.LINE_WIDTH, '#'))
 print("Test Exponential Integrator with Quadruped Robot ".center(conf.LINE_WIDTH, '#'))
-print("".center(conf.LINE_WIDTH, '#'), '\n')
+print("".center(conf.LINE_WIDTH, '#'))
 
 simu_params_standard = {
     'name': 'euler',
@@ -40,7 +40,7 @@ simu_params_exp_int_sparse = {
 }
 SIMU_PARAMS = [simu_params_standard, simu_params_exp_int]
 ASSUME_A_INVERTIBLE = 0
-USE_CONTROLLER = 0
+USE_CONTROLLER = 1
 ndt_force = simu_params_standard['ndt']
 dt = 0.005                      # controller time step
 T = 0.5

@@ -8,6 +8,7 @@ Object::Object(std::string name, ContactModel& contact_model):
 
 bool FloorObject::checkContact(ContactPoint &cp)
 {
+  // checks for penetration into the floor 
   if (cp.x(2) > 0.) {
     return false;
   }

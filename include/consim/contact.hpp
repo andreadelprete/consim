@@ -48,7 +48,8 @@ struct ContactPoint {
   Eigen::Vector3d     tanvel;                 /*!< tangential velocity vector */
   Eigen::Vector3d     viscvel;                /*!< velocity vector for viscous friction */
   Eigen::Vector3d     f;                      /*!< contact forces in world coordinates */
-
+  //TODO: Dynamic size for dJv
+  //TODO: store local and world v, and dJv also in both frames 
 };
 
 
@@ -76,6 +77,7 @@ public:
       double static_friction_coeff, double dynamic_friction_coeff);
 
   void computeForce(ContactPoint& cp);
+
 
 private:
   double normal_spring_const_;

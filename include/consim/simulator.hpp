@@ -11,7 +11,8 @@ namespace consim {
 
 class Simulator {
 public:
-  Simulator(float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data);
+  Simulator(float dt, int n_integration_steps, const pinocchio::Model &model, pinocchio::Data &data, bool expo_integrator = false, 
+  bool sparse_solver = false);
 
   const ContactPoint &addContactPoint(int frame_id);
 
@@ -77,6 +78,14 @@ private:
   void computeContactForces(const Eigen::VectorXd &dq);
 
   void computeContactState_();
+
+  
+
+  // Functions to be used in exponential integrator 
+  bool exponentialIntegrator_;
+  bool sparseSolver_;
+  // computes dJv and stores it in cp 
+  void computeJacobianDerivative(ContactPoint &cp);
 
   const pinocchio::Model* model_;
   pinocchio::Data* data_;
