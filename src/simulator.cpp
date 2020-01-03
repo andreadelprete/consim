@@ -152,6 +152,7 @@ void Simulator::step(const Eigen::VectorXd& tau) {
     }
   } // explicit first order euler 
   else{
+    // here goes common exponential integration code 
     if (sparseSolver_){
       throw std::runtime_error("Sparse Solver not implemented yet");
     } // sparse matrix exponential 
@@ -161,6 +162,7 @@ void Simulator::step(const Eigen::VectorXd& tau) {
 
       } // invertible A
       else{
+          // here goes first chunk of code 
 
       } // noninvertible A
 
@@ -215,5 +217,8 @@ void Simulator::setJointFriction(const Eigen::VectorXd& joint_friction)
   joint_friction_ = joint_friction;
 }
 
-
+void Simulator::setExponentialIntegrator(){
+  // make sure this function is explicitly called after defining ALL CONTACT POINTS
 }
+
+}  // namespace consim 

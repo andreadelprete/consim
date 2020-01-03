@@ -55,6 +55,8 @@ public:
   Eigen::VectorXd dq_;
   Eigen::VectorXd dqMean_;
   Eigen::VectorXd tau_;
+  // enable exponential integration  
+  void setExponentialIntegrator(); 
 
 
 
@@ -86,7 +88,10 @@ private:
   bool sparseSolver_;
   bool invertibleA_; 
   // computes dJv and stores it in cp 
-  void computeJacobianDerivative(ContactPoint &cp);
+  void computeJacobianDerivativeAcceleration(ContactPoint &cp);
+  void computeKp0()
+
+
 
   const pinocchio::Model* model_;
   pinocchio::Data* data_;

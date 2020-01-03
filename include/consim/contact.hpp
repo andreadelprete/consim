@@ -1,6 +1,8 @@
 #pragma once
 
 #include <Eigen/Eigen>
+#include <pinocchio/spatial/motion-dense.hpp>
+
 
 namespace consim {
 
@@ -48,8 +50,12 @@ struct ContactPoint {
   Eigen::Vector3d     tanvel;                 /*!< tangential velocity vector */
   Eigen::Vector3d     viscvel;                /*!< velocity vector for viscous friction */
   Eigen::Vector3d     f;                      /*!< contact forces in world coordinates */
-  //TODO: Dynamic size for dJv
-  //TODO: store local and world v, and dJv also in both frames 
+  
+  //TODO: store local and world v, and dJv also in both frames
+  Eigen::Vector6d v_local; 
+  Eigen::Vector3d v_world;
+  Eigen::Vector6d dJv_local;
+  Eigen::Vector3d dJv_world;
 };
 
 
@@ -86,6 +92,9 @@ private:
   double static_friction_damping_spring_coeff_;
   double static_friction_coeff_;
   double dynamic_friction_coeff_;
+  // add option for exponential integrator, resize and fill in constructor  
+  Eigen::MatrixXd matK_;
+  Eigen::MatrixXd matB_;
 };
 
 
