@@ -31,5 +31,11 @@ Eigen::VectorXd ExponentialIntegrator::computeDoubleIntegralXt(const Eigen::Matr
                                         const double &T, bool compute_integral, bool invertableA){};
 std::vector<Eigen::VectorXd> ExponentialIntegrator::computeXtAndIntegrals(const Eigen::MatrixXd &mat, const Eigen::VectorXd &b, 
                                         const Eigen::VectorXd &x0, const double &T){};
+std::vector<Eigen::VectorXd> ExponentialIntegrator::solveSparseExponential(){
+    // TODO 
+};
+std::vector<Eigen::VectorXd> ExponentialIntegrator::solveDenseExponential(){
+
+};
 
 } // namespace consim

@@ -21,6 +21,10 @@ namespace consim{
                                                     bool compute_integral = false, bool invertableA = false);
             std::vector <Eigen::VectorXd> computeXtAndIntegrals(const Eigen::MatrixXd &mat, const Eigen::VectorXd &b, const Eigen::VectorXd &x0, const double &T);
 
+            std::vector<Eigen::VectorXd> solveSparseExponential();
+            std::vector<Eigen::VectorXd> solveDenseExponential();
+            
+
         private:
             double dt_;
             int nc_; 
