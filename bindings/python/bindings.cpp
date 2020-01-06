@@ -13,7 +13,7 @@
 
 namespace consim {
 
-Simulator* build_simple_simulator(
+EulerSimulator* build_euler_simulator(
     float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data,
     double normal_spring_const, double normal_damping_coeff,
     double static_friction_spring_coeff, double static_friction_damping_spring_coeff,
@@ -27,10 +27,10 @@ Simulator* build_simple_simulator(
 
   if(!model.check(data))
   {
-    std::cout<<"[build_simple_simulator] Data is not consistent with specified model\n";
+    std::cout<<"[build_euler_simulator] Data is not consistent with specified model\n";
     data = pinocchio::Data(model);
   }
-  Simulator* sim = new Simulator(dt, n_integration_steps, model, data);
+  EulerSimulator* sim = new EulerSimulator(model, data, dt, n_integration_steps);
   sim->addObject(*obj);
 
   return sim;
@@ -56,8 +56,8 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
     using namespace boost::python;
     eigenpy::enableEigenPy();
 
-    bp::def("build_simple_simulator", build_simple_simulator,
-            "A simple way to create a simulator with floor object and LinearPenaltyContactModel.",
+    bp::def("build_euler_simulator", build_euler_simulator,
+            "A simple way to create a simulator using explicit euler integration with floor object and LinearPenaltyContactModel.",
             bp::return_value_policy<bp::manage_new_object>());
 
     bp::def("stop_watch_report", stop_watch_report,
@@ -80,19 +80,21 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
         .ADD_PROPERTY_RETURN_BY_VALUE("viscvel", &ContactPoint::viscvel)
         .ADD_PROPERTY_RETURN_BY_VALUE("f", &ContactPoint::f);
 
-    bp::class_<Simulator>("Simulator",
-                          "Main simulator class",
-                          bp::init<float, int, pinocchio::Model &, pinocchio::Data &>())
-        .def("add_contact_point", &Simulator::addContactPoint, return_internal_reference<>())
-        .def("get_contact", &Simulator::getContact, return_internal_reference<>())
-        .def("step", &Simulator::step)
-        .def("add_object", &Simulator::addObject)
-        .def("reset_state", &Simulator::resetState)
-        .def("set_joint_friction", &Simulator::setJointFriction)
+    bp::class_<EulerSimulator>("EulerSimulator",
+                          "Euler Simulator class",
+                          bp::init<pinocchio::Model &, pinocchio::Data &, float, int>())
+        .def("add_contact_point", &EulerSimulator::addContactPoint, return_internal_reference<>())
+        .def("get_contact", &EulerSimulator::getContact, return_internal_reference<>())
+        .def("step", &EulerSimulator::step)
+        .def("add_object", &EulerSimulator::addObject)
+        .def("reset_state", &EulerSimulator::resetState)
+        .def("set_joint_friction", &EulerSimulator::setJointFriction)
+        .def("get_q", &EulerSimulator::getQ)
+        .def("get_dq", &EulerSimulator::getDq);
 
-        .ADD_PROPERTY_READONLY_RETURN_BY_VALUE("q", &Simulator::q_)
-        .ADD_PROPERTY_READONLY_RETURN_BY_VALUE("dq", &Simulator::dq_)
-        .ADD_PROPERTY_READONLY_RETURN_BY_VALUE("tau", &Simulator::tau_);
+        // .ADD_PROPERTY_READONLY_RETURN_BY_VALUE("q", &EulerSimulator::q_)
+        // .ADD_PROPERTY_READONLY_RETURN_BY_VALUE("dq", &EulerSimulator::dq_)
+        // .ADD_PROPERTY_READONLY_RETURN_BY_VALUE("tau", &EulerSimulator::tau_);
 }
 //
 //#include <pinocchio/fwd.hpp>

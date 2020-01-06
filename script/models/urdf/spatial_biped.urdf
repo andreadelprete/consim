@@ -1,0 +1,229 @@
+<?xml version="1.0"?>
+<robot name="planar_biped">
+
+  <material name="red">
+    <color rgba="1 0 0 1"/>
+  </material>
+
+  <material name="green">
+    <color rgba="0 1 0 1"/>
+  </material>
+
+  <material name="blue">
+    <color rgba="0 0 .8 1"/>
+  </material>
+
+  <material name="white">
+    <color rgba="1 1 1 1"/>
+  </material>
+
+  <material name="black">
+    <color rgba="0 0 0 1"/>
+  </material>
+
+
+  <link name="base">
+      <inertial>
+         <origin rpy="0 0 0" xyz="0 0 0"/>
+         <mass value="2.0"/>
+         <inertia ixx=".01613" ixy="0.0" ixz="0.0" iyy=".01613" iyz="0.0" izz=".01613"/>
+      </inertial>
+
+      <visual>
+          <geometry>
+              <mesh filename="package://meshes/box.stl" scale=".2 .2 .2"/>
+              <!--<box size="0.22 0.22 0.22"/>-->
+          </geometry>
+          <material name="blue"/>
+      </visual>
+       <collision>
+          <geometry>
+              <mesh filename="package://meshes/box.stl" scale=".2 .2 .2"/>
+          </geometry>
+      </collision>
+  </link>
+
+  <joint name="LH_AA" type="revolute">
+      <axis xyz="1 0 0"/>
+      <limit effort="1000.0" lower="-10." upper="10." velocity="100."/>
+      <parent link="base"/>
+      <child link="L_HIP"/>
+      <origin xyz="0. .1 0."/>
+  </joint>
+
+
+  <link name="L_HIP">
+      <inertial>
+         <origin rpy="0 1.5707963267948966 0" xyz="0 0 0"/>
+         <mass value="1.0"/>
+         <inertia ixx=".0039583" ixy="0" ixz="0" iyy=".0039583" iyz="0" izz=".00125"/>
+      </inertial>
+      <visual>
+          <origin  rpy="0 1.5707963267948966 0" xyz="0. 0. 0."/>
+          <geometry>
+              <mesh filename="package://meshes/cylinder.stl" scale=".05 .05 .2"/>
+              <!--<cylinder length="0.55" radius="0.05"/>-->
+          </geometry>
+          <material name="blue"/>
+      </visual>
+      <collision>
+          <origin  rpy="0 1.5707963267948966 0" xyz="0. 0. 0."/>
+          <geometry>
+              <mesh filename="package://meshes/cylinder.stl" scale=".05 .05 .2"/>
+          </geometry>
+      </collision>
+  </link>
+
+  <joint name="LH_FE" type="revolute">
+      <axis xyz="0 1 0"/>
+      <limit effort="1000.0" lower="-10." upper="10." velocity="100."/>
+      <parent link="L_HIP"/>
+      <child link="L_FEM"/>
+      <origin xyz="0. 0. 0."/>
+  </joint>
+
+
+
+  <link name="L_FEM">
+      <inertial>
+         <origin rpy="0 0 0" xyz="0 0 0"/>
+         <mass value="1.0"/>
+         <inertia ixx=".02583" ixy="0" ixz="0" iyy=".02583" iyz="0" izz=".00125"/>
+      </inertial>
+      <visual>
+          <origin  rpy="0 0 0" xyz="0. 0. -0.275"/>
+          <geometry>
+              <mesh filename="package://meshes/cylinder.stl" scale=".05 .05 .5"/>
+              <!--<cylinder length="0.55" radius="0.05"/>-->
+          </geometry>
+          <material name="red"/>
+      </visual>
+      <collision>
+          <origin  rpy="0 0 0" xyz="0. 0. -0.275"/>
+          <geometry>
+              <mesh filename="package://meshes/cylinder.stl" scale=".05 .05 .5"/>
+          </geometry>
+      </collision>
+  </link>
+
+  <joint name="LK_FE" type="revolute">
+      <axis xyz="0 1 0"/>
+      <limit effort="1000.0" lower="-3.14" upper="3.14" velocity="5."/>
+      <parent link="L_FEM"/>
+      <child link="L_TIB"/>
+      <origin xyz="0. 0. -.5"/>
+  </joint>
+
+  <link name="L_TIB">
+      <inertial>
+         <origin rpy="0 0 0" xyz="0 0 0"/>
+         <mass value="1.0"/>
+         <inertia ixx=".0175" ixy="0" ixz="0" iyy=".0175" iyz="0" izz=".00125"/>
+      </inertial>
+      <visual>
+          <origin rpy="0 0 0" xyz="0 0. -0.22"/>
+          <geometry>
+              <mesh filename="package://meshes/cylinder.stl" scale=".05 .05 .5"/>
+              <!--<cylinder length="0.44" radius="0.05"/>-->
+          </geometry>
+          <material name="green"/>
+      </visual>
+      <collision>
+          <origin rpy="0 0 0" xyz="0 0. -0.22"/>
+          <geometry>
+              <mesh filename="package://meshes/cylinder.stl" scale=".05 .05 .5"/>
+          </geometry>
+      </collision>
+  </link>
+
+  <joint name="RH_AA" type="revolute">
+      <axis xyz="1 0 0"/>
+      <limit effort="1000.0" lower="-10." upper="10." velocity="100."/>
+      <parent link="base"/>
+      <child link="R_HIP"/>
+      <origin xyz="0. -.1 0."/>
+  </joint>
+
+  <link name="R_HIP">
+    <inertial>
+       <origin rpy="0 1.5707963267948966 0" xyz="0 0 0"/>
+       <mass value="1.0"/>
+       <inertia ixx=".0039583" ixy="0" ixz="0" iyy=".0039583" iyz="0" izz=".00125"/>
+    </inertial>
+      <visual>
+          <origin  rpy="0 1.5707963267948966 0" xyz="0. 0. 0."/>
+          <geometry>
+              <mesh filename="package://meshes/cylinder.stl" scale=".05 .05 .2"/>
+              <!--<cylinder length="0.55" radius="0.05"/>-->
+          </geometry>
+          <material name="blue"/>
+      </visual>
+      <collision>
+          <origin  rpy="0 1.5707963267948966 0" xyz="0. 0. 0."/>
+          <geometry>
+              <mesh filename="package://meshes/cylinder.stl" scale=".05 .05 .2"/>
+          </geometry>
+      </collision>
+  </link>
+
+  <joint name="RH_FE" type="revolute">
+      <axis xyz="0 1 0"/>
+      <limit effort="1000.0" lower="-3.14" upper="3.14" velocity="5."/>
+      <parent link="R_HIP"/>
+      <child link="R_FEM"/>
+      <origin xyz="0. 0. 0."/>
+  </joint>
+
+  <link name="R_FEM">
+      <inertial>
+         <origin rpy="0 0 0" xyz="0 0 0"/>
+         <mass value="1.0"/>
+         <inertia ixx=".02583" ixy="0" ixz="0" iyy=".02583" iyz="0" izz=".00125"/>
+      </inertial>
+      <visual>
+          <origin rpy="0 0 0" xyz="0 0. -0.275"/>
+          <geometry>
+            <mesh filename="package://meshes/cylinder.stl" scale=".05 .05 .5"/>
+              <!--<cylinder length="0.55" radius="0.05"/>-->
+          </geometry>
+          <material name="red"/>
+      </visual>
+      <collision>
+          <origin rpy="0 0 0" xyz="0 0. -0.275"/>
+          <geometry>
+              <mesh filename="package://meshes/cylinder.stl" scale=".05 .05 .5"/>
+          </geometry>
+      </collision>
+  </link>
+
+  <joint name="RK_FE" type="revolute">
+      <axis xyz="0 1 0"/>
+      <limit effort="1000.0" lower="-3.14" upper="3.14" velocity="5."/>
+      <parent link="R_FEM"/>
+      <child link="R_TIB"/>
+      <origin xyz="0. 0. -0.5"/>
+  </joint>
+
+  <link name="R_TIB">
+      <inertial>
+         <origin rpy="0 0 0" xyz="0 0 0"/>
+         <mass value="1.0"/>
+         <inertia ixx=".0175" ixy="0" ixz="0" iyy=".0175" iyz="0" izz=".00125"/>
+      </inertial>
+      <visual>
+          <origin rpy="0 0 0" xyz="0. 0. -0.22"/>
+          <geometry>
+            <mesh filename="package://meshes/cylinder.stl" scale=".05 .05 .5"/>
+              <!--<cylinder length="0.44" radius="0.05"/>-->
+          </geometry>
+          <material name="green"/>
+      </visual>
+      <collision>
+          <origin rpy="0 0 0" xyz="0. 0. -0.22"/>
+          <geometry>
+              <mesh filename="package://meshes/cylinder.stl" scale=".05 .05 .5"/>
+          </geometry>
+      </collision>
+  </link>
+
+</robot>
