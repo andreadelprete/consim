@@ -139,6 +139,7 @@ SET(HEADERS
 #    include/consim/utils/statistics.hpp
     include/consim/utils/stop-watch.hpp
     include/consim/utils/Stdafx.hh
+    include/consim/dynamic_algebra.hpp
 #    ${${PROJECT_NAME}_MATH_HEADERS}
 #    ${${PROJECT_NAME}_SOLVERS_HEADERS}
 #    ${${PROJECT_NAME}_ROBOTS_HEADERS}

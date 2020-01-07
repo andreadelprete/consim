@@ -7,6 +7,7 @@
 
 #include <pinocchio/algorithm/aba.hpp>
 #include <pinocchio/algorithm/compute-all-terms.hpp>
+// #include <pinocchio/algorithm/forwar 
 
 #include "consim/object.hpp"
 #include "consim/contact.hpp"
@@ -76,6 +77,7 @@ void AbstractSimulator::resetState(const Eigen::VectorXd& q, const Eigen::Vector
 
 void AbstractSimulator::checkContact()
 {
+  nactive_ = 0; 
   // Loop over all the contact points, over all the objects.
   for (auto &cp : contacts_) {
     cp->x = data_->oMf[cp->frame_id].translation();
@@ -98,6 +100,7 @@ void AbstractSimulator::checkContact()
       if (optr->checkContact(*cp))
       {
         cp->active = true;
+        nactive_ += 1; 
         cp->optr = optr;
         break;
       }
@@ -216,20 +219,23 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
  * ExponentialSimulator Class 
 */
 
-ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, 
-                                           bool sparse, bool invertibleA):
-AbstractSimulator(model, data, dt, n_integration_steps), sparse_(sparse), invertibleA_(invertibleA){
-
-  
-
+ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps,
+                                           bool sparse, bool invertibleA) : AbstractSimulator(model, data, dt, n_integration_steps), 
+                                           sparse_(sparse), invertibleA_(invertibleA), sub_dt(dt / ((double)n_integration_steps))
+{
+  dJvi_.resize(3); 
+  ai_.resize(3);
+  dJvilocal_.resize(3);
+  ailocal_.resize(3);
 }
 
 void ExponentialSimulator::allocateData(){
+  // this function must be called after adding all contacts 
   f_.resize(nk_); 
   p0_.resize(nk_); 
   p_.resize(nk_); 
   dp_.resize(nk_); 
-  Jc_.resize(nk_, model.nv); Jc_.setZero();
+  Jc_.resize(nk_, model_->nv); Jc_.setZero();
   dJv_.resize(nk_); dJv_.setZero();
   a_.resize(2 * nk_); a_.setZero();
   A.resize(2 * nk_, 2 * nk_); A.setZero();
@@ -243,6 +249,7 @@ void ExponentialSimulator::allocateData(){
 
 
 void ExponentialSimulator::step(const Eigen::VectorXd &tau){
+  // TODO: must call resetState before calling step for the first time 
   if(sparse_){
     throw std::runtime_error("Sparse integration not implemented yet");
   } // sparse 
@@ -253,21 +260,33 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     } //invertible dense 
     else{
 
-      solveDenseExpSystem(); s
+      solveDenseExpSystem();
 
 
     } // non-invertable dense
   }
+  computeContactState();
+  computeContactForces(dq_);
 } // ExponentialSimulator::step
 
 
 
 void ExponentialSimulator::computeContactForces(const Eigen::VectorXd &dq){
-  //TODO: does it make sense to store contact states multiple places 
-  f_.setZero(); 
-  p0_.setZero();
-  p_.setZero(); 
-  dp_.setZero();
+
+  // resize matrices and fillout contact information
+  // TODO: change to use templated header dynamic_algebra.hpp
+  f_.resize(3 * nactive_); f_.setZero();
+  p0_.resize(3 * nactive_); p0_.setZero();
+  p_.resize(3 * nactive_); p_.setZero();
+  dp_.resize(3 * nactive_); dp_.setZero();
+  xt_.resize(6 * nactive_); xt_.setZero();
+  intxt_.resize(6 * nactive_); intxt_.setZero();
+  int2xt_.resize(6 * nactive_); int2xt_.setZero();
+  K.resize(3 * nactive_, 3 * nactive_); K.setZero();
+  B.resize(3 * nactive_, 3 * nactive_); B.setZero();
+  D.resize(3 * nactive_, 6 * nactive_); D.setZero();
+  A.resize(6 * nactive_.6 * nactive_); A.setZero();
+
   // tau_ was already set to zero in checkContactStates
   if (joint_friction_flag_){
     tau_ -= joint_friction_.cwiseProduct(dq);
@@ -289,23 +308,24 @@ void ExponentialSimulator::computeContactForces(const Eigen::VectorXd &dq){
 
 } // ExponentialSimulator::computeContactForces
 
+
 void ExponentialSimulator::solveDenseExpSystem(){
   
 } // ExponentialSimulator::solveDenseExpSystem
 
 
+void ExponentialSimulator::computeFrameAcceleration(int frame_id){
+  // assumes second order FK is called
 
+  dJvilocal_.setZero();
+  ailocal_.setZero();
+  dJvi_.setZero();
+  ai_.setZero();
 
+  // TODO: this is wrong, should return pinocchio::motion -> 6d vector with linear and angular 
+  ailocal_ = pinocchio::getFrameAcceleration(*model_, *data_, frame_id);
 
-
-
-
-
-
-
-
-
-
+} //computeFrameAcceleration
 
 
 /* ____________________________________________________________________________________________*/

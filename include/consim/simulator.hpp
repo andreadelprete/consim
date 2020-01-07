@@ -6,6 +6,7 @@
 
 #include "consim/object.hpp"
 #include "consim/contact.hpp"
+#include  "consim/dynamic_algebra.hpp"
 
 namespace consim {
 
@@ -70,7 +71,8 @@ namespace consim {
       Eigen::VectorXd dqMean_;
       Eigen::VectorXd tau_;
       int nc_=0;
-      int nk_=0; 
+      int nk_=0;
+      int nactive_; // number of active contacts
       /**
         * loops over contact points, checks active contacts and sets reference contact positions 
       */
@@ -154,20 +156,29 @@ namespace consim {
       void solveSparseExpSystem(); 
 
       bool sparse_; 
-      bool invertibleA_; 
+      bool invertibleA_;
+      const double sub_dt;
+      
 
       Eigen::VectorXd f_;  // total force 
       Eigen::MatrixXd Jc_; // contact jacobian for all contacts 
       Eigen::VectorXd p0_; // reference position for contact 
       Eigen::VectorXd p_; // current contact position 
       Eigen::VectorXd dp_; // contact velocity 
-      Eigen::VectorXd xt_;
+      Eigen::VectorXd xt_;  // containts p and dp for all active contact points 
       Eigen::VectorXd intxt_;
       Eigen::VectorXd int2xt_;
 
+      void computeFrameAcceleration(int frame_id); 
+
       // contact acceleration components 
       Eigen::VectorXd dJv_; 
-      Eigen::VectorXd a_; 
+      Eigen::VectorXd a_;
+
+      Eigen::VectorXd dJvilocal_; // per frame
+      Eigen::VectorXd ailocal_;   // per frame
+      Eigen::VectorXd dJvi_; // per frame 
+      Eigen::VectorXd ai_; // per frame 
       // keep the stiffness/damping matrices fixed to the total size of contact points
       // worry about tracking index of Active sub-blocks later
       Eigen::MatrixXd K;
