@@ -86,6 +86,9 @@ namespace consim {
      // TODO: might change interface depending on parameters required for the exponential simulator version 
       virtual void computeContactForces(const Eigen::VectorXd &dq)=0;
 
+      inline void contactLinearJacobian(int frame_id);
+ 
+
       const pinocchio::Model *model_;
       pinocchio::Data *data_;
 
@@ -94,6 +97,9 @@ namespace consim {
   
       std::vector<ContactPoint *> contacts_;
       std::vector<Object *> objects_;
+
+      Eigen::MatrixXd frame_Jc_;
+      pinocchio::Data::Matrix6x J_;
 
       Eigen::VectorXd joint_friction_;
       bool joint_friction_flag_ = 0;
@@ -118,10 +124,6 @@ namespace consim {
 
     protected:
       const double sub_dt;
-      Eigen::MatrixXd frame_Jc_;
-      pinocchio::Data::Matrix6x J_;
-
-      inline void contactLinearJacobian(int frame_id);
       void computeContactForces(const Eigen::VectorXd &dq) override;
       
       
@@ -138,7 +140,19 @@ namespace consim {
       void step(const Eigen::VectorXd &tau) override;
 
     protected:
+      /**
+       * call after adding all contact points 
+       * 
+       */
+      void allocateData(); 
+      /**
+       * AbstractSimulator::computeContactState() must be called before  
+       * calling ExponentialSimulator::computeContactForces()
+       */
       void computeContactForces(const Eigen::VectorXd &dq) override; 
+      void solveDenseExpSystem(); 
+      void solveSparseExpSystem(); 
+
       bool sparse_; 
       bool invertibleA_; 
 
@@ -147,6 +161,10 @@ namespace consim {
       Eigen::VectorXd p0_; // reference position for contact 
       Eigen::VectorXd p_; // current contact position 
       Eigen::VectorXd dp_; // contact velocity 
+      Eigen::VectorXd xt_;
+      Eigen::VectorXd intxt_;
+      Eigen::VectorXd int2xt_;
+
       // contact acceleration components 
       Eigen::VectorXd dJv_; 
       Eigen::VectorXd a_; 
@@ -159,7 +177,7 @@ namespace consim {
       
 
 
-  } // class ExponentialSimulator
+  }; // class ExponentialSimulator
 
 
 

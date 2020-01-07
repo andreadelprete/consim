@@ -29,6 +29,8 @@ model_(&model), data_(&data), dt_(dt), n_integration_steps_(n_integration_steps)
   ddq_.resize(model.nv);
   dqMean_.resize(model.nv);
   tau_.resize(model.nv);
+  frame_Jc_.resize(3, model.nv);
+  J_.resize(6, model.nv);
 }; 
 
 const ContactPoint &AbstractSimulator::addContactPoint(int frame_id)
@@ -127,6 +129,14 @@ void AbstractSimulator::setJointFriction(const Eigen::VectorXd& joint_friction)
   joint_friction_ = joint_friction;
 }
 
+
+inline void AbstractSimulator::contactLinearJacobian(int frame_id)
+{
+  J_.setZero();
+  pinocchio::getFrameJacobian(*model_, *data_, frame_id, pinocchio::LOCAL_WORLD_ALIGNED, J_);
+  frame_Jc_ = J_.topRows(3);
+}
+
 /* ____________________________________________________________________________________________*/
 /** 
  * EulerSimulator Class 
@@ -134,16 +144,7 @@ void AbstractSimulator::setJointFriction(const Eigen::VectorXd& joint_friction)
 
 EulerSimulator::EulerSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps):
 AbstractSimulator(model, data, dt, n_integration_steps), sub_dt(dt / ((double)n_integration_steps)) {
-  
-  J_.resize(6, model.nv);
-  frame_Jc_.resize(3, model.nv);
-}
 
-inline void EulerSimulator::contactLinearJacobian(int frame_id)
-{
-  J_.setZero();
-  pinocchio::getFrameJacobian(*model_, *data_, frame_id, pinocchio::LOCAL_WORLD_ALIGNED, J_);
-  frame_Jc_ = J_.topRows(3);
 }
 
 void EulerSimulator::computeContactForces(const Eigen::VectorXd &dq) 
@@ -217,12 +218,17 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
 
 ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, 
                                            bool sparse, bool invertibleA):
-AbstractSimulator(model, data, dt, n_integration_steps), sparse_(sparse), invertableA_(invertibleA){
+AbstractSimulator(model, data, dt, n_integration_steps), sparse_(sparse), invertibleA_(invertibleA){
 
-  f_.resize(nk_); f_.setZero();
-  p0_.resize(nk_); p0_.setZero();
-  p_.resize(nk_); p_.setZero();
-  dp_.resize(nk_); dp_.setZero();
+  
+
+}
+
+void ExponentialSimulator::allocateData(){
+  f_.resize(nk_); 
+  p0_.resize(nk_); 
+  p_.resize(nk_); 
+  dp_.resize(nk_); 
   Jc_.resize(nk_, model.nv); Jc_.setZero();
   dJv_.resize(nk_); dJv_.setZero();
   a_.resize(2 * nk_); a_.setZero();
@@ -230,31 +236,62 @@ AbstractSimulator(model, data, dt, n_integration_steps), sparse_(sparse), invert
   K.resize(nk_, nk_); K.setZero();
   B.resize(nk_, nk_); B.setZero();
   D.resize(2*nk_, nk_); D.setZero();
-
-}
+  xt_.resize(nk_);
+  intxt_.resize(nk_); 
+  int2xt_.resize(nk_); 
+} //ExponentialSimulator::allocateData
 
 
 void ExponentialSimulator::step(const Eigen::VectorXd &tau){
   if(sparse_){
-
+    throw std::runtime_error("Sparse integration not implemented yet");
   } // sparse 
   else{
     if(invertibleA_){
+      throw std::runtime_error("Invertible and dense integration not implemented yet");
 
     } //invertible dense 
     else{
 
+      solveDenseExpSystem(); s
+
+
     } // non-invertable dense
   }
-}
+} // ExponentialSimulator::step
 
 
 
-void computeContactForces(const Eigen::VectorXd &dq){
+void ExponentialSimulator::computeContactForces(const Eigen::VectorXd &dq){
+  //TODO: does it make sense to store contact states multiple places 
+  f_.setZero(); 
+  p0_.setZero();
+  p_.setZero(); 
+  dp_.setZero();
+  // tau_ was already set to zero in checkContactStates
   if (joint_friction_flag_){
     tau_ -= joint_friction_.cwiseProduct(dq);
   }
-}
+  // loop over contacts, compute the force and store in vector f 
+  for(int i=0; i<nc_; i++){
+    if (!contacts_[i]->active) continue;
+    // update contact point velocity 
+    contactLinearJacobian(contacts_[i]->frame_id);
+    contacts_[i]->v = frame_Jc_ * dq;
+    p0_.segment(3*i,3)=contacts_[i]->x_start; 
+    p_.segment(3*i,3)=contacts_[i]->x; 
+    dp_.segment(3*i,3)=contacts_[i]->v; 
+    // compute force using the model  
+    contacts_[i]->optr->contactModel(*contacts_[i]);
+    f_.segment(3*i,3) = contacts_[i]->f; 
+  }
+
+
+} // ExponentialSimulator::computeContactForces
+
+void ExponentialSimulator::solveDenseExpSystem(){
+  
+} // ExponentialSimulator::solveDenseExpSystem
 
 
 
