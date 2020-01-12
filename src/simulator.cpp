@@ -72,7 +72,7 @@ void AbstractSimulator::resetState(const Eigen::VectorXd& q, const Eigen::Vector
 
   computeContactState();
   computeContactForces(dq_);
-
+  resetflag_ = true;
 }
 
 void AbstractSimulator::checkContact()
@@ -251,7 +251,9 @@ void ExponentialSimulator::allocateData(){
 
 
 void ExponentialSimulator::step(const Eigen::VectorXd &tau){
-  // TODO: must call resetState before calling step for the first time 
+  if(!resetflag_){
+    throw std::runtime_error("resetState() must be called first !");
+  }
   tau_ += tau; 
   // compute Kp0_
   kp0_ = K*p0_;

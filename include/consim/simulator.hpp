@@ -67,6 +67,7 @@ namespace consim {
 
     
     protected:
+
       Eigen::VectorXd q_;  
       Eigen::VectorXd dq_;
       Eigen::VectorXd ddq_;
@@ -76,6 +77,7 @@ namespace consim {
       unsigned int nc_=0;
       unsigned int nk_ = 0;
       unsigned int nactive_; // number of active contacts
+      bool resetflag_ = false;
       /**
         * loops over contact points, checks active contacts and sets reference contact positions 
       */
