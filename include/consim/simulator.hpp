@@ -174,6 +174,7 @@ namespace consim {
       Eigen::VectorXd kp0_; 
       Eigen::VectorXd dv0_; 
 
+      void resizeVectorsAndMatrices();
       void computeFrameAcceleration(unsigned int frame_id); 
 
       // contact acceleration components 
