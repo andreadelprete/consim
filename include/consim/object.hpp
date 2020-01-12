@@ -11,6 +11,11 @@ public:
   virtual bool checkContact(ContactPoint &cp) = 0;
   virtual void contactModel(ContactPoint &cp) = 0;
 
+  double getNormalStiffness() const { return contact_model_->getNormalStiffness(); };
+  double getNormalDamping() const { return contact_model_->getNormalDamping(); };
+  double getTangentialStiffness() const { return contact_model_->getTangentialStiffness(); };
+  double getTangentialDamping() const { return contact_model_->getTangentialDamping(); };
+
 protected:
   std::string name_;
   ContactModel* contact_model_;

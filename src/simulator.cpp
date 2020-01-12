@@ -14,6 +14,8 @@
 #include "consim/simulator.hpp"
 #include "consim/utils/stop-watch.hpp"
 
+
+
 #include <iostream>
 
 namespace consim {
@@ -282,10 +284,11 @@ void ExponentialSimulator::computeContactForces(const Eigen::VectorXd &dq){
   xt_.resize(6 * nactive_); xt_.setZero();
   intxt_.resize(6 * nactive_); intxt_.setZero();
   int2xt_.resize(6 * nactive_); int2xt_.setZero();
+  kp0_.resize(3*nactive_); kp0_.setZero();
   K.resize(3 * nactive_, 3 * nactive_); K.setZero();
   B.resize(3 * nactive_, 3 * nactive_); B.setZero();
   D.resize(3 * nactive_, 6 * nactive_); D.setZero();
-  A.resize(6 * nactive_.6 * nactive_); A.setZero();
+  A.resize(6 * nactive_, 6 * nactive_); A.setZero();
 
   // tau_ was already set to zero in checkContactStates
   if (joint_friction_flag_){
@@ -294,7 +297,7 @@ void ExponentialSimulator::computeContactForces(const Eigen::VectorXd &dq){
   // loop over contacts, compute the force and store in vector f 
   for(int i=0; i<nc_; i++){
     if (!contacts_[i]->active) continue;
-    // update contact point velocity 
+    // compute jacobian for active contact and store inn frame_Jc_
     contactLinearJacobian(contacts_[i]->frame_id);
     contacts_[i]->v = frame_Jc_ * dq;
     p0_.segment(3*i,3)=contacts_[i]->x_start; 
@@ -303,15 +306,14 @@ void ExponentialSimulator::computeContactForces(const Eigen::VectorXd &dq){
     // compute force using the model  
     contacts_[i]->optr->contactModel(*contacts_[i]);
     f_.segment(3*i,3) = contacts_[i]->f; 
+    // compute kp0_
+    kp0_(3 * i) = contacts_[i]->optr->getTangentialStiffness() * p0_(3 * i);         // x-direction
+    kp0_(3 * i + 1) = contacts_[i]->optr->getTangentialStiffness() * p0_(3 * i + 1); // y-direction
+    kp0_(3 * i + 2) = contacts_[i]->optr->getNormalStiffness() * p0_(3 * i + 2);     // z-direction
   }
 
 
 } // ExponentialSimulator::computeContactForces
-
-
-void ExponentialSimulator::solveDenseExpSystem(){
-  
-} // ExponentialSimulator::solveDenseExpSystem
 
 
 void ExponentialSimulator::computeFrameAcceleration(int frame_id){
@@ -323,10 +325,20 @@ void ExponentialSimulator::computeFrameAcceleration(int frame_id){
   ai_.setZero();
 
   // TODO: this is wrong, should return pinocchio::motion -> 6d vector with linear and angular 
-  ailocal_ = pinocchio::getFrameAcceleration(*model_, *data_, frame_id);
+  // ailocal_ = pinocchio::getFrameAcceleration(*model_, *data_, frame_id);
 
 } //computeFrameAcceleration
 
+
+void ExponentialSimulator::solveDenseExpSystem()
+{
+
+} // ExponentialSimulator::solveDenseExpSystem
+
+void ExponentialSimulator::solveSparseExpSystem()
+{
+
+} // ExponentialSimulator::solveSparseExpSystem
 
 /* ____________________________________________________________________________________________*/
 

@@ -8,6 +8,9 @@
 #include "consim/contact.hpp"
 #include  "consim/dynamic_algebra.hpp"
 
+// #include "MatrixExponential.hpp"
+// #include "LDSUtility.hpp"
+
 namespace consim {
 
   class AbstractSimulator {
@@ -152,6 +155,8 @@ namespace consim {
        * calling ExponentialSimulator::computeContactForces()
        */
       void computeContactForces(const Eigen::VectorXd &dq) override; 
+      
+
       void solveDenseExpSystem(); 
       void solveSparseExpSystem(); 
 
@@ -168,6 +173,7 @@ namespace consim {
       Eigen::VectorXd xt_;  // containts p and dp for all active contact points 
       Eigen::VectorXd intxt_;
       Eigen::VectorXd int2xt_;
+      Eigen::VectorXd kp0_; 
 
       void computeFrameAcceleration(int frame_id); 
 
