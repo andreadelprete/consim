@@ -3,7 +3,7 @@
 #include <pinocchio/spatial/se3.hpp>
 #include <pinocchio/multibody/model.hpp>
 #include <pinocchio/multibody/data.hpp>
-
+#include<pinocchio/spatial/motion.hpp>
 #include "consim/object.hpp"
 #include "consim/contact.hpp"
 #include  "consim/dynamic_algebra.hpp"
@@ -73,9 +73,9 @@ namespace consim {
       // Eigen::VectorXd f_;
       Eigen::VectorXd dqMean_;
       Eigen::VectorXd tau_;
-      int nc_=0;
-      int nk_=0;
-      int nactive_; // number of active contacts
+      unsigned int nc_=0;
+      unsigned int nk_ = 0;
+      unsigned int nactive_; // number of active contacts
       /**
         * loops over contact points, checks active contacts and sets reference contact positions 
       */
@@ -85,14 +85,10 @@ namespace consim {
       */
       void computeContactState();
 
-      /** 
-       * 
-      */
-     // TODO: might change interface depending on parameters required for the exponential simulator version 
+
       virtual void computeContactForces(const Eigen::VectorXd &dq)=0;
 
-      inline void contactLinearJacobian(int frame_id);
- 
+      inline void contactLinearJacobian(unsigned int frame_id);
 
       const pinocchio::Model *model_;
       pinocchio::Data *data_;
@@ -169,29 +165,35 @@ namespace consim {
       Eigen::MatrixXd Jc_; // contact jacobian for all contacts 
       Eigen::VectorXd p0_; // reference position for contact 
       Eigen::VectorXd p_; // current contact position 
-      Eigen::VectorXd dp_; // contact velocity 
+      Eigen::VectorXd dp_; // contact velocity
+      Eigen::VectorXd a_;
+      Eigen::VectorXd b_;
       Eigen::VectorXd xt_;  // containts p and dp for all active contact points 
       Eigen::VectorXd intxt_;
       Eigen::VectorXd int2xt_;
       Eigen::VectorXd kp0_; 
+      Eigen::VectorXd dv0_; 
 
-      void computeFrameAcceleration(int frame_id); 
+      void computeFrameAcceleration(unsigned int frame_id); 
 
       // contact acceleration components 
-      Eigen::VectorXd dJv_; 
-      Eigen::VectorXd a_;
+      Eigen::VectorXd dJv_;
+      pinocchio::Motion vilocal_ = pinocchio::Motion::Zero();
 
-      Eigen::VectorXd dJvilocal_; // per frame
-      Eigen::VectorXd ailocal_;   // per frame
-      Eigen::VectorXd dJvi_; // per frame 
-      Eigen::VectorXd ai_; // per frame 
+      pinocchio::Motion dJvilocal_ = pinocchio::Motion::Zero(); // per frame
+      // Eigen::VectorXd ailocal_;   // per frame
+      Eigen::VectorXd dJvi_; // per frame
+      pinocchio::SE3 frameSE3_ = pinocchio::SE3::Identity();
+      // Eigen::VectorXd ai_; // per frame 
       // keep the stiffness/damping matrices fixed to the total size of contact points
       // worry about tracking index of Active sub-blocks later
       Eigen::MatrixXd K;
       Eigen::MatrixXd B;
       Eigen::MatrixXd D;
       Eigen::MatrixXd A; 
-      
+      Eigen::MatrixXd Minv_;
+      Eigen::MatrixXd JMinv_;
+      Eigen::MatrixXd Upsilon_;
 
 
   }; // class ExponentialSimulator

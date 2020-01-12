@@ -34,13 +34,13 @@ LinearPenaltyContactModel::LinearPenaltyContactModel(
  */
 void LinearPenaltyContactModel::computeForce(ContactPoint& cptr)
 {
-  int i;
+  unsigned int i;
   double viscvel;
   Eigen::Vector3d temp;
 
   double tangent_force = 0.;
   double normal_force = 0.;
-  for (int i = 0; i < 3; ++i) {
+  for (i = 0; i < 3; ++i) {
     cptr.f(i) = normal_spring_const_ * cptr.normal(i) + normal_damping_coeff_ * cptr.normvel(i);
 
     // make sure the damping part does not attract a contact force with wrong sign

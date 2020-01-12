@@ -20,7 +20,7 @@ namespace consim {
 class Object;
 
 struct ContactPoint {
-  int frame_id;
+  unsigned int frame_id;
 
   bool active;
 
@@ -82,7 +82,7 @@ public:
       double static_friction_spring_coeff, double static_friction_damping_spring_coeff,
       double static_friction_coeff, double dynamic_friction_coeff);
 
-  void computeForce(ContactPoint& cp);
+  void computeForce(ContactPoint& cp) override;
 
   double getNormalStiffness() const override {return normal_spring_const_;};
   double getNormalDamping() const override { return normal_damping_coeff_; };
