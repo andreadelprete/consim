@@ -10,7 +10,7 @@
 #include "consim/object.hpp"
 #include "consim/contact.hpp"
 #include "consim/simulator.hpp"
-#include "consim/utils/stop-watch.hpp"
+// #include "consim/utils/stop-watch.hpp"
 
 
 
@@ -223,6 +223,7 @@ ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocc
                                            sparse_(sparse), invertibleA_(invertibleA), sub_dt(dt / ((double)n_integration_steps))
 {
   dJvi_.resize(3);
+  ddqMean_.resize(model_->nv);
   // crossAcci_.resize(3); 
   // ai_.resize(3);
   // dJvilocal_.resize(3);
@@ -267,6 +268,9 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
   A.block(nk_, 0, nk_, nk_) = -Upsilon_ * K;
   A.block(nk_, nk_, nk_, nk_) = -Upsilon_ * B;
   b_ = JMinv_ * (tau_ - data_->nle) + dJv_ + Upsilon_*kp0_;
+  // stack x0 
+  x0_.segment(0, 3*nactive_) = p_; 
+  x0_.segment(3*nactive_, 3*nactive_) = dp_; 
 
   //
   if (sparse_)
@@ -281,6 +285,15 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       solveDenseExpSystem();
     } // non-invertable dense
   }
+  // do the integration 
+  dqMean_ = dq_ + .5 * dt_ * dv0_ + JMinv_.transpose()*D*int2xt_/dt_ ;
+  ddqMean_ = dv0_ + JMinv_.transpose()*D*intxt_/dt_ ;
+  dq_ += dt_*ddqMean_;
+  q_ = pinocchio::integrate(*model_, q_, dqMean_ * dt_);
+  ddq_ = ddqMean_; 
+
+
+
   pinocchio::forwardKinematics(*model_, *data_, q_, dq_, ddq_); 
   computeContactState();
   computeContactForces(dq_);
@@ -321,6 +334,8 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     dJv_.segment(3*i,3) = dJvi_; 
   }
 
+  D.block(0,0, 3*nactive_, 3*nactive_) = K;
+  D.block(0,3*nactive_, 3*nactive_, 3*nactive_) = B; 
 
 } // ExponentialSimulator::computeContactForces
 
@@ -338,6 +353,11 @@ void ExponentialSimulator::computeFrameAcceleration(unsigned int frame_id)
 
 void ExponentialSimulator::solveDenseExpSystem()
 {
+  a_.segment(nactive_, nactive_) = b_;
+  // xt_ = utilDense_.ComputeXt(A, a_, x0_, dt_);
+  intxt_ = utilDense_.ComputeIntegralXt(A, a_, x0_, dt_);
+  int2xt_ = utilDense_.ComputeDoubleIntegralXt(A, a_, x0_, dt_); 
+
 
 } // ExponentialSimulator::solveDenseExpSystem
 
@@ -357,6 +377,7 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
   dp_.resize(3 * nactive_); dp_.setZero();
   a_.resize(3 * nactive_); a_.setZero();
   b_.resize(3 * nactive_); b_.setZero();
+  x0_.resize(6 * nactive_); x0_.setZero();
   xt_.resize(6 * nactive_); xt_.setZero();
   intxt_.resize(6 * nactive_); intxt_.setZero();
   int2xt_.resize(6 * nactive_); int2xt_.setZero();
@@ -369,6 +390,7 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
   Upsilon_.resize(3 * nactive_, 3 * nactive_); Upsilon_.setZero();
   JMinv_.resize(3 * nactive_, model_->nv); JMinv_.setZero();
   dJv_.resize(3 * nactive_); dJv_.setZero();
+  utilDense_.resize(6 * nactive_);
 } // ExponentialSimulator::resizeVectorsAndMatrices
 
 /* ____________________________________________________________________________________________*/

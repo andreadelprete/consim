@@ -3,13 +3,18 @@
 #include <pinocchio/spatial/se3.hpp>
 #include <pinocchio/multibody/model.hpp>
 #include <pinocchio/multibody/data.hpp>
-#include<pinocchio/spatial/motion.hpp>
+#include <pinocchio/spatial/motion.hpp>
+
+#include <MatrixExponential.hpp>
+#include <LDSUtility.hpp>
+
 #include "consim/object.hpp"
 #include "consim/contact.hpp"
 #include  "consim/dynamic_algebra.hpp"
 
-// #include "MatrixExponential.hpp"
-// #include "LDSUtility.hpp"
+
+
+
 
 namespace consim {
 
@@ -168,6 +173,7 @@ namespace consim {
       Eigen::VectorXd p0_; // reference position for contact 
       Eigen::VectorXd p_; // current contact position 
       Eigen::VectorXd dp_; // contact velocity
+      Eigen::VectorXd x0_;
       Eigen::VectorXd a_;
       Eigen::VectorXd b_;
       Eigen::VectorXd xt_;  // containts p and dp for all active contact points 
@@ -197,6 +203,11 @@ namespace consim {
       Eigen::MatrixXd Minv_;
       Eigen::MatrixXd JMinv_;
       Eigen::MatrixXd Upsilon_;
+
+      // expokit 
+      expokit::LDSUtility<double, Dynamic> utilDense_;
+      // 
+      Eigen::VectorXd ddqMean_;
 
 
   }; // class ExponentialSimulator

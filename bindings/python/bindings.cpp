@@ -6,7 +6,7 @@
 #include <eigenpy/eigenpy.hpp>
 
 #include "consim/simulator.hpp"
-#include "consim/utils/stop-watch.hpp"
+// #include "consim/utils/stop-watch.hpp"
 
 
 //eigenpy::switchToNumpyMatrix();
@@ -36,6 +36,29 @@ EulerSimulator* build_euler_simulator(
   return sim;
 }
 
+ExponentialSimulator* build_exponential_simulator(
+    float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data,
+    double normal_spring_const, double normal_damping_coeff,
+    double static_friction_spring_coeff, double static_friction_damping_spring_coeff,
+    double static_friction_coeff, double dynamic_friction_coeff,bool sparse, bool invertibleA)
+{
+  LinearPenaltyContactModel *contact_model = new LinearPenaltyContactModel(
+      normal_spring_const, normal_damping_coeff, static_friction_spring_coeff,
+      static_friction_damping_spring_coeff, static_friction_coeff, dynamic_friction_coeff);
+
+  Object* obj = new FloorObject("Floor", *contact_model);
+
+  if(!model.check(data))
+  {
+    std::cout<<"[build_exponential_simulator] Data is not consistent with specified model\n";
+    data = pinocchio::Data(model);
+  }
+  ExponentialSimulator* sim = new ExponentialSimulator(model, data, dt, n_integration_steps, sparse, invertibleA);
+  sim->addObject(*obj);
+
+  return sim;
+}
+
 void stop_watch_report(int precision)
 {
   getProfiler().report_all(precision);
@@ -58,6 +81,10 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
 
     bp::def("build_euler_simulator", build_euler_simulator,
             "A simple way to create a simulator using explicit euler integration with floor object and LinearPenaltyContactModel.",
+            bp::return_value_policy<bp::manage_new_object>());
+
+    bp::def("build_exponential_simulator", build_exponential_simulator,
+            "A simple way to create a simulator using exponential integration with floor object and LinearPenaltyContactModel.",
             bp::return_value_policy<bp::manage_new_object>());
 
     bp::def("stop_watch_report", stop_watch_report,
@@ -89,8 +116,22 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
         .def("add_object", &EulerSimulator::addObject)
         .def("reset_state", &EulerSimulator::resetState)
         .def("set_joint_friction", &EulerSimulator::setJointFriction)
-        .def("get_q", &EulerSimulator::getQ)
-        .def("get_dq", &EulerSimulator::getDq);
+        .def("get_q", &EulerSimulator::get_q)
+        .def("get_dq", &EulerSimulator::get_dq)
+        .def("get_ddq", &EulerSimulator::get_ddq);
+    
+    bp::class_<ExponentialSimulator>("ExponentialSimulator",
+                          "Exponential Simulator class",
+                          bp::init<pinocchio::Model &, pinocchio::Data &, float, int, bool, bool>())
+        .def("add_contact_point", &ExponentialSimulator::addContactPoint, return_internal_reference<>())
+        .def("get_contact", &ExponentialSimulator::getContact, return_internal_reference<>())
+        .def("step", &ExponentialSimulator::step)
+        .def("add_object", &ExponentialSimulator::addObject)
+        .def("reset_state", &ExponentialSimulator::resetState)
+        .def("set_joint_friction", &ExponentialSimulator::setJointFriction)
+        .def("get_q", &ExponentialSimulator::get_q)
+        .def("get_dq", &ExponentialSimulator::get_dq)
+        .def("get_ddq", &EulerSimulator::get_ddq);
 
         // .ADD_PROPERTY_READONLY_RETURN_BY_VALUE("q", &EulerSimulator::q_)
         // .ADD_PROPERTY_READONLY_RETURN_BY_VALUE("dq", &EulerSimulator::dq_)
