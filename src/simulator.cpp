@@ -15,6 +15,8 @@
 
 
 #include <iostream>
+// #include <stdio.h>
+
 
 namespace consim {
 
@@ -224,6 +226,8 @@ ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocc
 {
   dJvi_.resize(3);
   ddqMean_.resize(model_->nv);
+  Minv_.resize(model_->nv, model_->nv); Minv_.setZero();
+  dv0_.resize(model_->nv); dv0_.setZero();
   // crossAcci_.resize(3); 
   // ai_.resize(3);
   // dJvilocal_.resize(3);
@@ -246,8 +250,7 @@ void ExponentialSimulator::allocateData(){
   xt_.resize(nk_);
   intxt_.resize(nk_); 
   int2xt_.resize(nk_);
-  Minv_.resize(model_->nv, model_->nv); Minv_.setZero();
-  dv0_.resize(model_->nv); dv0_.setZero();
+  
 } //ExponentialSimulator::allocateData
 
 
@@ -255,22 +258,35 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
   if(!resetflag_){
     throw std::runtime_error("resetState() must be called first !");
   }
+
   tau_ += tau; 
+  // printf("control added\n"); 
+
   // compute Kp0_
   kp0_ = K*p0_;
+  // printf("kp0\n");
   // compute Minv & dv0_
   Minv_ = pinocchio::computeMinverse(*model_, *data_, q_);
+  // printf("Minv\n");
   JMinv_ = Jc_ * Minv_;
+  // printf("JMinv\n");
   dv0_ = Minv_ * (tau_ - data_->nle + Jc_.transpose() * kp0_);
+  // printf("dvbar\n");
   // fill out A matrix
   Upsilon_ = JMinv_ * Jc_.transpose();
-  A.block(0, nk_, nk_, nk_) = Eigen::MatrixXd::Identity(nk_, nk_);
-  A.block(nk_, 0, nk_, nk_) = -Upsilon_ * K;
-  A.block(nk_, nk_, nk_, nk_) = -Upsilon_ * B;
+  // printf("Upsilon\n");
+  A.block(0, 3*nactive_, 3*nactive_, 3*nactive_) = Eigen::MatrixXd::Identity(3*nactive_, 3*nactive_);
+  // printf("A upper right \n");
+  A.block(3*nactive_, 0, 3*nactive_, 3*nactive_) = -Upsilon_ * K;
+  // printf("A lower left \n");
+  A.block(3*nactive_, 3*nactive_, 3*nactive_, 3*nactive_) = -Upsilon_ * B;
+  // printf("A lower right\n");
   b_ = JMinv_ * (tau_ - data_->nle) + dJv_ + Upsilon_*kp0_;
+  // printf("b\n");
   // stack x0 
   x0_.segment(0, 3*nactive_) = p_; 
   x0_.segment(3*nactive_, 3*nactive_) = dp_; 
+  printf("x0\n");
 
   //
   if (sparse_)
@@ -285,6 +301,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       solveDenseExpSystem();
     } // non-invertable dense
   }
+  printf("intXt\n");
   // do the integration 
   dqMean_ = dq_ + .5 * dt_ * dv0_ + JMinv_.transpose()*D*int2xt_/dt_ ;
   ddqMean_ = dv0_ + JMinv_.transpose()*D*intxt_/dt_ ;
@@ -292,11 +309,14 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
   q_ = pinocchio::integrate(*model_, q_, dqMean_ * dt_);
   ddq_ = ddqMean_; 
 
-
+  printf("updates\n");
 
   pinocchio::forwardKinematics(*model_, *data_, q_, dq_, ddq_); 
+  // printf("forward kinematics\n");
   computeContactState();
+  printf("contact state\n");
   computeContactForces(dq_);
+  // printf("contact forces \n");
 } // ExponentialSimulator::step
 
 
@@ -336,6 +356,8 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
 
   D.block(0,0, 3*nactive_, 3*nactive_) = K;
   D.block(0,3*nactive_, 3*nactive_, 3*nactive_) = B; 
+
+  printf("contact force computed \n");
 
 } // ExponentialSimulator::computeContactForces
 

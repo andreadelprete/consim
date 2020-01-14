@@ -147,12 +147,13 @@ namespace consim {
       ~ExponentialSimulator(){};
       void step(const Eigen::VectorXd &tau) override;
 
-    protected:
       /**
        * call after adding all contact points 
        * 
        */
       void allocateData(); 
+
+    protected:
       /**
        * AbstractSimulator::computeContactState() must be called before  
        * calling ExponentialSimulator::computeContactForces()
