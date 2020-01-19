@@ -377,8 +377,8 @@ void ExponentialSimulator::solveDenseExpSystem()
 {
   a_.segment(nactive_, nactive_) = b_;
   // xt_ = utilDense_.ComputeXt(A, a_, x0_, dt_);
-  intxt_ = utilDense_.ComputeIntegralXt(A, a_, x0_, dt_);
-  int2xt_ = utilDense_.ComputeDoubleIntegralXt(A, a_, x0_, dt_); 
+  utilDense_.ComputeIntegralXt(A, a_, x0_, dt_, intxt_);
+  utilDense_.ComputeDoubleIntegralXt(A, a_, x0_, dt_, int2xt_); 
 
 
 } // ExponentialSimulator::solveDenseExpSystem

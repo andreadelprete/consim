@@ -39,7 +39,7 @@ if __name__=="__main__":
 
 
 
-    N = 800 
+    N = 451
     q = [q0]
     dq = [dq0]
     for t in range(N):
@@ -73,7 +73,7 @@ if __name__=="__main__":
     print 'allocate data works'
     exp_sim.reset_state(q0, dq0, True)
     print 'reset state successful!'
-    N = 5 
+    
     q = [q0]
     dq = [dq0]
     # exp_sim.step(tau)
@@ -81,8 +81,8 @@ if __name__=="__main__":
     # dq += [euler_sim.get_dq()]
     for t in range(N):
         exp_sim.step(tau)
-        q += [euler_sim.get_q()]
-        dq += [euler_sim.get_dq()]
+        q += [exp_sim.get_q()]
+        dq += [exp_sim.get_dq()]
     print 'Simulation using exponential simulator done '
 
     qz = []
