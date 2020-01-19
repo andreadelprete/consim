@@ -72,13 +72,10 @@ if __name__=="__main__":
     exp_sim.allocate_data()
     print 'allocate data works'
     exp_sim.reset_state(q0, dq0, True)
-    print 'reset state successful!'
-    
+    print 'ExpoSim reset state done !' 
     q = [q0]
     dq = [dq0]
-    # exp_sim.step(tau)
-    # q += [euler_sim.get_q()]
-    # dq += [euler_sim.get_dq()]
+
     for t in range(N):
         exp_sim.step(tau)
         q += [exp_sim.get_q()]

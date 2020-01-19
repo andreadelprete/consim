@@ -298,7 +298,9 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       throw std::runtime_error("Invertible and dense integration not implemented yet");
     } //invertible dense 
     else{
+      printf("solving dense system started\n");
       solveDenseExpSystem();
+      printf("solving dense system ended\n");
     } // non-invertable dense
   }
   printf("intXt\n");
@@ -333,6 +335,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
   for(unsigned int i=0; i<nc_; i++){
     if (!contacts_[i]->active) continue;
     // compute jacobian for active contact and store inn frame_Jc_
+    printf("contact active with index \n",i+1); 
     contactLinearJacobian(contacts_[i]->frame_id);
     Jc_.block(3*i,0,3,model_->nv) = frame_Jc_;
     contacts_[i]->v = frame_Jc_ * dq;
