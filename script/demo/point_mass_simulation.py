@@ -16,7 +16,7 @@ if __name__=="__main__":
     # create the euler simulator 
     dt = 1.e-3 
     ndt = 10 
-    mu = 0.3                            # friction coefficient
+    mu = 0.3        # friction coefficient
 
     K = 1e5
     B = 3e2
@@ -39,7 +39,7 @@ if __name__=="__main__":
 
 
 
-    N = 460
+    N = 800
     q = [q0]
     dq = [dq0]
     for t in range(N):
@@ -90,6 +90,7 @@ if __name__=="__main__":
 
     plt.plot(dt*np.arange(N+1), qz, label='exp')
     plt.legend()
+    plt.grid()
     plt.title('Ball Height vs time ')
     plt.show()
 

@@ -161,21 +161,14 @@ void EulerSimulator::computeContactForces(const Eigen::VectorXd &dq)
 
   for (auto &cp : contacts_) {
     if (!cp->active) continue;
-
     // If the contact point is active, compute it's velocity and call the
     // contact model function on the object.
     // TODO: Is there a faster way to compute the contact point velocity than
     //       multiply the jacobian with the generalized velocity from pinocchio?
     contactLinearJacobian(cp->frame_id);
     cp->v = frame_Jc_ * dq;
-    // printf("contact point position %f\n", cp->normal(2));
-    // printf("contact point velocity %f\n", cp->normvel(2));
-    // contact force computation is called in th
     cp->optr->contactModel(*cp);
-    // printf("contact point force %f\n", cp->f(2));
-
     tau_ += frame_Jc_.transpose() * cp->f;
-    // printf("integration force %f\n", tau_(2));
   }
   getProfiler().stop("compute_contact_forces");
 }
@@ -228,10 +221,6 @@ ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocc
   ddqMean_.resize(model_->nv);
   Minv_.resize(model_->nv, model_->nv); Minv_.setZero();
   dv0_.resize(model_->nv); dv0_.setZero();
-  // crossAcci_.resize(3); 
-  // ai_.resize(3);
-  // dJvilocal_.resize(3);
-  // ailocal_.resize(3);
 }
 
 void ExponentialSimulator::allocateData(){
@@ -260,22 +249,19 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
   }
   tau_ += tau; 
   if (nactive_> 0){
-  // compute Kp0_
+
   kp0_ = K*p0_;
-  // compute Minv & dv0_
   Minv_ = pinocchio::computeMinverse(*model_, *data_, q_);
   JMinv_ = Jc_ * Minv_;
   dv0_ = Minv_ * (tau_ - data_->nle + Jc_.transpose() * kp0_);
-  // fill out A matrix
   Upsilon_ = JMinv_ * Jc_.transpose();
   A.block(0, 3*nactive_, 3*nactive_, 3*nactive_) = Eigen::MatrixXd::Identity(3*nactive_, 3*nactive_);
   A.block(3*nactive_, 0, 3*nactive_, 3*nactive_) = -Upsilon_ * K;
   A.block(3*nactive_, 3*nactive_, 3*nactive_, 3*nactive_) = -Upsilon_ * B;
   b_ = JMinv_ * (tau_ - data_->nle) + dJv_ + Upsilon_*kp0_;
-  // stack x0 
   x0_.segment(0, 3*nactive_) = p_; 
   x0_.segment(3*nactive_, 3*nactive_) = dp_; 
-  //
+
   if (sparse_)
   {
     throw std::runtime_error("Sparse integration not implemented yet");
@@ -285,12 +271,9 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       throw std::runtime_error("Invertible and dense integration not implemented yet");
     } //invertible dense 
     else{
-      printf("solving dense system started\n");
       solveDenseExpSystem();
-      printf("solving dense system ended\n");
     } // non-invertable dense
   }
-  // do the integration 
   dqMean_ = dq_ + .5 * dt_ * dv0_ + JMinv_.transpose()*D*int2xt_/dt_ ;
   ddqMean_ = dv0_ + JMinv_.transpose()*D*intxt_/dt_ ;
   dq_ += dt_*ddqMean_;
@@ -343,9 +326,8 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     computeFrameAcceleration(contacts_[i]->frame_id); 
     dJv_.segment(3*i,3) = dJvi_; 
   }
-
-  D.block(0,0, 3*nactive_, 3*nactive_) = K;
-  D.block(0,3*nactive_, 3*nactive_, 3*nactive_) = B; 
+  D.block(0,0, 3*nactive_, 3*nactive_) = -K;
+  D.block(0,3*nactive_, 3*nactive_, 3*nactive_) = -B; 
 } // ExponentialSimulator::computeContactForces
 
 void ExponentialSimulator::computeFrameAcceleration(unsigned int frame_id)
