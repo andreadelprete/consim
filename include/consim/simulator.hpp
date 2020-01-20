@@ -81,7 +81,7 @@ namespace consim {
       Eigen::VectorXd tau_;
       unsigned int nc_=0;
       unsigned int nk_ = 0;
-      unsigned int nactive_; // number of active contacts
+      int nactive_; // number of active contacts
       bool resetflag_ = false;
       /**
         * loops over contact points, checks active contacts and sets reference contact positions 

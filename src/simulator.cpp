@@ -15,7 +15,6 @@
 
 
 #include <iostream>
-// #include <stdio.h>
 
 
 namespace consim {
@@ -34,7 +33,7 @@ model_(&model), data_(&data), dt_(dt), n_integration_steps_(n_integration_steps)
   tau_.resize(model.nv);
   frame_Jc_.resize(3, model.nv);
   J_.resize(6, model.nv);
-}; 
+} 
 
 const ContactPoint &AbstractSimulator::addContactPoint(int frame_id)
 {
@@ -91,6 +90,7 @@ void AbstractSimulator::checkContact()
         cp->f.fill(0);
         cp->friction_flag = false;
       } else {
+        nactive_ += 1;
         // If the contact point is still active, then no need to search for
         // other contacting object (we assume there is only one object acting
         // on a contact point at each timestep).
@@ -260,34 +260,22 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
   }
 
   tau_ += tau; 
-  // printf("control added\n"); 
-
+  if (nactive_> 0){
   // compute Kp0_
   kp0_ = K*p0_;
-  // printf("kp0\n");
   // compute Minv & dv0_
   Minv_ = pinocchio::computeMinverse(*model_, *data_, q_);
-  // printf("Minv\n");
   JMinv_ = Jc_ * Minv_;
-  // printf("JMinv\n");
   dv0_ = Minv_ * (tau_ - data_->nle + Jc_.transpose() * kp0_);
-  // printf("dvbar\n");
   // fill out A matrix
   Upsilon_ = JMinv_ * Jc_.transpose();
-  // printf("Upsilon\n");
   A.block(0, 3*nactive_, 3*nactive_, 3*nactive_) = Eigen::MatrixXd::Identity(3*nactive_, 3*nactive_);
-  // printf("A upper right \n");
   A.block(3*nactive_, 0, 3*nactive_, 3*nactive_) = -Upsilon_ * K;
-  // printf("A lower left \n");
   A.block(3*nactive_, 3*nactive_, 3*nactive_, 3*nactive_) = -Upsilon_ * B;
-  // printf("A lower right\n");
   b_ = JMinv_ * (tau_ - data_->nle) + dJv_ + Upsilon_*kp0_;
-  // printf("b\n");
   // stack x0 
   x0_.segment(0, 3*nactive_) = p_; 
   x0_.segment(3*nactive_, 3*nactive_) = dp_; 
-  printf("x0\n");
-
   //
   if (sparse_)
   {
@@ -303,22 +291,23 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       printf("solving dense system ended\n");
     } // non-invertable dense
   }
-  printf("intXt\n");
   // do the integration 
   dqMean_ = dq_ + .5 * dt_ * dv0_ + JMinv_.transpose()*D*int2xt_/dt_ ;
   ddqMean_ = dv0_ + JMinv_.transpose()*D*intxt_/dt_ ;
   dq_ += dt_*ddqMean_;
   q_ = pinocchio::integrate(*model_, q_, dqMean_ * dt_);
   ddq_ = ddqMean_; 
-
-  printf("updates\n");
-
+  } // active contacts > 0 
+  else{
+    pinocchio::aba(*model_, *data_, q_, dq_, tau_);
+    ddq_ = data_->ddq; 
+    dqMean_ = dq_ + ddq_ * .5 * dt_;
+    q_ = pinocchio::integrate(*model_, q_, dqMean_ * dt_);
+    dq_ += data_->ddq * dt_; 
+  }
   pinocchio::forwardKinematics(*model_, *data_, q_, dq_, ddq_); 
-  // printf("forward kinematics\n");
   computeContactState();
-  printf("contact state\n");
   computeContactForces(dq_);
-  // printf("contact forces \n");
 } // ExponentialSimulator::step
 
 
@@ -335,16 +324,25 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
   for(unsigned int i=0; i<nc_; i++){
     if (!contacts_[i]->active) continue;
     // compute jacobian for active contact and store inn frame_Jc_
-    printf("contact active with index \n",i+1); 
+    // std::cout<<"contact active with index: "<< i+1<<std::endl;
     contactLinearJacobian(contacts_[i]->frame_id);
+    // std::cout<<"frame contact linear jacobian"<<std::endl; 
+    // std::cout<<"frame_Jc_ size: "<<frame_Jc_.size()<<std::endl;
+    // std::cout<<"Jc_ size: "<<Jc_.size()<<std::endl;
+    // std::cout<<"model nv: "<<model_->nv<<std::endl;
+    // std::cout<<"nActive: "<<nactive_<<std::endl; 
     Jc_.block(3*i,0,3,model_->nv) = frame_Jc_;
+    // std::cout<<"fill Jc_"<<std::endl; 
     contacts_[i]->v = frame_Jc_ * dq;
+    // std::cout<<"update contact velocity "<<std::endl;
     p0_.segment(3*i,3)=contacts_[i]->x_start; 
     p_.segment(3*i,3)=contacts_[i]->x; 
     dp_.segment(3*i,3)=contacts_[i]->v; 
+    // std::cout<<"stack contact info "<<std::endl;
     // compute force using the model  
     contacts_[i]->optr->contactModel(*contacts_[i]);
     f_.segment(3*i,3) = contacts_[i]->f; 
+    // std::cout<<"compute contact force and fill f_ "<<std::endl;
     // fill out K&B
     K(3*i, 3*i) = contacts_[i]->optr->getTangentialStiffness();
     K(3*i + 1, 3*i + 1) = contacts_[i]->optr->getTangentialStiffness();
@@ -352,15 +350,18 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     B(3*i, 3*i) = contacts_[i]->optr->getTangentialDamping();
     B(3*i + 1, 3*i + 1) = contacts_[i]->optr->getTangentialDamping();
     B(3*i + 2, 3*i + 2) = contacts_[i]->optr->getNormalDamping();
+    // std::cout<<"Fill K&B "<<std::endl;
     // compute dJvi_
     computeFrameAcceleration(contacts_[i]->frame_id); 
+    // std::cout<<"frame acceleration i "<<std::endl;
     dJv_.segment(3*i,3) = dJvi_; 
+    // std::cout<<"dJv "<<std::endl;
   }
 
   D.block(0,0, 3*nactive_, 3*nactive_) = K;
   D.block(0,3*nactive_, 3*nactive_, 3*nactive_) = B; 
 
-  printf("contact force computed \n");
+  // printf("contact force computed \n");
 
 } // ExponentialSimulator::computeContactForces
 

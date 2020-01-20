@@ -39,7 +39,7 @@ if __name__=="__main__":
 
 
 
-    N = 451
+    N = 460
     q = [q0]
     dq = [dq0]
     for t in range(N):
