@@ -258,7 +258,6 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
   if(!resetflag_){
     throw std::runtime_error("resetState() must be called first !");
   }
-
   tau_ += tau; 
   if (nactive_> 0){
   // compute Kp0_
@@ -324,25 +323,15 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
   for(unsigned int i=0; i<nc_; i++){
     if (!contacts_[i]->active) continue;
     // compute jacobian for active contact and store inn frame_Jc_
-    // std::cout<<"contact active with index: "<< i+1<<std::endl;
     contactLinearJacobian(contacts_[i]->frame_id);
-    // std::cout<<"frame contact linear jacobian"<<std::endl; 
-    // std::cout<<"frame_Jc_ size: "<<frame_Jc_.size()<<std::endl;
-    // std::cout<<"Jc_ size: "<<Jc_.size()<<std::endl;
-    // std::cout<<"model nv: "<<model_->nv<<std::endl;
-    // std::cout<<"nActive: "<<nactive_<<std::endl; 
     Jc_.block(3*i,0,3,model_->nv) = frame_Jc_;
-    // std::cout<<"fill Jc_"<<std::endl; 
     contacts_[i]->v = frame_Jc_ * dq;
-    // std::cout<<"update contact velocity "<<std::endl;
     p0_.segment(3*i,3)=contacts_[i]->x_start; 
     p_.segment(3*i,3)=contacts_[i]->x; 
     dp_.segment(3*i,3)=contacts_[i]->v; 
-    // std::cout<<"stack contact info "<<std::endl;
     // compute force using the model  
     contacts_[i]->optr->contactModel(*contacts_[i]);
     f_.segment(3*i,3) = contacts_[i]->f; 
-    // std::cout<<"compute contact force and fill f_ "<<std::endl;
     // fill out K&B
     K(3*i, 3*i) = contacts_[i]->optr->getTangentialStiffness();
     K(3*i + 1, 3*i + 1) = contacts_[i]->optr->getTangentialStiffness();
@@ -350,19 +339,13 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     B(3*i, 3*i) = contacts_[i]->optr->getTangentialDamping();
     B(3*i + 1, 3*i + 1) = contacts_[i]->optr->getTangentialDamping();
     B(3*i + 2, 3*i + 2) = contacts_[i]->optr->getNormalDamping();
-    // std::cout<<"Fill K&B "<<std::endl;
     // compute dJvi_
     computeFrameAcceleration(contacts_[i]->frame_id); 
-    // std::cout<<"frame acceleration i "<<std::endl;
     dJv_.segment(3*i,3) = dJvi_; 
-    // std::cout<<"dJv "<<std::endl;
   }
 
   D.block(0,0, 3*nactive_, 3*nactive_) = K;
   D.block(0,3*nactive_, 3*nactive_, 3*nactive_) = B; 
-
-  // printf("contact force computed \n");
-
 } // ExponentialSimulator::computeContactForces
 
 void ExponentialSimulator::computeFrameAcceleration(unsigned int frame_id)
@@ -373,7 +356,6 @@ void ExponentialSimulator::computeFrameAcceleration(unsigned int frame_id)
   dJvilocal_.linear() += vilocal_.angular().cross(vilocal_.linear());
   frameSE3_.rotation() = data_->oMf[frame_id].rotation();
   dJvi_ = frameSE3_.act(dJvilocal_).linear();
-
 } //computeFrameAcceleration
 
 
@@ -383,8 +365,6 @@ void ExponentialSimulator::solveDenseExpSystem()
   // xt_ = utilDense_.ComputeXt(A, a_, x0_, dt_);
   utilDense_.ComputeIntegralXt(A, a_, x0_, dt_, intxt_);
   utilDense_.ComputeDoubleIntegralXt(A, a_, x0_, dt_, int2xt_); 
-
-
 } // ExponentialSimulator::solveDenseExpSystem
 
 void ExponentialSimulator::solveSparseExpSystem()
