@@ -15,21 +15,27 @@ if __name__=="__main__":
     print 'RobotWrapper Object Created Successfully!'
     # create the euler simulator 
     dt = 1.e-3 
-    ndt = 10 
+    ndt = 1
     mu = 0.3        # friction coefficient
 
     K = 1e5
     B = 3e2
 
+    N = 800
+
     euler_sim = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
                                         K, B ,K, B, mu, mu)
     contact_names = ['root_joint']
-    cpts = []
+    cpts_euler = []
     for cf in contact_names:
         if not robot.model.existFrame(cf):
             print("ERROR: Frame", cf, "does not exist")
-        cpts += [euler_sim.add_contact_point(robot.model.getFrameId(cf))]
+        cpts_euler += [euler_sim.add_contact_point(robot.model.getFrameId(cf))]
     print 'EulerSimulator Object Created Successfully!'
+
+    fcnt_euler = np.zeros([N+1, len(cpts_euler), 3])
+
+    
 
     q0 = np.array([0., 0., 1., 0., 0., 0., 1.]) [:,None]
     dq0 = np.zeros(robot.nv)[:,None]
@@ -37,15 +43,21 @@ if __name__=="__main__":
     robot.forwardKinematics(q0)
     euler_sim.reset_state(q0, dq0, True)
 
+    for i, cp in enumerate(cpts_euler):
+        fcnt_euler[0,i,:] = np.resize(cp.f,3)
 
 
-    N = 800
+    
     q = [q0]
     dq = [dq0]
     for t in range(N):
         euler_sim.step(tau)
         q += [euler_sim.get_q()]
         dq += [euler_sim.get_dq()]
+        # store the contact forces 
+        for i, cp in enumerate(cpts_euler):
+            fcnt_euler[t+1,i,:] = np.resize(cp.f,3)
+
     print 'Simulation using euler simulator done '
 
     qz = []
@@ -62,11 +74,15 @@ if __name__=="__main__":
     exp_sim = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
                                         K, B ,K, B, mu, mu, isSparse, isInvertible)
     print 'ExponentialSimulator Object Created Successfully!'
+
+    cpts_exp = []
     for cf in contact_names:
         if not robot.model.existFrame(cf):
             print("ERROR: Frame", cf, "does not exist")
-        cpts += [exp_sim.add_contact_point(robot.model.getFrameId(cf))]
+        cpts_exp += [exp_sim.add_contact_point(robot.model.getFrameId(cf))]
     print 'Contacts added to ExponentialSimulator Successfully!'
+
+    fcnt_exp = np.zeros([N+1, len(cpts_exp), 3])
 
     robot.forwardKinematics(q0)
     exp_sim.allocate_data()
@@ -76,10 +92,17 @@ if __name__=="__main__":
     q = [q0]
     dq = [dq0]
 
+    for i, cp in enumerate(cpts_exp):
+        fcnt_exp[0,i,:] = np.resize(cp.f,3)
+
+
     for t in range(N):
         exp_sim.step(tau)
         q += [exp_sim.get_q()]
         dq += [exp_sim.get_dq()]
+        for i, cp in enumerate(cpts_exp):
+            fcnt_exp[t+1,i,:] = np.resize(cp.f,3)
+
     print 'Simulation using exponential simulator done '
 
     qz = []
@@ -88,10 +111,21 @@ if __name__=="__main__":
         qz += [qi[2,0]]
         dqz += [dq[i][2,0]]
 
-    plt.plot(dt*np.arange(N+1), qz, label='exp')
+    plt.plot(dt*np.arange(N+1), qz,'--',label='exp')
     plt.legend()
     plt.grid()
     plt.title('Ball Height vs time ')
+
+    plt.figure('normal contact forces')
+    for i,cp in enumerate(cpts_euler):
+        plt.plot(dt*np.arange(N+1), fcnt_euler[:,i,2], label='euler fz pt %s'%i)
+
+    for i,cp in enumerate(cpts_exp):
+        plt.plot(dt*np.arange(N+1), fcnt_exp[:,i,2],'--', label='exp fz pt %s'%i)
+    plt.legend()
+    plt.grid()
+    plt.title('normal contact forces')
+
     plt.show()
 
     
