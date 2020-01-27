@@ -159,6 +159,13 @@ namespace consim {
        * calling ExponentialSimulator::computeContactForces()
        */
       void computeContactForces(const Eigen::VectorXd &dq) override; 
+      /**
+       * computes average contact force during one integration step 
+       * loops over the average force to compute tangential and normal force per contact 
+       * projects any violations of the cone onto its boundaries 
+       * sets a flag to to switch integration mode to include saturated forces 
+       */
+      void checkFrictionCone(); 
       
 
       void solveDenseExpSystem(); 
@@ -209,6 +216,13 @@ namespace consim {
       expokit::LDSUtility<double, Dynamic> utilDense_;
       // 
       Eigen::VectorXd ddqMean_;
+      // friction cone 
+      Eigen::VectorXd f_avg;  
+      Eigen::VectorXd fpr_; 
+      Eigen::VectorXd fi_;  
+      bool cone_flag_; 
+      double ftan_; 
+      unsigned int i_active_; 
 
 
   }; // class ExponentialSimulator

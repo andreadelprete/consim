@@ -16,7 +16,6 @@
 
 #include <iostream>
 
-
 namespace consim {
 
 /** 
@@ -221,6 +220,7 @@ ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocc
   ddqMean_.resize(model_->nv);
   Minv_.resize(model_->nv, model_->nv); Minv_.setZero();
   dv0_.resize(model_->nv); dv0_.setZero();
+  fi_.resize(3); fi_.setZero();
 }
 
 void ExponentialSimulator::allocateData(){
@@ -248,13 +248,17 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     throw std::runtime_error("resetState() must be called first !");
   }
   tau_ += tau; 
+
+  for (int i = 0; i < n_integration_steps_; i++)
+    {
+  
   if (nactive_> 0){
 
   kp0_ = K*p0_;
   Minv_ = pinocchio::computeMinverse(*model_, *data_, q_);
   JMinv_ = Jc_ * Minv_;
   dv0_ = Minv_ * (tau_ - data_->nle + Jc_.transpose() * kp0_);
-  Upsilon_ = JMinv_ * Jc_.transpose();
+  Upsilon_ =  Jc_*JMinv_.transpose();
   A.block(0, 3*nactive_, 3*nactive_, 3*nactive_) = Eigen::MatrixXd::Identity(3*nactive_, 3*nactive_);
   A.block(3*nactive_, 0, 3*nactive_, 3*nactive_) = -Upsilon_ * K;
   A.block(3*nactive_, 3*nactive_, 3*nactive_, 3*nactive_) = -Upsilon_ * B;
@@ -274,22 +278,33 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       solveDenseExpSystem();
     } // non-invertable dense
   }
-  dqMean_ = dq_ + .5 * dt_ * dv0_ + JMinv_.transpose()*D*int2xt_/dt_ ;
-  ddqMean_ = dv0_ + JMinv_.transpose()*D*intxt_/dt_ ;
-  dq_ += dt_*ddqMean_;
-  q_ = pinocchio::integrate(*model_, q_, dqMean_ * dt_);
+  // the friction cone implementation will get here 
+  checkFrictionCone();
+
+  if(cone_flag_){
+    ddqMean_ = Minv_*(tau - data_->nle + Jc_.transpose()*fpr_);
+    dqMean_ = dq_ + sub_dt* ddqMean_; 
+  } // violates friction cone 
+  else{
+    ddqMean_ = dv0_ + JMinv_.transpose()*D*intxt_/sub_dt ;
+    dqMean_ = dq_ + .5 * sub_dt * dv0_ + JMinv_.transpose()*D*int2xt_/sub_dt ;
+  } // within friction cone 
+
+  dq_ += sub_dt*ddqMean_;
+  q_ = pinocchio::integrate(*model_, q_, dqMean_ * sub_dt);
   ddq_ = ddqMean_; 
   } // active contacts > 0 
   else{
     pinocchio::aba(*model_, *data_, q_, dq_, tau_);
     ddq_ = data_->ddq; 
-    dqMean_ = dq_ + ddq_ * .5 * dt_;
-    q_ = pinocchio::integrate(*model_, q_, dqMean_ * dt_);
-    dq_ += data_->ddq * dt_; 
+    dqMean_ = dq_ + ddq_ * .5 * sub_dt;
+    q_ = pinocchio::integrate(*model_, q_, dqMean_ * sub_dt);
+    dq_ += data_->ddq * sub_dt; 
   }
   pinocchio::forwardKinematics(*model_, *data_, q_, dq_, ddq_); 
   computeContactState();
   computeContactForces(dq_);
+  }  // sub_dt loop
 } // ExponentialSimulator::step
 
 
@@ -303,28 +318,30 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     tau_ -= joint_friction_.cwiseProduct(dq);
   }
   // loop over contacts, compute the force and store in vector f 
+  i_active_ = 0; 
   for(unsigned int i=0; i<nc_; i++){
     if (!contacts_[i]->active) continue;
     // compute jacobian for active contact and store inn frame_Jc_
     contactLinearJacobian(contacts_[i]->frame_id);
-    Jc_.block(3*i,0,3,model_->nv) = frame_Jc_;
+    Jc_.block(3*i_active_,0,3,model_->nv) = frame_Jc_;
     contacts_[i]->v = frame_Jc_ * dq;
-    p0_.segment(3*i,3)=contacts_[i]->x_start; 
-    p_.segment(3*i,3)=contacts_[i]->x; 
-    dp_.segment(3*i,3)=contacts_[i]->v; 
+    p0_.segment(3*i_active_,3)=contacts_[i]->x_start; 
+    p_.segment(3*i_active_,3)=contacts_[i]->x; 
+    dp_.segment(3*i_active_,3)=contacts_[i]->v; 
     // compute force using the model  
     contacts_[i]->optr->contactModel(*contacts_[i]);
-    f_.segment(3*i,3) = contacts_[i]->f; 
+    f_.segment(3*i_active_,3) = contacts_[i]->f; 
     // fill out K&B
-    K(3*i, 3*i) = contacts_[i]->optr->getTangentialStiffness();
-    K(3*i + 1, 3*i + 1) = contacts_[i]->optr->getTangentialStiffness();
-    K(3*i + 2, 3 * i + 2) = contacts_[i]->optr->getNormalStiffness();
-    B(3*i, 3*i) = contacts_[i]->optr->getTangentialDamping();
-    B(3*i + 1, 3*i + 1) = contacts_[i]->optr->getTangentialDamping();
-    B(3*i + 2, 3*i + 2) = contacts_[i]->optr->getNormalDamping();
+    K(3*i_active_, 3*i_active_) = contacts_[i]->optr->getTangentialStiffness();
+    K(3*i_active_ + 1, 3*i_active_ + 1) = contacts_[i]->optr->getTangentialStiffness();
+    K(3*i_active_ + 2, 3 * i_active_ + 2) = contacts_[i]->optr->getNormalStiffness();
+    B(3*i_active_, 3*i_active_) = contacts_[i]->optr->getTangentialDamping();
+    B(3*i_active_ + 1, 3*i_active_ + 1) = contacts_[i]->optr->getTangentialDamping();
+    B(3*i_active_ + 2, 3*i_active_ + 2) = contacts_[i]->optr->getNormalDamping();
     // compute dJvi_
     computeFrameAcceleration(contacts_[i]->frame_id); 
-    dJv_.segment(3*i,3) = dJvi_; 
+    dJv_.segment(3*i_active_,3) = dJvi_; 
+    i_active_ += 1;  
   }
   D.block(0,0, 3*nactive_, 3*nactive_) = -K;
   D.block(0,3*nactive_, 3*nactive_, 3*nactive_) = -B; 
@@ -340,13 +357,38 @@ void ExponentialSimulator::computeFrameAcceleration(unsigned int frame_id)
   dJvi_ = frameSE3_.act(dJvilocal_).linear();
 } //computeFrameAcceleration
 
+void ExponentialSimulator::checkFrictionCone(){
+  f_avg = (1/sub_dt)*D*intxt_ + K*p0_;
+  i_active_ = 0; 
+  cone_flag_ = false; 
+  for(unsigned int i=0; i<nc_; i++){
+    if (!contacts_[i]->active) continue;
+    ftan_ = sqrt(sqr(f_avg(3*i_active_)) + sqr(f_avg(1+3*i_active_))); 
+    if (ftan_<(f_avg(2+3*i_active_) * contacts_[i]->optr->getFrictionCoefficient())) // fi_tan < mu*fi_z 
+    {
+      continue; 
+    } // no violation 
+    else{
+
+
+      cone_flag_ = true; 
+
+    } // project onto cone boundaries 
+
+
+  }
+ 
+} // checkFrictionCone
+
+
+
 
 void ExponentialSimulator::solveDenseExpSystem()
 {
   a_.segment(nactive_, nactive_) = b_;
   // xt_ = utilDense_.ComputeXt(A, a_, x0_, dt_);
-  utilDense_.ComputeIntegralXt(A, a_, x0_, dt_, intxt_);
-  utilDense_.ComputeDoubleIntegralXt(A, a_, x0_, dt_, int2xt_); 
+  utilDense_.ComputeIntegralXt(A, a_, x0_, sub_dt, intxt_);
+  utilDense_.ComputeDoubleIntegralXt(A, a_, x0_, sub_dt, int2xt_); 
 } // ExponentialSimulator::solveDenseExpSystem
 
 void ExponentialSimulator::solveSparseExpSystem()
@@ -379,7 +421,12 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
   JMinv_.resize(3 * nactive_, model_->nv); JMinv_.setZero();
   dJv_.resize(3 * nactive_); dJv_.setZero();
   utilDense_.resize(6 * nactive_);
+  f_avg.resize(3 * nactive_); f_avg.setZero();
+  fpr_.resize(3 * nactive_); fpr_.setZero();
+  
+  
 } // ExponentialSimulator::resizeVectorsAndMatrices
+
 
 /* ____________________________________________________________________________________________*/
 

@@ -15,7 +15,7 @@ if __name__=="__main__":
     print 'RobotWrapper Object Created Successfully!'
     # create the euler simulator 
     dt = 1.e-3 
-    ndt = 1
+    ndt = 10
     mu = 0.3        # friction coefficient
 
     K = 1e5
@@ -69,6 +69,8 @@ if __name__=="__main__":
     plt.figure('Ball Height')
     plt.plot(dt*np.arange(N+1), qz, label='euler')
 
+
+
     isSparse = False 
     isInvertible = False 
     exp_sim = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
@@ -97,7 +99,8 @@ if __name__=="__main__":
 
 
     for t in range(N):
-        exp_sim.step(tau)
+        exp_sim.step(tau) 
+
         q += [exp_sim.get_q()]
         dq += [exp_sim.get_dq()]
         for i, cp in enumerate(cpts_exp):
@@ -110,6 +113,9 @@ if __name__=="__main__":
     for i,qi in enumerate(q):
         qz += [qi[2,0]]
         dqz += [dq[i][2,0]]
+
+    dt = 1.e-3 
+    N = 800
 
     plt.plot(dt*np.arange(N+1), qz,'--',label='exp')
     plt.legend()

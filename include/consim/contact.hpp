@@ -65,6 +65,7 @@ public:
   virtual double getNormalDamping() const = 0 ;
   virtual double getTangentialStiffness() const = 0;
   virtual double getTangentialDamping() const = 0;
+  virtual double getFrictionCoefficient() const = 0;
 };
 
 class LinearPenaltyContactModel: public ContactModel {
@@ -88,6 +89,7 @@ public:
   double getNormalDamping() const override { return normal_damping_coeff_; };
   double getTangentialStiffness() const override { return static_friction_spring_coeff_; };
   double getTangentialDamping() const override { return static_friction_damping_spring_coeff_; };
+  double getFrictionCoefficient() const override { return static_friction_coeff_; };
 
 private:
   double normal_spring_const_;
