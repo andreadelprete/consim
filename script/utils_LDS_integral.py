@@ -69,6 +69,7 @@ def expm_times_v(A, v, use_exact_onenorm="auto", verbose=False):
         res = X.dot(res)
     return res
 
+
 def compute_x_T(A, a, x0, T, dt=None, invertible_A=False):
     if(dt is not None):
         N = int(T/dt)

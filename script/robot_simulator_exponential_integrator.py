@@ -81,7 +81,16 @@ class RobotSimulator:
     DISPLAY_N = 10
 
     # Class constructor
-    def __init__(self, conf, robot, root_joint=None):
+    def __init__(self, conf, robot, root_joint=None, logFileName=None):
+        self.logFileName = logFileName
+        if(self.logFileName is not None):
+            f = open(logFileName + 'A', 'w')  # Starting from empty file
+            f.close()
+            f = open(logFileName + 'b', 'w')  # Starting from empty file
+            f.close()
+            f = open(logFileName + 'xInit', 'w')  # Starting from empty file
+            f.close()
+
         self.conf = conf
         self.assume_A_invertible = False
         # se3.RobotWrapper.BuildFromURDF(conf.urdf, [conf.path, ], se3.JointModelFreeFlyer())
@@ -90,7 +99,7 @@ class RobotSimulator:
         self.data = self.robot.data
         self.t = 0.0
         self.ndt_force = 1  # number of contact force samples for each time step
-        self.f = zero(0)  # Contact forces, should be lambda but it's a Python keyword
+        self.f = zero(0)
         self.f_log = matlib.zeros((self.ndt_force, 0))
         nv = self.model.nv  # Dimension of joint velocities vector
         if root_joint is None:  # Basically if we have a floating base
@@ -192,11 +201,11 @@ class RobotSimulator:
         n = U.shape[0]
         A = matlib.zeros((2*n, 2*n))
         A[:n, n:] = matlib.eye(n)
-        A[n:,:n] = -U*K
-        A[n:,n:] = -U*B
+        A[n:, :n] = -U*K
+        A[n:, n:] = -U*B
 
 #        print "A", A
-        if(self.assume_A_invertible):            
+        if(self.assume_A_invertible):
             int_x, int2_x = compute_double_integral_x_T(A, a, x0, dt,
                                                         compute_also_integral=True,
                                                         invertible_A=True)
@@ -208,9 +217,9 @@ class RobotSimulator:
 
     def solve_sparse_exp(self, x0, b, dt):
         debug = False
-        if(int(self.t*1e3)%100==0):
+        if(int(self.t*1e3) % 100 == 0):
             debug = True
-            
+
         D_x = zero(self.nk)
         D_int_x = zero(self.nk)
         D_int2_x = zero(self.nk)
@@ -219,20 +228,21 @@ class RobotSimulator:
         # normalize rows of Upsilon
         U = self.Upsilon.copy()
         for i in range(U.shape[0]):
-            U[i,:] = np.abs(U[i,:])/np.sum(np.abs(U[i,:]))
-            
+            U[i, :] = np.abs(U[i, :])/np.sum(np.abs(U[i, :]))
+
         done = False
         left = range(self.nk)
 #        if debug: print "\nU\n", U
         while not done:
             # find elements have at least 10% effect of current item derivative (compared to sum of all elements)
-#            if debug: print "Analyze row", left[0], ':', U[left[0],:]
-            ii = np.where(U[left[0],:].A1>0.1)[0]
+            #            if debug: print "Analyze row", left[0], ':', U[left[0],:]
+            ii = np.where(U[left[0], :].A1 > 0.1)[0]
 #            ii = np.array([left[0]])
 #            ii = np.array([left[0], left[1], left[2]])
 #            ii = np.array(left)
-            if debug: print("Select elements:", ii, "which give %.1f %% coverage"%(1e2*np.sum(U[left[0],ii])))
-            
+            if debug:
+                print("Select elements:", ii, "which give %.1f %% coverage" % (1e2*np.sum(U[left[0], ii])))
+
             k = ii.shape[0]
             Ux = self.Upsilon[ii, :][:, ii]
             Kx = self.K[ii, :][:, ii]
@@ -248,7 +258,7 @@ class RobotSimulator:
             D_x[ii] = Dx * x
             D_int_x[ii] = Dx * int_x
             D_int2_x[ii] = Dx * int2_x
-           
+
             try:
                 for i in ii:
                     left.remove(i)
@@ -307,49 +317,25 @@ class RobotSimulator:
 
             if(use_sparse_solver):
                 D_x, D_int_x, D_int2_x = self.solve_sparse_exp(x0, b, dt)
-            #                D_x = zero(self.nk)
-            #                D_int_x = zero(self.nk)
-            #                D_int2_x = zero(self.nk)
-            #                dx0 = self.A*x0
-            #
-            #                Ux = self.Upsilon[0::3,0::3]
-            #                Kx = self.K[0::3, 0::3]
-            #                Bx = self.B[0::3, 0::3]
-            #                ax = dx0[0::3, 0]
-            #                ax -= np.vstack((self.dp[0::3,0], -Ux*Kx*self.p[0::3,0] -Ux*Bx*self.dp[0::3,0]))
-            #                ax[4:,0] += b[0::3, 0]
-            #                x0x = np.vstack((self.p[0::3,0], self.dp[0::3,0]))
-            #                x, int_x, int2_x = self.solve_dense_expo_system(Ux, Kx, Bx, ax, x0x, dt)
-            #                D_x[0::3,0] = np.hstack((-Kx, -Bx)) * x
-            #                D_int_x[0::3,0] = np.hstack((-Kx, -Bx)) * int_x
-            #                D_int2_x[0::3,0] = np.hstack((-Kx, -Bx)) * int2_x
-            #
-            #                for i in range(4):
-            #                    ii = 3*i+1
-            #                    Ux = self.Upsilon[ii:ii+2,ii:ii+2]
-            #                    Kx = self.K[ii:ii+2, ii:ii+2]
-            #                    Bx = self.B[ii:ii+2, ii:ii+2]
-            #                    ax = zero(4)
-            #                    ax[:2,0] = dx0[ii:ii+2, 0]
-            #                    ax[2:,0] = dx0[self.nk+ii:self.nk+ii+2, 0]
-            #                    ax -= np.vstack((self.dp[ii:ii+2,0], -Ux*Kx*self.p[ii:ii+2,0] -Ux*Bx*self.dp[ii:ii+2,0]))
-            #                    ax[2:,0] += b[ii:ii+2, 0]
-            #                    x0x = np.vstack((self.p[ii:ii+2,0], self.dp[ii:ii+2,0]))
-            #                    x, int_x, int2_x = self.solve_dense_expo_system(Ux, Kx, Bx, ax, x0x, dt)
-            #                    D_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) * x
-            #                    D_int_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) * int_x
-            #                    D_int2_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) * int2_x
+                # Code about matrix expoitation was here
 
             else:
                 self.a[self.nk:, 0] = b
 
+                # I know, file is opened and closed at each iteration, but this is Python who cares
+                if (self.logFileName is not None):
+                    # Writing down A
+                    with open(self.logFileName + 'A', 'a+') as f:
+                        np.savetxt(f, self.A.flatten(), '%.3f', '\t')
+                    with open(self.logFileName + 'b', 'a+') as f:
+                        np.savetxt(f, [np.asarray(self.a)[:, 0]], '%.3f', '\t')  # All this mess to print it as a row, and no transposing does not help
+                    with open(self.logFileName + 'xInit', 'a+') as f:
+                        np.savetxt(f, [np.asarray(x0)[:, 0]], '%.3f', '\t')
+
                 if(self.assume_A_invertible):
-                    int_x, int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt, 
-                                                                compute_also_integral=True,
-                                                                invertible_A=True)
+                    int_x, int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt, compute_also_integral=True, invertible_A=True)
                 else:
-                    int_x = compute_integral_x_T(
-                        self.A, self.a, x0, dt, invertible_A=False)
+                    int_x = compute_integral_x_T(self.A, self.a, x0, dt, invertible_A=False)
                     int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt, invertible_A=False)
                     #                x, int_x, int2_x = compute_x_T_and_two_integrals(self.A, self.a, x0, dt)
 
@@ -401,3 +387,39 @@ class RobotSimulator:
         #        if(time_spent < dt): time.sleep(dt-time_spent)
 
         return self.q, self.v, self.f
+
+
+''' Moved because of readability
+                            D_x = zero(self.nk)
+                           D_int_x = zero(self.nk)
+                           D_int2_x = zero(self.nk)
+                           dx0 = self.A*x0
+
+                           Ux = self.Upsilon[0::3,0::3]
+                           Kx = self.K[0::3, 0::3]
+                           Bx = self.B[0::3, 0::3]
+                           ax = dx0[0::3, 0]
+                           ax -= np.vstack((self.dp[0::3,0], -Ux*Kx*self.p[0::3,0] -Ux*Bx*self.dp[0::3,0]))
+                           ax[4:,0] += b[0::3, 0]
+                           x0x = np.vstack((self.p[0::3,0], self.dp[0::3,0]))
+                           x, int_x, int2_x = self.solve_dense_expo_system(Ux, Kx, Bx, ax, x0x, dt)
+                           D_x[0::3,0] = np.hstack((-Kx, -Bx)) * x
+                           D_int_x[0::3,0] = np.hstack((-Kx, -Bx)) * int_x
+                           D_int2_x[0::3,0] = np.hstack((-Kx, -Bx)) * int2_x
+
+                           for i in range(4):
+                               ii = 3*i+1
+                               Ux = self.Upsilon[ii:ii+2,ii:ii+2]
+                               Kx = self.K[ii:ii+2, ii:ii+2]
+                               Bx = self.B[ii:ii+2, ii:ii+2]
+                               ax = zero(4)
+                               ax[:2,0] = dx0[ii:ii+2, 0]
+                               ax[2:,0] = dx0[self.nk+ii:self.nk+ii+2, 0]
+                               ax -= np.vstack((self.dp[ii:ii+2,0], -Ux*Kx*self.p[ii:ii+2,0] -Ux*Bx*self.dp[ii:ii+2,0]))
+                               ax[2:,0] += b[ii:ii+2, 0]
+                               x0x = np.vstack((self.p[ii:ii+2,0], self.dp[ii:ii+2,0]))
+                               x, int_x, int2_x = self.solve_dense_expo_system(Ux, Kx, Bx, ax, x0x, dt)
+                               D_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) * x
+                               D_int_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) * int_x
+                               D_int2_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) * int2_x
+'''

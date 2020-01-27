@@ -38,7 +38,8 @@ simu_params_exp_int_sparse = {
     'ndt': 1,
     'sparse': 1
 }
-SIMU_PARAMS = [simu_params_standard, simu_params_exp_int]
+# SIMU_PARAMS = [simu_params_standard, simu_params_exp_int]
+SIMU_PARAMS = [simu_params_exp_int]
 ASSUME_A_INVERTIBLE = 0
 USE_CONTROLLER = 0
 ndt_force = simu_params_standard['ndt']
@@ -55,7 +56,8 @@ DISPLAY_N = int(conf.DISPLAY_T/dt)
 
 solo = loadSolo()
 
-simu = RobotSimulator(conf, solo, se3.JointModelFreeFlyer())
+# simu = RobotSimulator(conf, solo, se3.JointModelFreeFlyer())
+simu = RobotSimulator(conf, solo, se3.JointModelFreeFlyer(), 'logStuff') # With logger enabled
 simu.assume_A_invertible = ASSUME_A_INVERTIBLE
 simu.ndt_force = ndt_force
 q0, v0 = np.asmatrix(matlib.copy(simu.q)), np.asmatrix(matlib.copy(simu.v))
@@ -219,5 +221,5 @@ for (name, f) in forces.items():
 #    leg = ax[i].legend()
 #    leg.get_frame().set_alpha(0.5)
 
-if(1):
-    plt.show()
+
+plt.show()
