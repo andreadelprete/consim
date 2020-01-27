@@ -16,6 +16,9 @@
 
 #include <iostream>
 
+// TODO: sqr already defined in contact.cpp 
+#define sqr(x) (x * x)
+
 namespace consim {
 
 /** 
@@ -220,7 +223,6 @@ ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocc
   ddqMean_.resize(model_->nv);
   Minv_.resize(model_->nv, model_->nv); Minv_.setZero();
   dv0_.resize(model_->nv); dv0_.setZero();
-  fi_.resize(3); fi_.setZero();
 }
 
 void ExponentialSimulator::allocateData(){
@@ -366,18 +368,26 @@ void ExponentialSimulator::checkFrictionCone(){
     ftan_ = sqrt(sqr(f_avg(3*i_active_)) + sqr(f_avg(1+3*i_active_))); 
     if (ftan_<(f_avg(2+3*i_active_) * contacts_[i]->optr->getFrictionCoefficient())) // fi_tan < mu*fi_z 
     {
-      continue; 
+      fpr_.segment(3*i_active_,3) = f_avg.segment(3*i_active_,3); 
     } // no violation 
     else{
-
-
+      // if fi_z is pulling in world frame => fi_z < 0, this will also be activated  
+      if(f_avg(2+3*i_active_)<0){
+        fpr_(3*i_active_) =  0.; 
+        fpr_(1+3*i_active_) = 0.;
+        fpr_(2+3*i_active_) = 0.;
+      } // pulling force case 
+      else{
+        cone_direction_ = atan2(f_avg(1+3*i_active_), f_avg(3*i_active_)); 
+        fpr_(3*i_active_) = cos(cone_direction_)*f_avg(2+3*i_active_) * contacts_[i]->optr->getFrictionCoefficient();
+        fpr_(1+3*i_active_) = sin(cone_direction_)*f_avg(2+3*i_active_) * contacts_[i]->optr->getFrictionCoefficient();
+        fpr_(2+3*i_active_) = f_avg(2+3*i_active_); 
+      } 
+      
       cone_flag_ = true; 
-
     } // project onto cone boundaries 
-
-
+    i_active_ += 1; 
   }
- 
 } // checkFrictionCone
 
 

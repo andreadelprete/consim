@@ -219,8 +219,8 @@ namespace consim {
       // friction cone 
       Eigen::VectorXd f_avg;  
       Eigen::VectorXd fpr_; 
-      Eigen::VectorXd fi_;  
-      bool cone_flag_; 
+      bool cone_flag_ = false; 
+      double cone_direction_; 
       double ftan_; 
       unsigned int i_active_; 
 
