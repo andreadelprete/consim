@@ -76,6 +76,7 @@ void AbstractSimulator::resetState(const Eigen::VectorXd& q, const Eigen::Vector
   computeContactState();
   computeContactForces(dq_);
   resetflag_ = true;
+  nactive_prev = nactive_; 
 }
 
 void AbstractSimulator::checkContact()
@@ -223,6 +224,7 @@ ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocc
   ddqMean_.resize(model_->nv);
   Minv_.resize(model_->nv, model_->nv); Minv_.setZero();
   dv0_.resize(model_->nv); dv0_.setZero();
+  nactive_prev = -1; // ensures matrice resize at reset state 
 }
 
 void ExponentialSimulator::allocateData(){
@@ -313,7 +315,14 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
 
   void ExponentialSimulator::computeContactForces(const Eigen::VectorXd &dq)
 {
-  resizeVectorsAndMatrices();
+  if (!(nactive_==nactive_prev)){
+    Eigen::internal::set_is_malloc_allowed(true); 
+    nactive_prev = nactive_;
+    resizeVectorsAndMatrices();
+    Eigen::internal::set_is_malloc_allowed(false); 
+  } // only reallocate memory if number of active contacts changes
+  
+  
   // tau_ was already set to zero in checkContactStates
   if (joint_friction_flag_)
   {
@@ -333,7 +342,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     // compute force using the model  
     contacts_[i]->optr->contactModel(*contacts_[i]);
     f_.segment(3*i_active_,3) = contacts_[i]->f; 
-    // fill out K&B
+    // fill out diagonals on K&B
     K(3*i_active_, 3*i_active_) = contacts_[i]->optr->getTangentialStiffness();
     K(3*i_active_ + 1, 3*i_active_ + 1) = contacts_[i]->optr->getTangentialStiffness();
     K(3*i_active_ + 2, 3 * i_active_ + 2) = contacts_[i]->optr->getNormalStiffness();
@@ -383,7 +392,6 @@ void ExponentialSimulator::checkFrictionCone(){
         fpr_(1+3*i_active_) = sin(cone_direction_)*f_avg(2+3*i_active_) * contacts_[i]->optr->getFrictionCoefficient();
         fpr_(2+3*i_active_) = f_avg(2+3*i_active_); 
       } 
-      
       cone_flag_ = true; 
     } // project onto cone boundaries 
     i_active_ += 1; 
@@ -433,7 +441,6 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
   utilDense_.resize(6 * nactive_);
   f_avg.resize(3 * nactive_); f_avg.setZero();
   fpr_.resize(3 * nactive_); fpr_.setZero();
-  
   
 } // ExponentialSimulator::resizeVectorsAndMatrices
 

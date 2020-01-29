@@ -82,6 +82,7 @@ namespace consim {
       unsigned int nc_=0;
       unsigned int nk_ = 0;
       int nactive_; // number of active contacts
+      int nactive_prev;  // number of active contacts at previous time step 
       bool resetflag_ = false;
       /**
         * loops over contact points, checks active contacts and sets reference contact positions 
@@ -217,12 +218,13 @@ namespace consim {
       // 
       Eigen::VectorXd ddqMean_;
       // friction cone 
-      Eigen::VectorXd f_avg;  
-      Eigen::VectorXd fpr_; 
-      bool cone_flag_ = false; 
-      double cone_direction_; 
+      Eigen::VectorXd f_avg;  // average force for cone 
+      Eigen::VectorXd fpr_;   // projected force on cone boundaries 
+      bool cone_flag_ = false; // cone violation status 
+      double cone_direction_; // angle of tangential(to contact surface) force 
       double ftan_; 
-      unsigned int i_active_; 
+      unsigned int i_active_; // index of the active contact 
+      
 
 
   }; // class ExponentialSimulator
