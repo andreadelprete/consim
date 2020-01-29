@@ -176,7 +176,6 @@ namespace consim {
       bool invertibleA_;
       const double sub_dt;
       
-
       Eigen::VectorXd f_;  // total force 
       Eigen::MatrixXd Jc_; // contact jacobian for all contacts 
       Eigen::VectorXd p0_; // reference position for contact 

@@ -248,6 +248,7 @@ void ExponentialSimulator::allocateData(){
 
 
 void ExponentialSimulator::step(const Eigen::VectorXd &tau){
+  getProfiler().start("exponential_simulator::step");
   if(!resetflag_){
     throw std::runtime_error("resetState() must be called first !");
   }
@@ -283,7 +284,9 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     } // non-invertable dense
   }
   // the friction cone implementation will get here 
+  getProfiler().start("exponential_simulator::checkFrictionCone");
   checkFrictionCone();
+  getProfiler().stop("exponential_simulator::checkFrictionCone");
 
   if(cone_flag_){
     ddqMean_ = Minv_*(tau - data_->nle + Jc_.transpose()*fpr_);
@@ -305,10 +308,24 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     q_ = pinocchio::integrate(*model_, q_, dqMean_ * sub_dt);
     dq_ += data_->ddq * sub_dt; 
   }
+
+  /** 
+   * pinocchio::computeAllTerms already calls first order FK 
+   * https://github.com/stack-of-tasks/pinocchio/blob/3f4d9e8504ff4e05dbae0ede0bd808d025e4a6d8/src/algorithm/compute-all-terms.hpp#L20
+   * we need second order FK for pinocchio::getFrameAcceleration
+   * seems a bit inefficient to call forward kinematics twice   
+  */
+
+  getProfiler().start("pinocchio::fk_second_order");
   pinocchio::forwardKinematics(*model_, *data_, q_, dq_, ddq_); 
+  getProfiler().stop("pinocchio::fk_second_order");
+  
   computeContactState();
+  getProfiler().start("exponential_simulator::computeContactForces");
   computeContactForces(dq_);
+  getProfiler().stop("exponential_simulator::computeContactForces");
   }  // sub_dt loop
+  getProfiler().stop("exponential_simulator::step");
 } // ExponentialSimulator::step
 
 
@@ -316,10 +333,12 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
   void ExponentialSimulator::computeContactForces(const Eigen::VectorXd &dq)
 {
   if (!(nactive_==nactive_prev)){
+    getProfiler().start("exponential_simulator::resizeVectorsAndMatrices");
     Eigen::internal::set_is_malloc_allowed(true); 
     nactive_prev = nactive_;
     resizeVectorsAndMatrices();
     Eigen::internal::set_is_malloc_allowed(false); 
+    getProfiler().stop("exponential_simulator::resizeVectorsAndMatrices");
   } // only reallocate memory if number of active contacts changes
   
   
@@ -332,7 +351,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
   i_active_ = 0; 
   for(unsigned int i=0; i<nc_; i++){
     if (!contacts_[i]->active) continue;
-    // compute jacobian for active contact and store inn frame_Jc_
+    // compute jacobian for active contact and store in frame_Jc_
     contactLinearJacobian(contacts_[i]->frame_id);
     Jc_.block(3*i_active_,0,3,model_->nv) = frame_Jc_;
     contacts_[i]->v = frame_Jc_ * dq;
@@ -360,12 +379,14 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
 
 void ExponentialSimulator::computeFrameAcceleration(unsigned int frame_id)
 {
+  getProfiler().start("exponential_simulator::computeFrameAcceleration");
   dJvi_.setZero();
   vilocal_ = pinocchio::getFrameVelocity(*model_, *data_, frame_id);
   dJvilocal_ = pinocchio::getFrameAcceleration(*model_, *data_, frame_id);
   dJvilocal_.linear() += vilocal_.angular().cross(vilocal_.linear());
   frameSE3_.rotation() = data_->oMf[frame_id].rotation();
   dJvi_ = frameSE3_.act(dJvilocal_).linear();
+  getProfiler().stop("exponential_simulator::computeFrameAcceleration");
 } //computeFrameAcceleration
 
 void ExponentialSimulator::checkFrictionCone(){
@@ -406,6 +427,7 @@ void ExponentialSimulator::solveDenseExpSystem()
   a_.segment(nactive_, nactive_) = b_;
   // xt_ = utilDense_.ComputeXt(A, a_, x0_, dt_);
   utilDense_.ComputeIntegralXt(A, a_, x0_, sub_dt, intxt_);
+  //TODO: don't compute second integral if cone is violated ? 
   utilDense_.ComputeDoubleIntegralXt(A, a_, x0_, sub_dt, int2xt_); 
 } // ExponentialSimulator::solveDenseExpSystem
 
@@ -445,7 +467,7 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
 } // ExponentialSimulator::resizeVectorsAndMatrices
 
 
-/* ____________________________________________________________________________________________*/
+/*____________________________________________________________________________________________*/
 
 
 

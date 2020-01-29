@@ -6,7 +6,7 @@
 
 #include <Eigen/Dense>
 
-namespace consim {
+namespace real_time_tools {
 
   // Class for creating a dynamic matrix with a pre-allocated maximum size
   template<int _MaxRows, int _MaxCols>
