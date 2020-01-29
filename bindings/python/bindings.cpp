@@ -129,10 +129,9 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
         .def("add_object", &ExponentialSimulator::addObject)
         .def("reset_state", &ExponentialSimulator::resetState)
         .def("set_joint_friction", &ExponentialSimulator::setJointFriction)
-        .def("allocate_data", &ExponentialSimulator::allocateData)
         .def("get_q", &ExponentialSimulator::get_q)
         .def("get_dq", &ExponentialSimulator::get_dq)
-        .def("get_ddq", &EulerSimulator::get_ddq);
+        .def("get_ddq", &ExponentialSimulator::get_ddq);
 
         // .ADD_PROPERTY_READONLY_RETURN_BY_VALUE("q", &EulerSimulator::q_)
         // .ADD_PROPERTY_READONLY_RETURN_BY_VALUE("dq", &EulerSimulator::dq_)

@@ -227,24 +227,7 @@ ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocc
   nactive_prev = -1; // ensures matrice resize at reset state 
 }
 
-void ExponentialSimulator::allocateData(){
-  // this function must be called after adding all contacts 
-  f_.resize(nk_); 
-  p0_.resize(nk_); 
-  p_.resize(nk_); 
-  dp_.resize(nk_); 
-  Jc_.resize(nk_, model_->nv); Jc_.setZero();
-  dJv_.resize(nk_); dJv_.setZero();
-  a_.resize(2 * nk_); a_.setZero();
-  A.resize(2 * nk_, 2 * nk_); A.setZero();
-  K.resize(nk_, nk_); K.setZero();
-  B.resize(nk_, nk_); B.setZero();
-  D.resize(2*nk_, nk_); D.setZero();
-  xt_.resize(nk_);
-  intxt_.resize(nk_); 
-  int2xt_.resize(nk_);
-  
-} //ExponentialSimulator::allocateData
+
 
 
 void ExponentialSimulator::step(const Eigen::VectorXd &tau){
@@ -280,7 +263,12 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       throw std::runtime_error("Invertible and dense integration not implemented yet");
     } //invertible dense 
     else{
-      solveDenseExpSystem();
+      a_.segment(nactive_, nactive_) = b_;
+      utilDense_.ComputeIntegralXt(A, a_, x0_, sub_dt, intxt_);
+      /**
+       * compute second integral only in case of valid contact forces 
+       */ 
+      // solveDenseExpSystem();
     } // non-invertable dense
   }
   // the friction cone implementation will get here 
@@ -293,6 +281,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     dqMean_ = dq_ + sub_dt* ddqMean_; 
   } // violates friction cone 
   else{
+    utilDense_.ComputeDoubleIntegralXt(A, a_, x0_, sub_dt, int2xt_); 
     ddqMean_ = dv0_ + JMinv_.transpose()*D*intxt_/sub_dt ;
     dqMean_ = dq_ + .5 * sub_dt * dv0_ + JMinv_.transpose()*D*int2xt_/sub_dt ;
   } // within friction cone 
@@ -417,7 +406,7 @@ void ExponentialSimulator::checkFrictionCone(){
     } // project onto cone boundaries 
     i_active_ += 1; 
   }
-} // checkFrictionCone
+} // ExponentialSimulator::checkFrictionCone
 
 
 

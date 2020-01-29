@@ -7,6 +7,7 @@ import os, sys
 from os.path import dirname, join
 import matplotlib.pyplot as plt 
 
+
 if __name__=="__main__":
     # build the point mass model 
     urdf_path = os.path.abspath('../models/urdf/free_flyer.urdf')
@@ -88,7 +89,7 @@ if __name__=="__main__":
     fcnt_exp = np.zeros([N+1, len(cpts_exp), 3])
 
     robot.forwardKinematics(q0)
-    exp_sim.allocate_data()
+    # exp_sim.allocate_data()
     print 'allocate data works'
     exp_sim.reset_state(q0, dq0, True)
     print 'ExpoSim reset state done !' 
@@ -133,7 +134,12 @@ if __name__=="__main__":
     plt.grid()
     plt.title('normal contact forces')
 
+
+    consim.stop_watch_report(3)
+
     plt.show()
+
+    
 
     
 
