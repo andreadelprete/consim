@@ -65,19 +65,19 @@ namespace consim {
 
       virtual void step(const Eigen::VectorXd &tau)=0;
 
-      Eigen::VectorXd get_q() const {return q_;};
-      Eigen::VectorXd get_dq() const {return dq_;};
-      Eigen::VectorXd get_ddq() const {return ddq_;};
+      const Eigen::VectorXd& get_q() const {return q_;};
+      const Eigen::VectorXd& get_v() const {return v_;};
+      const Eigen::VectorXd& get_dv() const {return dv_;};
       // Eigen::VectorXd get_f() const {return f_};
 
     
     protected:
 
       Eigen::VectorXd q_;  
-      Eigen::VectorXd dq_;
-      Eigen::VectorXd ddq_;
+      Eigen::VectorXd v_;
+      Eigen::VectorXd dv_;
       // Eigen::VectorXd f_;
-      Eigen::VectorXd dqMean_;
+      Eigen::VectorXd vMean_;
       Eigen::VectorXd tau_;
       unsigned int nc_=0;
       unsigned int nk_ = 0;
@@ -126,10 +126,6 @@ namespace consim {
     */
 
       void step(const Eigen::VectorXd &tau) override;
-
-      Eigen::VectorXd getQ() const {return q_;};
-      Eigen::VectorXd getDq() const {return dq_;}; 
-    
 
     protected:
       const double sub_dt;
@@ -194,10 +190,8 @@ namespace consim {
       pinocchio::Motion vilocal_ = pinocchio::Motion::Zero();
 
       pinocchio::Motion dJvilocal_ = pinocchio::Motion::Zero(); // per frame
-      // Eigen::VectorXd ailocal_;   // per frame
       Eigen::VectorXd dJvi_; // per frame
       pinocchio::SE3 frameSE3_ = pinocchio::SE3::Identity();
-      // Eigen::VectorXd ai_; // per frame 
       // keep the stiffness/damping matrices fixed to the total size of contact points
       // worry about tracking index of Active sub-blocks later
       Eigen::MatrixXd K;
@@ -211,16 +205,14 @@ namespace consim {
       // expokit 
       expokit::LDSUtility<double, Dynamic> utilDense_;
       // 
-      Eigen::VectorXd ddqMean_;
+      Eigen::VectorXd dvMean_;
       // friction cone 
       Eigen::VectorXd f_avg;  // average force for cone 
       Eigen::VectorXd fpr_;   // projected force on cone boundaries 
       bool cone_flag_ = false; // cone violation status 
       double cone_direction_; // angle of tangential(to contact surface) force 
       double ftan_; 
-      unsigned int i_active_; // index of the active contact 
-      
-
+      unsigned int i_active_; // index of the active contact     
 
   }; // class ExponentialSimulator
 

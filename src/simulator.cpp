@@ -27,11 +27,10 @@ namespace consim {
 
 AbstractSimulator::AbstractSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps): 
 model_(&model), data_(&data), dt_(dt), n_integration_steps_(n_integration_steps) {
-  
   q_.resize(model.nq);
-  dq_.resize(model.nv);
-  ddq_.resize(model.nv);
-  dqMean_.resize(model.nv);
+  v_.resize(model.nv);
+  dv_.resize(model.nv);
+  vMean_.resize(model.nv);
   tau_.resize(model.nv);
   frame_Jc_.resize(3, model.nv);
   J_.resize(6, model.nv);
@@ -62,8 +61,8 @@ void AbstractSimulator::addObject(Object& obj) {
 void AbstractSimulator::resetState(const Eigen::VectorXd& q, const Eigen::VectorXd& dq, bool reset_contact_state)
 {
   q_ = q;
-  dq_ = dq;
-  dqMean_ = dq;
+  v_ = dq;
+  vMean_ = dq;
 
   if (reset_contact_state) {
     for (auto &cptr : contacts_) {
@@ -74,7 +73,7 @@ void AbstractSimulator::resetState(const Eigen::VectorXd& q, const Eigen::Vector
   }
 
   computeContactState();
-  computeContactForces(dq_);
+  computeContactForces(v_);
   resetflag_ = true;
   nactive_prev = nactive_; 
 }
@@ -120,14 +119,14 @@ void AbstractSimulator::computeContactState()
   // Compute all the terms (mass matrix, jacobians, ...)
   data_->M.fill(0);
   getProfiler().start("pinocchio::computeAllTerms");
-  pinocchio::computeAllTerms(*model_, *data_, q_, dq_);
+  pinocchio::computeAllTerms(*model_, *data_, q_, v_);
   pinocchio::updateFramePlacements(*model_, *data_);
   getProfiler().stop("pinocchio::computeAllTerms");
 
   // Contact handling: Detect contact, compute contact forces, compute resulting torques.
   getProfiler().start("check_contact_state");
   checkContact();
-  // computeContactForces(dq_);
+  // computeContactForces(v_);
   getProfiler().stop("check_contact_state");
 }
 
@@ -141,7 +140,7 @@ inline void AbstractSimulator::contactLinearJacobian(unsigned int frame_id)
 {
   J_.setZero();
   pinocchio::getFrameJacobian(*model_, *data_, frame_id, pinocchio::LOCAL_WORLD_ALIGNED, J_);
-  frame_Jc_ = J_.topRows(3);
+  frame_Jc_ = J_.topRows<3>();
 }
 
 /* ____________________________________________________________________________________________*/
@@ -187,22 +186,19 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
 
       // Add the user torque;
       tau_ += tau;
-
       // Compute the acceloration ddq.
       getProfiler().start("pinocchio::aba");
-      pinocchio::aba(*model_, *data_, q_, dq_, tau_);
+      pinocchio::aba(*model_, *data_, q_, v_, tau_);
       getProfiler().stop("pinocchio::aba");
-
       // Integrate the system forward in time.
-      dqMean_ = dq_ + data_->ddq * .5 * sub_dt;
-      q_ = pinocchio::integrate(*model_, q_, dqMean_ * sub_dt);
-      dq_ += data_->ddq * sub_dt;
-
+      vMean_ = v_ + data_->ddq * .5 * sub_dt;
+      q_ = pinocchio::integrate(*model_, q_, vMean_ * sub_dt);
+      v_ += data_->ddq * sub_dt;
       // Compute the new data values and contact information after the integration
       // step. This way, if this method returns, the values computed in data and
       // on the contact state are consistent with the q, dq and ddq values.
       computeContactState();
-      computeContactForces(dq_);
+      computeContactForces(v_);
     }
   getProfiler().stop("euler_simulator::step");
 }
@@ -221,7 +217,7 @@ ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocc
                                            sparse_(sparse), invertibleA_(invertibleA), sub_dt(dt / ((double)n_integration_steps))
 {
   dJvi_.resize(3);
-  ddqMean_.resize(model_->nv);
+  dvMean_.resize(model_->nv);
   Minv_.resize(model_->nv, model_->nv); Minv_.setZero();
   dv0_.resize(model_->nv); dv0_.setZero();
   nactive_prev = -1; // ensures matrice resize at reset state 
@@ -241,7 +237,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     {
   
   if (nactive_> 0){
-
+  Eigen::internal::set_is_malloc_allowed(false); 
   kp0_ = K*p0_;
   Minv_ = pinocchio::computeMinverse(*model_, *data_, q_);
   JMinv_ = Jc_ * Minv_;
@@ -251,9 +247,10 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
   A.block(3*nactive_, 0, 3*nactive_, 3*nactive_) = -Upsilon_ * K;
   A.block(3*nactive_, 3*nactive_, 3*nactive_, 3*nactive_) = -Upsilon_ * B;
   b_ = JMinv_ * (tau_ - data_->nle) + dJv_ + Upsilon_*kp0_;
-  x0_.segment(0, 3*nactive_) = p_; 
-  x0_.segment(3*nactive_, 3*nactive_) = dp_; 
-
+  x0_.head(3*nactive_) = p_; 
+  x0_.tail(3*nactive_) = dp_; 
+  Eigen::internal::set_is_malloc_allowed(true); 
+  std::cout<<"M innv and so on work with no memory allocation "<<std::endl; 
   if (sparse_)
   {
     throw std::runtime_error("Sparse integration not implemented yet");
@@ -277,25 +274,26 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
   getProfiler().stop("exponential_simulator::checkFrictionCone");
 
   if(cone_flag_){
-    ddqMean_ = Minv_*(tau - data_->nle + Jc_.transpose()*fpr_);
-    dqMean_ = dq_ + sub_dt* ddqMean_; 
+    dvMean_ = Minv_*(tau - data_->nle + Jc_.transpose()*fpr_);
+    vMean_ = v_ + sub_dt* dvMean_; 
   } // violates friction cone 
   else{
     utilDense_.ComputeDoubleIntegralXt(A, a_, x0_, sub_dt, int2xt_); 
-    ddqMean_ = dv0_ + JMinv_.transpose()*D*intxt_/sub_dt ;
-    dqMean_ = dq_ + .5 * sub_dt * dv0_ + JMinv_.transpose()*D*int2xt_/sub_dt ;
+    dvMean_ = dv0_ + JMinv_.transpose()*D*intxt_/sub_dt ;
+    vMean_ = v_ + .5 * sub_dt * dv0_ + JMinv_.transpose()*(D*int2xt_)/sub_dt ;
   } // within friction cone 
 
-  dq_ += sub_dt*ddqMean_;
-  q_ = pinocchio::integrate(*model_, q_, dqMean_ * sub_dt);
-  ddq_ = ddqMean_; 
+  v_ += sub_dt*dvMean_;
+  q_ = pinocchio::integrate(*model_, q_, vMean_ * sub_dt);
+  dv_ = dvMean_; 
   } // active contacts > 0 
   else{
-    pinocchio::aba(*model_, *data_, q_, dq_, tau_);
-    ddq_ = data_->ddq; 
-    dqMean_ = dq_ + ddq_ * .5 * sub_dt;
-    q_ = pinocchio::integrate(*model_, q_, dqMean_ * sub_dt);
-    dq_ += data_->ddq * sub_dt; 
+
+    pinocchio::aba(*model_, *data_, q_, v_, tau_);
+    dv_ = data_->ddq; 
+    vMean_ = v_ + dv_ * .5 * sub_dt;
+    q_ = pinocchio::integrate(*model_, q_, vMean_ * sub_dt);
+    v_ += data_->ddq * sub_dt; 
   }
 
   /** 
@@ -306,12 +304,11 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
   */
 
   getProfiler().start("pinocchio::fk_second_order");
-  pinocchio::forwardKinematics(*model_, *data_, q_, dq_, ddq_); 
+  pinocchio::forwardKinematics(*model_, *data_, q_, v_, dv_); 
   getProfiler().stop("pinocchio::fk_second_order");
-  
   computeContactState();
   getProfiler().start("exponential_simulator::computeContactForces");
-  computeContactForces(dq_);
+  computeContactForces(v_);
   getProfiler().stop("exponential_simulator::computeContactForces");
   }  // sub_dt loop
   getProfiler().stop("exponential_simulator::step");
@@ -323,10 +320,8 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
 {
   if (!(nactive_==nactive_prev)){
     getProfiler().start("exponential_simulator::resizeVectorsAndMatrices");
-    Eigen::internal::set_is_malloc_allowed(true); 
     nactive_prev = nactive_;
     resizeVectorsAndMatrices();
-    Eigen::internal::set_is_malloc_allowed(false); 
     getProfiler().stop("exponential_simulator::resizeVectorsAndMatrices");
   } // only reallocate memory if number of active contacts changes
   
@@ -342,6 +337,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     if (!contacts_[i]->active) continue;
     // compute jacobian for active contact and store in frame_Jc_
     contactLinearJacobian(contacts_[i]->frame_id);
+    Eigen::internal::set_is_malloc_allowed(false); 
     Jc_.block(3*i_active_,0,3,model_->nv) = frame_Jc_;
     contacts_[i]->v = frame_Jc_ * dq;
     p0_.segment(3*i_active_,3)=contacts_[i]->x_start; 
@@ -357,8 +353,12 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     B(3*i_active_, 3*i_active_) = contacts_[i]->optr->getTangentialDamping();
     B(3*i_active_ + 1, 3*i_active_ + 1) = contacts_[i]->optr->getTangentialDamping();
     B(3*i_active_ + 2, 3*i_active_ + 2) = contacts_[i]->optr->getNormalDamping();
+    Eigen::internal::set_is_malloc_allowed(true); 
+    std::cout<<"computeContactForces fill Jc p0, p dp f K,B"<<std::endl;
+
     // compute dJvi_
     computeFrameAcceleration(contacts_[i]->frame_id); 
+
     dJv_.segment(3*i_active_,3) = dJvi_; 
     i_active_ += 1;  
   }
@@ -413,7 +413,7 @@ void ExponentialSimulator::checkFrictionCone(){
 
 void ExponentialSimulator::solveDenseExpSystem()
 {
-  a_.segment(nactive_, nactive_) = b_;
+  a_.tail(3*nactive_) = b_;
   // xt_ = utilDense_.ComputeXt(A, a_, x0_, dt_);
   utilDense_.ComputeIntegralXt(A, a_, x0_, sub_dt, intxt_);
   //TODO: don't compute second integral if cone is violated ? 
@@ -434,7 +434,7 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
   p0_.resize(3 * nactive_); p0_.setZero();
   p_.resize(3 * nactive_); p_.setZero();
   dp_.resize(3 * nactive_); dp_.setZero();
-  a_.resize(3 * nactive_); a_.setZero();
+  a_.resize(6 * nactive_); a_.setZero();
   b_.resize(3 * nactive_); b_.setZero();
   x0_.resize(6 * nactive_); x0_.setZero();
   xt_.resize(6 * nactive_); xt_.setZero();

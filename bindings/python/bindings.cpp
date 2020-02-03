@@ -11,7 +11,24 @@
 
 //eigenpy::switchToNumpyMatrix();
 
+
 namespace consim {
+
+class AbstractSimulatorWrapper : public AbstractSimulator, public boost::python::wrapper<AbstractSimulator>
+{
+  public: 
+    AbstractSimulatorWrapper(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps) : 
+              AbstractSimulator(model, data, dt, n_integration_steps), boost::python::wrapper<AbstractSimulator>() {}
+
+    void step(const Eigen::VectorXd &tau){
+      this->get_override("step")(tau);
+    }
+
+  void computeContactForces(const Eigen::VectorXd &dq){
+    this->get_override("computeContactForces")(dq);
+  }
+
+};
 
 EulerSimulator* build_euler_simulator(
     float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data,
@@ -67,6 +84,7 @@ void stop_watch_report(int precision)
 
 namespace bp = boost::python;
 
+
 #define ADD_PROPERTY_RETURN_BY_VALUE(name, ref) add_property(name, \
     make_getter(ref, bp::return_value_policy<bp::return_by_value>()), \
     make_setter(ref, bp::return_value_policy<bp::return_by_value>()))
@@ -107,18 +125,31 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
         .ADD_PROPERTY_RETURN_BY_VALUE("viscvel", &ContactPoint::viscvel)
         .ADD_PROPERTY_RETURN_BY_VALUE("f", &ContactPoint::f);
 
-    bp::class_<EulerSimulator>("EulerSimulator",
+
+    bp::class_<AbstractSimulatorWrapper, boost::noncopyable>("AbstractSimulator", "Abstract Simulator Class", 
+                         bp::init<pinocchio::Model &, pinocchio::Data &, float, int>())
+        .def("add_contact_point", &AbstractSimulator::addContactPoint, return_internal_reference<>())
+        .def("get_contact", &AbstractSimulator::getContact, return_internal_reference<>())
+        .def("add_object", &AbstractSimulator::addObject)
+        .def("reset_state", &AbstractSimulator::resetState)
+        .def("set_joint_friction", &AbstractSimulator::setJointFriction)
+        .def("step", bp::pure_virtual(&AbstractSimulator::step))
+        .add_property("q",
+                    bp::make_function(&EulerSimulator::get_q, bp::return_value_policy<bp::return_by_value>()),
+                    "configuration vector")
+        .add_property("v",
+                    bp::make_function(&EulerSimulator::get_v, bp::return_value_policy<bp::return_by_value>()),
+                    "velocity vector")
+        .add_property("dv",
+                    bp::make_function(&EulerSimulator::get_dv, bp::return_value_policy<bp::return_by_value>()),
+                    "acceleration vector");
+
+
+    bp::class_<EulerSimulator, bases<AbstractSimulatorWrapper>>("EulerSimulator",
                           "Euler Simulator class",
-                          bp::init<pinocchio::Model &, pinocchio::Data &, float, int>())
-        .def("add_contact_point", &EulerSimulator::addContactPoint, return_internal_reference<>())
-        .def("get_contact", &EulerSimulator::getContact, return_internal_reference<>())
-        .def("step", &EulerSimulator::step)
-        .def("add_object", &EulerSimulator::addObject)
-        .def("reset_state", &EulerSimulator::resetState)
-        .def("set_joint_friction", &EulerSimulator::setJointFriction)
-        .def("get_q", &EulerSimulator::get_q)
-        .def("get_dq", &EulerSimulator::get_dq)
-        .def("get_ddq", &EulerSimulator::get_ddq);
+                          bp::init<pinocchio::Model &, pinocchio::Data &, float, int>());
+        // .def("step", &EulerSimulator::step);
+
     
     bp::class_<ExponentialSimulator>("ExponentialSimulator",
                           "Exponential Simulator class",
@@ -129,9 +160,18 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
         .def("add_object", &ExponentialSimulator::addObject)
         .def("reset_state", &ExponentialSimulator::resetState)
         .def("set_joint_friction", &ExponentialSimulator::setJointFriction)
-        .def("get_q", &ExponentialSimulator::get_q)
-        .def("get_dq", &ExponentialSimulator::get_dq)
-        .def("get_ddq", &ExponentialSimulator::get_ddq);
+        .add_property("q",
+                    bp::make_function(&ExponentialSimulator::get_q, bp::return_value_policy<bp::return_by_value>()),
+                    "dimension of configuration vector")
+        .add_property("v",
+                    bp::make_function(&ExponentialSimulator::get_v, bp::return_value_policy<bp::return_by_value>()),
+                    "dimension of configuration vector")
+        .add_property("dv",
+                    bp::make_function(&ExponentialSimulator::get_dv, bp::return_value_policy<bp::return_by_value>()),
+                    "dimension of configuration vector");
+        // .def("get_q", &ExponentialSimulator::get_q)
+        // .def("get_v", &ExponentialSimulator::get_v)
+        // .def("get_dv", &ExponentialSimulator::get_dv);
 
         // .ADD_PROPERTY_READONLY_RETURN_BY_VALUE("q", &EulerSimulator::q_)
         // .ADD_PROPERTY_READONLY_RETURN_BY_VALUE("dq", &EulerSimulator::dq_)
