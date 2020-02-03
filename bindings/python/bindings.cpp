@@ -13,7 +13,7 @@
 
 
 namespace consim {
-
+// abstract simulator wrapper for bindings 
 class AbstractSimulatorWrapper : public AbstractSimulator, public boost::python::wrapper<AbstractSimulator>
 {
   public: 
@@ -128,47 +128,66 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
 
     bp::class_<AbstractSimulatorWrapper, boost::noncopyable>("AbstractSimulator", "Abstract Simulator Class", 
                          bp::init<pinocchio::Model &, pinocchio::Data &, float, int>())
-        .def("add_contact_point", &AbstractSimulator::addContactPoint, return_internal_reference<>())
-        .def("get_contact", &AbstractSimulator::getContact, return_internal_reference<>())
-        .def("add_object", &AbstractSimulator::addObject)
-        .def("reset_state", &AbstractSimulator::resetState)
-        .def("set_joint_friction", &AbstractSimulator::setJointFriction)
-        .def("step", bp::pure_virtual(&AbstractSimulator::step))
-        .add_property("q",
-                    bp::make_function(&EulerSimulator::get_q, bp::return_value_policy<bp::return_by_value>()),
-                    "configuration vector")
-        .add_property("v",
-                    bp::make_function(&EulerSimulator::get_v, bp::return_value_policy<bp::return_by_value>()),
-                    "velocity vector")
-        .add_property("dv",
-                    bp::make_function(&EulerSimulator::get_dv, bp::return_value_policy<bp::return_by_value>()),
-                    "acceleration vector");
+        .def("add_contact_point", &AbstractSimulatorWrapper::addContactPoint, return_internal_reference<>())
+        .def("get_contact", &AbstractSimulatorWrapper::getContact, return_internal_reference<>())
+        .def("add_object", &AbstractSimulatorWrapper::addObject)
+        .def("reset_state", &AbstractSimulatorWrapper::resetState)
+        .def("set_joint_friction", &AbstractSimulatorWrapper::setJointFriction)
+        .def("step", bp::pure_virtual(&AbstractSimulatorWrapper::step))
+        .def("get_q", &AbstractSimulatorWrapper::get_q,bp::return_value_policy<bp::copy_const_reference>(), "configuration state vector")
+        .def("get_v", &AbstractSimulatorWrapper::get_v,bp::return_value_policy<bp::copy_const_reference>(), "tangent vector to configuration")
+        .def("get_dv", &AbstractSimulatorWrapper::get_dv,bp::return_value_policy<bp::copy_const_reference>(), "time derivative of tangent vector to configuration");
+
 
 
     bp::class_<EulerSimulator, bases<AbstractSimulatorWrapper>>("EulerSimulator",
                           "Euler Simulator class",
-                          bp::init<pinocchio::Model &, pinocchio::Data &, float, int>());
-        // .def("step", &EulerSimulator::step);
+                          bp::init<pinocchio::Model &, pinocchio::Data &, float, int>())
+        .def("add_contact_point", &EulerSimulator::addContactPoint, return_internal_reference<>())
+        .def("get_contact", &EulerSimulator::getContact, return_internal_reference<>())
+        .def("add_object", &EulerSimulator::addObject)
+        .def("reset_state", &EulerSimulator::resetState)
+        .def("set_joint_friction", &EulerSimulator::setJointFriction)
+        .def("step", &EulerSimulator::step)
+        .def("get_q", &EulerSimulator::get_q,bp::return_value_policy<bp::copy_const_reference>(), "configuration state vector")
+        .def("get_v", &EulerSimulator::get_v,bp::return_value_policy<bp::copy_const_reference>(), "tangent vector to configuration")
+        .def("get_dv", &EulerSimulator::get_dv,bp::return_value_policy<bp::copy_const_reference>(), "time derivative of tangent vector to configuration");
 
-    
-    bp::class_<ExponentialSimulator>("ExponentialSimulator",
+
+    bp::class_<ExponentialSimulator, bases<AbstractSimulatorWrapper>>("ExponentialSimulator",
                           "Exponential Simulator class",
                           bp::init<pinocchio::Model &, pinocchio::Data &, float, int, bool, bool>())
         .def("add_contact_point", &ExponentialSimulator::addContactPoint, return_internal_reference<>())
         .def("get_contact", &ExponentialSimulator::getContact, return_internal_reference<>())
-        .def("step", &ExponentialSimulator::step)
         .def("add_object", &ExponentialSimulator::addObject)
         .def("reset_state", &ExponentialSimulator::resetState)
         .def("set_joint_friction", &ExponentialSimulator::setJointFriction)
-        .add_property("q",
-                    bp::make_function(&ExponentialSimulator::get_q, bp::return_value_policy<bp::return_by_value>()),
-                    "dimension of configuration vector")
-        .add_property("v",
-                    bp::make_function(&ExponentialSimulator::get_v, bp::return_value_policy<bp::return_by_value>()),
-                    "dimension of configuration vector")
-        .add_property("dv",
-                    bp::make_function(&ExponentialSimulator::get_dv, bp::return_value_policy<bp::return_by_value>()),
-                    "dimension of configuration vector");
+        .def("step", &ExponentialSimulator::step)
+        .def("get_q", &ExponentialSimulator::get_q,bp::return_value_policy<bp::copy_const_reference>(), "configuration state vector")
+        .def("get_v", &ExponentialSimulator::get_v,bp::return_value_policy<bp::copy_const_reference>(), "tangent vector to configuration")
+        .def("get_dv", &ExponentialSimulator::get_dv,bp::return_value_policy<bp::copy_const_reference>(), "time derivative of tangent vector to configuration");
+
+
+
+    
+    // bp::class_<ExponentialSimulator>("ExponentialSimulator",
+    //                       "Exponential Simulator class",
+    //                       bp::init<pinocchio::Model &, pinocchio::Data &, float, int, bool, bool>())
+    //     .def("add_contact_point", &ExponentialSimulator::addContactPoint, return_internal_reference<>())
+    //     .def("get_contact", &ExponentialSimulator::getContact, return_internal_reference<>())
+    //     .def("step", &ExponentialSimulator::step)
+    //     .def("add_object", &ExponentialSimulator::addObject)
+    //     .def("reset_state", &ExponentialSimulator::resetState)
+    //     .def("set_joint_friction", &ExponentialSimulator::setJointFriction)
+    //     .add_property("q",
+    //                 bp::make_function(&ExponentialSimulator::get_q, bp::return_value_policy<bp::return_by_value>()),
+    //                 "dimension of configuration vector")
+    //     .add_property("v",
+    //                 bp::make_function(&ExponentialSimulator::get_v, bp::return_value_policy<bp::return_by_value>()),
+    //                 "dimension of configuration vector")
+    //     .add_property("dv",
+    //                 bp::make_function(&ExponentialSimulator::get_dv, bp::return_value_policy<bp::return_by_value>()),
+    //                 "dimension of configuration vector");
         // .def("get_q", &ExponentialSimulator::get_q)
         // .def("get_v", &ExponentialSimulator::get_v)
         // .def("get_dv", &ExponentialSimulator::get_dv);

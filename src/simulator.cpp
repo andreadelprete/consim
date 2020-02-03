@@ -237,7 +237,6 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     {
   
   if (nactive_> 0){
-  Eigen::internal::set_is_malloc_allowed(false); 
   kp0_ = K*p0_;
   Minv_ = pinocchio::computeMinverse(*model_, *data_, q_);
   JMinv_ = Jc_ * Minv_;
@@ -249,7 +248,6 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
   b_ = JMinv_ * (tau_ - data_->nle) + dJv_ + Upsilon_*kp0_;
   x0_.head(3*nactive_) = p_; 
   x0_.tail(3*nactive_) = dp_; 
-  Eigen::internal::set_is_malloc_allowed(true); 
   std::cout<<"M innv and so on work with no memory allocation "<<std::endl; 
   if (sparse_)
   {
@@ -337,7 +335,6 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     if (!contacts_[i]->active) continue;
     // compute jacobian for active contact and store in frame_Jc_
     contactLinearJacobian(contacts_[i]->frame_id);
-    Eigen::internal::set_is_malloc_allowed(false); 
     Jc_.block(3*i_active_,0,3,model_->nv) = frame_Jc_;
     contacts_[i]->v = frame_Jc_ * dq;
     p0_.segment(3*i_active_,3)=contacts_[i]->x_start; 
@@ -353,7 +350,6 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     B(3*i_active_, 3*i_active_) = contacts_[i]->optr->getTangentialDamping();
     B(3*i_active_ + 1, 3*i_active_ + 1) = contacts_[i]->optr->getTangentialDamping();
     B(3*i_active_ + 2, 3*i_active_ + 2) = contacts_[i]->optr->getNormalDamping();
-    Eigen::internal::set_is_malloc_allowed(true); 
     std::cout<<"computeContactForces fill Jc p0, p dp f K,B"<<std::endl;
 
     // compute dJvi_
