@@ -277,10 +277,10 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       else{
         utilDense_.ComputeDoubleIntegralXt(A, a_, x0_, sub_dt, int2xt_); 
         dvMean_ = dv0_ + JMinv_.transpose()*D*intxt_/sub_dt ; // malloc happens here 
-        vMean_ = v_ + .5 * sub_dt * dv0_ + JMinv_.transpose()*(D*int2xt_)/sub_dt ; // malloc happenns here 
+        vMean_ = v_ + .5 * sub_dt * dv0_ + JMinv_.transpose()*(D*int2xt_)/sub_dt ; // malloc happens here 
       } // within friction cone 
       v_ += sub_dt*dvMean_;
-      q_ = pinocchio::integrate(*model_, q_, vMean_ * sub_dt); // malloc happenns here 
+      q_ = pinocchio::integrate(*model_, q_, vMean_ * sub_dt); // malloc happens here 
       dv_ = dvMean_; 
     } // active contacts > 0 
     else{
@@ -363,7 +363,7 @@ void ExponentialSimulator::computeFrameAcceleration(unsigned int frame_id)
 
 void ExponentialSimulator::checkFrictionCone(){
   // Eigen::internal::set_is_malloc_allowed(false);
-  f_avg.noalias() = (1/sub_dt)*D*intxt_ + kp0_; // malloc  happens here  
+  f_avg.noalias() = (1/sub_dt)*D*intxt_ + kp0_; // malloc happens here  
   // Eigen::internal::set_is_malloc_allowed(true);
   Eigen::internal::set_is_malloc_allowed(false);
   i_active_ = 0; 
