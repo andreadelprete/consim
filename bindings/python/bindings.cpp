@@ -167,34 +167,6 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
         .def("get_v", &ExponentialSimulator::get_v,bp::return_value_policy<bp::copy_const_reference>(), "tangent vector to configuration")
         .def("get_dv", &ExponentialSimulator::get_dv,bp::return_value_policy<bp::copy_const_reference>(), "time derivative of tangent vector to configuration");
 
-
-
-    
-    // bp::class_<ExponentialSimulator>("ExponentialSimulator",
-    //                       "Exponential Simulator class",
-    //                       bp::init<pinocchio::Model &, pinocchio::Data &, float, int, bool, bool>())
-    //     .def("add_contact_point", &ExponentialSimulator::addContactPoint, return_internal_reference<>())
-    //     .def("get_contact", &ExponentialSimulator::getContact, return_internal_reference<>())
-    //     .def("step", &ExponentialSimulator::step)
-    //     .def("add_object", &ExponentialSimulator::addObject)
-    //     .def("reset_state", &ExponentialSimulator::resetState)
-    //     .def("set_joint_friction", &ExponentialSimulator::setJointFriction)
-    //     .add_property("q",
-    //                 bp::make_function(&ExponentialSimulator::get_q, bp::return_value_policy<bp::return_by_value>()),
-    //                 "dimension of configuration vector")
-    //     .add_property("v",
-    //                 bp::make_function(&ExponentialSimulator::get_v, bp::return_value_policy<bp::return_by_value>()),
-    //                 "dimension of configuration vector")
-    //     .add_property("dv",
-    //                 bp::make_function(&ExponentialSimulator::get_dv, bp::return_value_policy<bp::return_by_value>()),
-    //                 "dimension of configuration vector");
-        // .def("get_q", &ExponentialSimulator::get_q)
-        // .def("get_v", &ExponentialSimulator::get_v)
-        // .def("get_dv", &ExponentialSimulator::get_dv);
-
-        // .ADD_PROPERTY_READONLY_RETURN_BY_VALUE("q", &EulerSimulator::q_)
-        // .ADD_PROPERTY_READONLY_RETURN_BY_VALUE("dq", &EulerSimulator::dq_)
-        // .ADD_PROPERTY_READONLY_RETURN_BY_VALUE("tau", &EulerSimulator::tau_);
 }
 //
 //#include <pinocchio/fwd.hpp>
