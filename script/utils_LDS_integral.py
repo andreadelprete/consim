@@ -211,6 +211,30 @@ def compute_x_T_and_two_integrals(A, a, x0, T):
     return x, int_x, int2_x
 
 
+def compute_integral_expm(A, T, dt=None):
+    n = A.shape[0]
+    
+    if(dt is not None):
+        N = int(T/dt)
+        int_expm = matlib.zeros((n,n))
+        for i in range(1, N):
+            ex = expm(i*dt*A)
+            int_expm += dt*ex
+        return int_expm
+    
+    C = matlib.zeros((n+n, n+n))
+    C[0:n,     0:n] = A
+    C[0:n,     n:] = matlib.identity(n)
+    z0 = matlib.zeros((n+n, n))
+#    z0[:n, 0] = x0
+    z0[-n:, :] = matlib.identity(n)
+    e_TC = expm(T*C, verbose=True)
+    z = e_TC*z0
+#    z = expm_times_v(T*C, z0, verbose=True)
+    res = z[:n, :]
+    return res
+    
+    
 def print_error(x_exact, x_approx):
     print("Approximation error: ", np.max(np.abs(x_exact-x_approx).A1 / np.abs(x_exact).A1))
 
@@ -219,8 +243,8 @@ if __name__ == '__main__':
     import time
     N_TESTS = 1000
     T = 0.001
-    dt = 1e-6
-    n = 8*3*2
+    dt = 1e-7
+    n = 4*3*2
     n2 = int(n/2)
     stiffness = 1e5
     damping = 1e2
@@ -230,9 +254,10 @@ if __name__ == '__main__':
     Upsilon = U*U.T
     K = matlib.eye(n2)*stiffness
     B = matlib.eye(n2)*damping
-    A = matlib.block([[matlib.zeros((n2, n2)), matlib.eye(n2)],
-                      [-Upsilon*K,      -Upsilon*B]])
-    # A  = matlib.rand((n, n))
+#    A = matlib.block([[matlib.zeros((n2, n2)), matlib.eye(n2)],
+#                      [-Upsilon*K,      -Upsilon*B]])
+    A  = matlib.rand((n, n))
+    
 
     # print("x(0) is:", x0.T)
     # print("a is:   ", a.T)
@@ -317,3 +342,18 @@ if __name__ == '__main__':
     print_error(x_v2, x_T)
     print_error(int_x_v2, int_x_T)
     print_error(int2_x_v2, int2_x_T)
+
+    
+    print("\nTest computation integral of matrix exponential")
+    start_time = time.time()
+    int_expm_approx = compute_integral_expm(A, T, dt)
+    time_approx = time.time()-start_time
+
+    start_time = time.time()
+    int_expm = compute_integral_expm(A, T)
+    time_exact = time.time()-start_time
+
+    print("Approximated int exp(A) computed in               ", 1e3*time_approx)
+    print("Exact int exp(A) computed in                      ", 1e3*time_exact)
+    print_error(int_expm, int_expm_approx)
+    print("")
