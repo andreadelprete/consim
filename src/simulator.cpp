@@ -32,6 +32,7 @@ model_(&model), data_(&data), dt_(dt), n_integration_steps_(n_integration_steps)
   tau_.resize(model.nv);
   frame_Jc_.resize(3, model.nv);
   J_.resize(6, model.nv);
+  qnext_.resize(model.nq);
 } 
 
 const ContactPoint &AbstractSimulator::addContactPoint(int frame_id)
@@ -190,7 +191,8 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
       getProfiler().stop("pinocchio::aba");
       // Integrate the system forward in time.
       vMean_ = v_ + data_->ddq * .5 * sub_dt;
-      q_ = pinocchio::integrate(*model_, q_, vMean_ * sub_dt);
+      pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
+      q_ = qnext_;
       v_ += data_->ddq * sub_dt;
       // Compute the new data values and contact information after the integration
       // step. This way, if this method returns, the values computed in data and
@@ -221,7 +223,6 @@ ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocc
   nactive_prev = -1; // ensures matrice resize at reset state 
   temp01_.resize(model_->nv);
   temp02_.resize(model_->nv);
-  qnext_.resize(model_->nq);
 }
 
 

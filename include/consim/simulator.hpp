@@ -74,6 +74,7 @@ namespace consim {
     protected:
 
       Eigen::VectorXd q_;  
+      Eigen::VectorXd qnext_;
       Eigen::VectorXd v_;
       Eigen::VectorXd dv_;
       // Eigen::VectorXd f_;
@@ -206,12 +207,10 @@ namespace consim {
       expokit::LDSUtility<double, Dynamic> utilDense_;
       // 
       Eigen::VectorXd dvMean_;
-      Eigen::VectorXd vMeanDt_;
       Eigen::VectorXd temp01_;
       Eigen::VectorXd temp02_;
       Eigen::VectorXd temp03_;
       Eigen::VectorXd temp04_;
-      Eigen::VectorXd qnext_;
 
       Eigen::MatrixXd tempStepMat_; 
       // friction cone 
