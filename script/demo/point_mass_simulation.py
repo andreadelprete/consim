@@ -76,7 +76,7 @@ if __name__=="__main__":
 
     isSparse = False 
     isInvertible = False 
-    ndt_exp = 5
+    ndt_exp = 10
     exp_sim = consim.build_exponential_simulator(dt, ndt_exp, robot.model, robot.data,
                                         K, B ,K, B, mu, mu, isSparse, isInvertible)
     print 'ExponentialSimulator Object Created Successfully!'

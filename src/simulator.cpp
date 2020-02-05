@@ -274,7 +274,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       }
       // the friction cone implementation will get here 
       getProfiler().start("exponential_simulator::checkFrictionCone");
-      checkFrictionCone(); // has malloc in f_avg
+      checkFrictionCone();
       getProfiler().stop("exponential_simulator::checkFrictionCone");
 
       if(cone_flag_){
@@ -352,7 +352,10 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     // compute jacobian for active contact and store in frame_Jc_
     contactLinearJacobian(contacts_[i]->frame_id); 
     Jc_.block(3*i_active_,0,3,model_->nv) = frame_Jc_;
-    contacts_[i]->v.noalias() = frame_Jc_ * dq;
+    // contacts_[i]->v.noalias() = frame_Jc_ * dq;
+    // contacts_[i]->v.noalias() = frame_Jc_ * pinocchio::getFrameVelocity();
+    computeFrameKinematics(i); 
+    dJv_.segment(3*i_active_,3) = dJvi_; // cross component of acceleration
     p0_.segment(3*i_active_,3)=contacts_[i]->x_start; 
     p_.segment(3*i_active_,3)=contacts_[i]->x; 
     dp_.segment(3*i_active_,3)=contacts_[i]->v; 
@@ -364,23 +367,22 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     contacts_[i]->optr->contactModel(*contacts_[i]); 
     f_.segment(3*i_active_,3) = contacts_[i]->f; 
     // compute dJvi_
-    computeFrameAcceleration(contacts_[i]->frame_id); 
-    dJv_.segment(3*i_active_,3) = dJvi_; 
+    
     i_active_ += 1;  
   }
   Eigen::internal::set_is_malloc_allowed(true);
 } // ExponentialSimulator::computeContactForces
 
-void ExponentialSimulator::computeFrameAcceleration(unsigned int frame_id)
+void ExponentialSimulator::computeFrameKinematics(unsigned int contact_id)
 {
   getProfiler().start("exponential_simulator::computeFrameAcceleration");
   dJvi_.setZero();
-  vilocal_ = pinocchio::getFrameVelocity(*model_, *data_, frame_id); // no malloc 
-  dJvilocal_ = pinocchio::getFrameAcceleration(*model_, *data_, frame_id); // no malloc 
-  // the lines below most likely involve memory allocation 
+  vilocal_ = pinocchio::getFrameVelocity(*model_, *data_, contacts_[contact_id]->frame_id); 
+  dJvilocal_ = pinocchio::getFrameAcceleration(*model_, *data_, contacts_[contact_id]->frame_id); 
   dJvilocal_.linear() += vilocal_.angular().cross(vilocal_.linear());
-  frameSE3_.rotation() = data_->oMf[frame_id].rotation();
+  frameSE3_.rotation() = data_->oMf[contacts_[contact_id]->frame_id].rotation();
   dJvi_ = frameSE3_.act(dJvilocal_).linear();
+  contacts_[contact_id]->v.noalias() = frameSE3_.rotation()*vilocal_.linear(); 
   getProfiler().stop("exponential_simulator::computeFrameAcceleration");
 } //computeFrameAcceleration
 
@@ -425,7 +427,6 @@ void ExponentialSimulator::solveDenseExpSystem()
   a_.tail(3*nactive_) = b_;
   // xt_ = utilDense_.ComputeXt(A, a_, x0_, dt_);
   utilDense_.ComputeIntegralXt(A, a_, x0_, sub_dt, intxt_);
-  //TODO: don't compute second integral if cone is violated ? 
   utilDense_.ComputeDoubleIntegralXt(A, a_, x0_, sub_dt, int2xt_); 
 } // ExponentialSimulator::solveDenseExpSystem
 
