@@ -216,12 +216,12 @@ ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocc
 {
   dJvi_.resize(3);
   dvMean_.resize(model_->nv);
-  vMeanDt_.resize(model_->nv);
   Minv_.resize(model_->nv, model_->nv); Minv_.setZero();
   dv0_.resize(model_->nv); dv0_.setZero();
   nactive_prev = -1; // ensures matrice resize at reset state 
   temp01_.resize(model_->nv);
   temp02_.resize(model_->nv);
+  qnext_.resize(model_->nq);
 }
 
 
@@ -295,22 +295,20 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
         vMean_ = v_ + .5 * sub_dt * dv0_ + temp01_/sub_dt; 
         Eigen::internal::set_is_malloc_allowed(true);
       } // within friction cone 
-      
-      vMeanDt_ = vMean_ * sub_dt;
+      Eigen::internal::set_is_malloc_allowed(false);
       v_ += sub_dt*dvMean_;
-      q_ = pinocchio::integrate(*model_, q_, vMeanDt_); // malloc happens here 
-
+      pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
+      q_ = qnext_;
       dv_ = dvMean_; 
+      Eigen::internal::set_is_malloc_allowed(true);
     } // active contacts > 0 
     else{
       Eigen::internal::set_is_malloc_allowed(false);
       pinocchio::aba(*model_, *data_, q_, v_, tau_);
       dv_ = data_->ddq; 
       vMean_ = v_ + dv_ * .5 * sub_dt;
-      vMeanDt_ = vMean_ * sub_dt;
-      Eigen::internal::set_is_malloc_allowed(true);
-      q_ = pinocchio::integrate(*model_, q_, vMeanDt_);
-      Eigen::internal::set_is_malloc_allowed(false);
+      pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
+      q_ = qnext_;
       v_ += data_->ddq * sub_dt; 
       Eigen::internal::set_is_malloc_allowed(true);
     } // no active contacts 

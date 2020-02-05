@@ -211,6 +211,7 @@ namespace consim {
       Eigen::VectorXd temp02_;
       Eigen::VectorXd temp03_;
       Eigen::VectorXd temp04_;
+      Eigen::VectorXd qnext_;
 
       Eigen::MatrixXd tempStepMat_; 
       // friction cone 
