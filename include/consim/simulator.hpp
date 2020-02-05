@@ -206,6 +206,13 @@ namespace consim {
       expokit::LDSUtility<double, Dynamic> utilDense_;
       // 
       Eigen::VectorXd dvMean_;
+      Eigen::VectorXd vMeanDt_;
+      Eigen::VectorXd temp01_;
+      Eigen::VectorXd temp02_;
+      Eigen::VectorXd temp03_;
+      Eigen::VectorXd temp04_;
+
+      Eigen::MatrixXd tempStepMat_; 
       // friction cone 
       Eigen::VectorXd f_avg;  // average force for cone 
       Eigen::VectorXd fpr_;   // projected force on cone boundaries 

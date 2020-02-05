@@ -216,9 +216,12 @@ ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocc
 {
   dJvi_.resize(3);
   dvMean_.resize(model_->nv);
+  vMeanDt_.resize(model_->nv);
   Minv_.resize(model_->nv, model_->nv); Minv_.setZero();
   dv0_.resize(model_->nv); dv0_.setZero();
   nactive_prev = -1; // ensures matrice resize at reset state 
+  temp01_.resize(model_->nv);
+  temp02_.resize(model_->nv);
 }
 
 
@@ -237,15 +240,18 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       Eigen::internal::set_is_malloc_allowed(false);
       Minv_ = pinocchio::computeMinverse(*model_, *data_, q_);
       JMinv_.noalias() = Jc_ * Minv_;
-      Eigen::internal::set_is_malloc_allowed(true);
-      dv0_.noalias() = Minv_ * (tau_ - data_->nle + Jc_.transpose() * kp0_); // malloc happens here 
-      Eigen::internal::set_is_malloc_allowed(false);
+      temp01_.noalias() = Jc_.transpose() * kp0_;
+      temp02_ = tau_ - data_->nle + temp01_;
+      dv0_.noalias() = Minv_ * temp02_; 
       Upsilon_.noalias() =  Jc_*JMinv_.transpose();
-      Eigen::internal::set_is_malloc_allowed(true);
-      A.block(3*nactive_, 0, 3*nactive_, 3*nactive_).noalias() = -Upsilon_ * K; // malloc happens here 
-      A.block(3*nactive_, 3*nactive_, 3*nactive_, 3*nactive_).noalias() = -Upsilon_ * B; //m alloc happens here 
-      b_.noalias() = JMinv_ * (tau_ - data_->nle) + dJv_ + Upsilon_*kp0_; // malloc happens here 
-      Eigen::internal::set_is_malloc_allowed(false);
+      tempStepMat_.noalias() =  Upsilon_ * K;
+      A.block(3*nactive_, 0, 3*nactive_, 3*nactive_).noalias() = -tempStepMat_;  
+      tempStepMat_.noalias() = Upsilon_ * B; 
+      A.block(3*nactive_, 3*nactive_, 3*nactive_, 3*nactive_).noalias() = -tempStepMat_; 
+      temp01_ = tau_ - data_->nle; 
+      temp04_.noalias() = JMinv_*temp01_;  
+      temp03_.noalias() =  Upsilon_*kp0_; 
+      b_.noalias() = temp04_ + dJv_ + temp03_; 
       x0_.head(3*nactive_) = p_; 
       x0_.tail(3*nactive_) = dp_; 
       Eigen::internal::set_is_malloc_allowed(true);
@@ -271,24 +277,42 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       getProfiler().stop("exponential_simulator::checkFrictionCone");
 
       if(cone_flag_){
-        dvMean_ = Minv_*(tau - data_->nle + Jc_.transpose()*fpr_); // malloc happens here  
+        Eigen::internal::set_is_malloc_allowed(false);
+        temp01_.noalias() = Jc_.transpose()*fpr_; 
+        temp02_ = tau - data_->nle + temp01_;
+        dvMean_.noalias() = Minv_*temp02_; 
         vMean_ = v_ + sub_dt* dvMean_; 
+        Eigen::internal::set_is_malloc_allowed(true);
       } // violates friction cone 
       else{
         utilDense_.ComputeDoubleIntegralXt(A, a_, x0_, sub_dt, int2xt_); 
-        dvMean_ = dv0_ + JMinv_.transpose()*D*intxt_/sub_dt ; // malloc happens here 
-        vMean_ = v_ + .5 * sub_dt * dv0_ + JMinv_.transpose()*(D*int2xt_)/sub_dt ; // malloc happens here 
+        Eigen::internal::set_is_malloc_allowed(false);
+        temp03_.noalias() = D*intxt_; 
+        temp01_.noalias() = JMinv_.transpose() * temp03_;
+        dvMean_ = dv0_ + temp01_/sub_dt ; 
+        temp03_.noalias() = D*int2xt_; 
+        temp01_.noalias() = JMinv_.transpose() * temp03_;
+        vMean_ = v_ + .5 * sub_dt * dv0_ + temp01_/sub_dt; 
+        Eigen::internal::set_is_malloc_allowed(true);
       } // within friction cone 
+      
+      vMeanDt_ = vMean_ * sub_dt;
       v_ += sub_dt*dvMean_;
-      q_ = pinocchio::integrate(*model_, q_, vMean_ * sub_dt); // malloc happens here 
+      q_ = pinocchio::integrate(*model_, q_, vMeanDt_); // malloc happens here 
+
       dv_ = dvMean_; 
     } // active contacts > 0 
     else{
+      Eigen::internal::set_is_malloc_allowed(false);
       pinocchio::aba(*model_, *data_, q_, v_, tau_);
       dv_ = data_->ddq; 
       vMean_ = v_ + dv_ * .5 * sub_dt;
-      q_ = pinocchio::integrate(*model_, q_, vMean_ * sub_dt);
+      vMeanDt_ = vMean_ * sub_dt;
+      Eigen::internal::set_is_malloc_allowed(true);
+      q_ = pinocchio::integrate(*model_, q_, vMeanDt_);
+      Eigen::internal::set_is_malloc_allowed(false);
       v_ += data_->ddq * sub_dt; 
+      Eigen::internal::set_is_malloc_allowed(true);
     } // no active contacts 
     /** 
      * pinocchio::computeAllTerms already calls first order FK 
@@ -362,10 +386,9 @@ void ExponentialSimulator::computeFrameAcceleration(unsigned int frame_id)
 } //computeFrameAcceleration
 
 void ExponentialSimulator::checkFrictionCone(){
-  // Eigen::internal::set_is_malloc_allowed(false);
-  f_avg.noalias() = (1/sub_dt)*D*intxt_ + kp0_; // malloc happens here  
-  // Eigen::internal::set_is_malloc_allowed(true);
   Eigen::internal::set_is_malloc_allowed(false);
+  temp03_.noalias() = D*intxt_;
+  f_avg= kp0_ + temp03_/sub_dt; 
   i_active_ = 0; 
   cone_flag_ = false; 
   for(unsigned int i=0; i<nc_; i++){
@@ -441,6 +464,9 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
     utilDense_.resize(6 * nactive_);
     f_avg.resize(3 * nactive_); f_avg.setZero();
     fpr_.resize(3 * nactive_); fpr_.setZero();
+    tempStepMat_.resize(3 * nactive_, 3 * nactive_); tempStepMat_.setZero();
+    temp03_.resize(3*nactive_); temp03_.setZero();
+    temp04_.resize(3*nactive_); temp04_.setZero();
     // fillout K & B only needed whenever number of active contacts changes 
     i_active_ = 0; 
     for(unsigned int i=0; i<nc_; i++){
