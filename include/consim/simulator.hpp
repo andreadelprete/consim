@@ -10,7 +10,7 @@
 
 #include "consim/object.hpp"
 #include "consim/contact.hpp"
-#include  "consim/dynamic_algebra.hpp"
+//#include "consim/dynamic_algebra.hpp"
 
 
 
