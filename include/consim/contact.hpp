@@ -2,6 +2,8 @@
 
 #include <Eigen/Eigen>
 
+
+
 namespace consim {
 
 #define NO_CONTACT                       0
@@ -17,8 +19,8 @@ namespace consim {
 
 class Object;
 
-struct Contact {
-  int frame_id;
+struct ContactPoint {
+  unsigned int frame_id;
 
   bool active;
 
@@ -48,7 +50,7 @@ struct Contact {
   Eigen::Vector3d     tanvel;                 /*!< tangential velocity vector */
   Eigen::Vector3d     viscvel;                /*!< velocity vector for viscous friction */
   Eigen::Vector3d     f;                      /*!< contact forces in world coordinates */
-
+  
 };
 
 
@@ -57,11 +59,16 @@ struct Contact {
 
 class ContactModel {
 public:
-  virtual void compute_force(Contact& cp) = 0;
+  virtual void computeForce(ContactPoint &cp) = 0;
 
+  virtual double getNormalStiffness() const = 0;
+  virtual double getNormalDamping() const = 0 ;
+  virtual double getTangentialStiffness() const = 0;
+  virtual double getTangentialDamping() const = 0;
+  virtual double getFrictionCoefficient() const = 0;
 };
 
-class DampedSpringStaticFrictionContactModel: public ContactModel {
+class LinearPenaltyContactModel: public ContactModel {
 public:
   /**
    * contact_parms[1] = normal spring coefficient
@@ -71,13 +78,18 @@ public:
    * contact_parms[5] = static friction coefficient (friction cone)
    * contact_parms[6] = dynamic friction coefficient (proportional to normal force)
    */
-  DampedSpringStaticFrictionContactModel(
+  LinearPenaltyContactModel(
       double normal_spring_const, double normal_damping_coeff,
       double static_friction_spring_coeff, double static_friction_damping_spring_coeff,
       double static_friction_coeff, double dynamic_friction_coeff);
 
+  void computeForce(ContactPoint& cp) override;
 
-  void compute_force(Contact& cp);
+  double getNormalStiffness() const override {return normal_spring_const_;};
+  double getNormalDamping() const override { return normal_damping_coeff_; };
+  double getTangentialStiffness() const override { return static_friction_spring_coeff_; };
+  double getTangentialDamping() const override { return static_friction_damping_spring_coeff_; };
+  double getFrictionCoefficient() const override { return static_friction_coeff_; };
 
 private:
   double normal_spring_const_;
@@ -88,27 +100,5 @@ private:
   double dynamic_friction_coeff_;
 };
 
-class NonlinearSpringDamperContactModel: public ContactModel{
-public:
-  /*
-  */
-  NonlinearSpringDamperContactModel(
-    double spring_stiffness_coeff, double spring_damping_coeff,
-    double static_friction_coeff, double dynamic_friction_coeff,
-    double maximum_penetration, bool enable_friction_cone);
-
-  void compute_force(Contact& cp);
-
-
-private:
-  double spring_stiffness_coeff_;
-  double spring_damping_coeff_;
-  double static_friction_coeff_;
-  double dynamic_friction_coeff_;
-  double maximum_penetration_;
-  bool enable_friction_cone_;
-  const double pi_ = std::atan(1.0)*4;
-
-};
 
 }
