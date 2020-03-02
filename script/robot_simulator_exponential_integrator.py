@@ -326,11 +326,11 @@ class RobotSimulator:
                 if (self.logFileName is not None):
                     # Writing down A
                     with open(self.logFileName + 'A', 'a+') as f:
-                        np.savetxt(f, self.A.flatten(), '%.3f', '\t')
+                        np.savetxt(f, self.A.flatten(), '%.18f', '\t')
                     with open(self.logFileName + 'b', 'a+') as f:
-                        np.savetxt(f, [np.asarray(self.a)[:, 0]], '%.3f', '\t')  # All this mess to print it as a row, and no transposing does not help
+                        np.savetxt(f, [np.asarray(self.a)[:, 0]], '%.18f', '\t')  # All this mess to print it as a row, and no transposing does not help
                     with open(self.logFileName + 'xInit', 'a+') as f:
-                        np.savetxt(f, [np.asarray(x0)[:, 0]], '%.3f', '\t')
+                        np.savetxt(f, [np.asarray(x0)[:, 0]], '%.18f', '\t')
 
                 if(self.assume_A_invertible):
                     int_x, int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt, compute_also_integral=True, invertible_A=True)

@@ -44,7 +44,7 @@ ASSUME_A_INVERTIBLE = 0
 USE_CONTROLLER = 1
 ndt_force = simu_params_standard['ndt']
 dt = 0.005                      # controller time step
-T = 0.5
+T = 1
 
 offset = np.matrix([0.0, -0.0, 0.0]).T
 amp = np.matrix([0.0, 0.0, 0.05]).T
@@ -56,8 +56,8 @@ DISPLAY_N = int(conf.DISPLAY_T/dt)
 
 solo = loadSolo()
 
-# simu = RobotSimulator(conf, solo, se3.JointModelFreeFlyer())
-simu = RobotSimulator(conf, solo, se3.JointModelFreeFlyer(), 'logStuff') # With logger enabled
+simu = RobotSimulator(conf, solo, se3.JointModelFreeFlyer())
+# simu = RobotSimulator(conf, solo, se3.JointModelFreeFlyer(), 'logStuff')  # With logger enabled
 simu.assume_A_invertible = ASSUME_A_INVERTIBLE
 simu.ndt_force = ndt_force
 q0, v0 = np.asmatrix(matlib.copy(simu.q)), np.asmatrix(matlib.copy(simu.v))
