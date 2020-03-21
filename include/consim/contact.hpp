@@ -23,6 +23,7 @@ struct ContactPoint {
   unsigned int frame_id;
 
   bool active;
+  bool unilateral;      // true if the contact is unilateral, false if bilateral
 
   Object* optr;
 

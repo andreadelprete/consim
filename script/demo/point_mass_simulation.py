@@ -6,6 +6,7 @@ from pinocchio.robot_wrapper import RobotWrapper
 import os, sys
 from os.path import dirname, join
 import matplotlib.pyplot as plt 
+import consim_py.utils.plot_utils as plut
 
 
 if __name__=="__main__":
@@ -15,16 +16,17 @@ if __name__=="__main__":
     robot = RobotWrapper.BuildFromURDF(urdf_path, [mesh_path], pin.JointModelFreeFlyer()) 
     print('RobotWrapper Object Created Successfully!')
 
-    dt = 1.e-3 
+    dt = 10.e-3
     mu = 0.3        # friction coefficient
     isSparse = False 
     isInvertible = False
+    unilateral_contacts = 0
     K = 1e5
     B = 3e2
-    N = 800
+    N = 20
     
-    q0 = np.array([0., 0., 1., 0., 0., 0., 1.]) [:,None]
-    dq0 = np.zeros(robot.nv)[:,None]
+    q0 = np.array([0., 0., -1e-10, 0., 0., 0., 1.]) [:,None]
+    dq0 = np.array([0., 0., -1.0, 0., 0., 0.]) [:,None]
     tau = np.zeros(robot.nv) [:,None]
     contact_names = ['root_joint']
     
@@ -44,15 +46,17 @@ if __name__=="__main__":
     simu_params += [{'name': 'euler 10',
                     'type': 'euler', 
                     'ndt': 10}]
-    simu_params += [{'name': 'euler 1',
-                    'type': 'euler', 
-                    'ndt': 1}]
+#    simu_params += [{'name': 'euler 1',
+#                    'type': 'euler', 
+#                    'ndt': 1}]
     
+    line_styles = ['-', '--', '-.', ':']
+    i_ls = 0
     for simu_param in simu_params:
         ndt = simu_param['ndt']
         name = simu_param['name']
-        
-        if(simu_param['type']=='exponential'):
+        simu_type = simu_param['type']
+        if(simu_type=='exponential'):
             sim = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
                                         K, B ,K, B, mu, mu, isSparse, isInvertible)
         else:
@@ -63,7 +67,7 @@ if __name__=="__main__":
         for cf in contact_names:
             if not robot.model.existFrame(cf):
                 print(("ERROR: Frame", cf, "does not exist"))
-            cpts += [sim.add_contact_point(robot.model.getFrameId(cf))]
+            cpts += [sim.add_contact_point(robot.model.getFrameId(cf), unilateral_contacts)]
         print('Contacts added to simulator Successfully!')
     
         fcnt = np.zeros([N+1, len(cpts), 3])
@@ -88,21 +92,27 @@ if __name__=="__main__":
         qz = []
         dqz = []
         for i,qi in enumerate(q):
+            if(abs(qi[2,0])>1e2):
+                qi[2,0] = np.nan
             qz += [qi[2,0]]
             dqz += [dq[i][2,0]]
         
         plt.figure('Ball Height')
-        plt.plot(dt*np.arange(N+1), qz, label=name)
+        plt.plot(dt*np.arange(N+1), qz, line_styles[i_ls], alpha=0.7, label=name)
         plt.legend()
         plt.grid()
         plt.title('Ball Height vs time ')
 
         plt.figure('normal contact forces')
         for i,cp in enumerate(cpts):
-            plt.plot(dt*np.arange(N+1), fcnt[:,i,2], label=name+' pnt %s'%i)
+            plt.plot(dt*np.arange(N+1), fcnt[:,i,2], alpha=0.7, label=name+' pnt %s'%i)
         plt.legend()
         plt.grid()
         plt.title('normal contact forces')
+        
+        i_ls += 1
+        if(i_ls >= len(line_styles)):
+            i_ls = 0
 
     consim.stop_watch_report(3)
 

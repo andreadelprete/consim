@@ -8,6 +8,10 @@ Object::Object(std::string name, ContactModel& contact_model):
 
 bool FloorObject::checkContact(ContactPoint &cp)
 {
+  // if(!cp.unilateral){
+  //   return true;
+  // }
+
   // checks for penetration into the floor 
   if (cp.x(2) > 0.) {
     return false;

@@ -12,7 +12,14 @@
 #include "consim/contact.hpp"
 //#include "consim/dynamic_algebra.hpp"
 
-
+#define CONSIM_PROFILER
+#ifndef CONSIM_PROFILER
+#define CONSIM_START_PROFILER(name)
+#define CONSIM_STOP_PROFILER(name)
+#else
+#define CONSIM_START_PROFILER(name) getProfiler().start(name)
+#define CONSIM_STOP_PROFILER(name) getProfiler().stop(name)
+#endif
 
 
 
@@ -27,7 +34,7 @@ namespace consim {
         * Defines a pinocchio frame as a contact point for contact interaction checking.
         * A contact is a struct containing all the contact information 
       */
-      const ContactPoint &addContactPoint(int frame_id);
+      const ContactPoint &addContactPoint(int frame_id, bool unilateral);
 
       /**
         * Returns the contact points reference 

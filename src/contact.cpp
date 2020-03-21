@@ -44,7 +44,7 @@ void LinearPenaltyContactModel::computeForce(ContactPoint& cptr)
     cptr.f(i) = normal_spring_const_ * cptr.normal(i) + normal_damping_coeff_ * cptr.normvel(i);
 
     // make sure the damping part does not attract a contact force with wrong sign
-    if (macro_sign(cptr.f(i)) * macro_sign(cptr.normal(i)) < 0) {
+    if (cptr.unilateral && (cptr.f(i)) * macro_sign(cptr.normal(i)) < 0) {
       cptr.f(i) = 0.0;
     }
 
@@ -71,11 +71,12 @@ void LinearPenaltyContactModel::computeForce(ContactPoint& cptr)
   tangent_force = sqrt(tangent_force);
   viscvel = sqrt(viscvel);
 
-  /* If static friction too large -> spring breaks -> dynamic friction in
-     the direction of the viscvel vector; we also reset the x_start
-     vector such that static friction would be triggered appropriately,
-     i.e., when the viscvel becomes zero */
-  if (tangent_force > static_friction_coeff_ * normal_force || cptr.friction_flag) {
+  if(cptr.unilateral && (tangent_force > static_friction_coeff_ * normal_force || cptr.friction_flag)) 
+  {
+    /* If static friction too large -> spring breaks -> dynamic friction in
+      the direction of the viscvel vector; we also reset the x_start
+      vector such that static friction would be triggered appropriately,
+      i.e., when the viscvel becomes zero */
     cptr.friction_flag = true;
     for (i = 0; i < 3; ++i) {
       cptr.f(i) += -dynamic_friction_coeff_ * normal_force * cptr.viscvel(i)/viscvel;
@@ -84,12 +85,13 @@ void LinearPenaltyContactModel::computeForce(ContactPoint& cptr)
         cptr.x_start = cptr.x;
       }
     }
-  } else {
-    for (i = 0; i < 3; ++i) {
-      cptr.f(i) += temp(i);
-    }
+  } 
+  else {
+      for (i = 0; i < 3; ++i) {
+        cptr.f(i) += temp(i);
+      }
   }
 }
 
 
-}
+} // namespace consim

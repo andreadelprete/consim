@@ -16,6 +16,7 @@ public:
   double getTangentialStiffness() const { return contact_model_->getTangentialStiffness(); };
   double getTangentialDamping() const { return contact_model_->getTangentialDamping(); };
   double getFrictionCoefficient() const { return contact_model_->getFrictionCoefficient(); };
+  const std::string & getName() const { return name_; }
 
 protected:
   std::string name_;
