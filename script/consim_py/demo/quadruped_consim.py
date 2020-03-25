@@ -27,7 +27,7 @@ USE_CONTROLLER = True
 # parameters used for CoM Sinusoid 
 offset = np.matrix([0.0, -0.0, 0.0]).T
 amp = np.matrix([0.0, 0.0, 0.05]).T
-two_pi_f = 2*np.pi*np.matrix([0.0, .0, 1.0]).T
+two_pi_f = 2*np.pi*np.matrix([0.0, .0, 2.0]).T
 controller_dt = 5.e-3 
 
 if __name__=="__main__":
@@ -42,24 +42,24 @@ if __name__=="__main__":
     simu_params += [{'name': 'exponential 100',
                     'type': 'exponential', 
                     'ndt': 100}]
-    simu_params += [{'name': 'exponential 10',
-                    'type': 'exponential', 
-                    'ndt': 10}]
-    simu_params += [{'name': 'exponential 1',
-                    'type': 'exponential', 
-                    'ndt': 1}]
+    # simu_params += [{'name': 'exponential 10',
+    #                 'type': 'exponential', 
+    #                 'ndt': 10}]
+    # simu_params += [{'name': 'exponential 1',
+    #                 'type': 'exponential', 
+    #                 'ndt': 1}]
     
 
-    line_styles = ['-', '--', '-.', ':']
+    line_styles = ['-', '--', '-.', '-..', ':']
     i_ls = 0
     
     mu = 0.3        # friction coefficient
     isSparse = False 
     isInvertible = False
-    unilateral_contacts = True 
+    unilateral_contacts = False 
     K = 1e5
     B = 3e2
-    T = 1 #  2 second simution  
+    T = 1 #  1 second simution  
     dt = 1.e-3 
 
     N_SIMULATION = int(T/dt)        # number of time steps simulated
@@ -76,8 +76,9 @@ if __name__=="__main__":
     q0 = conf.q0
     # lower base height such that feet start below contact surface
     # this is needed for bilateral contacts 
-    # q0[2] -=  .01195 # (.012 + 1.e-4)   
+    q0[2] -=  1.e-10  
     v0 = np.zeros(robot.nv) [:,None]
+    tau = np.zeros(robot.nv) [:,None]
  
     # loop over simulations     
     for simu_param in simu_params:
@@ -177,8 +178,8 @@ if __name__=="__main__":
             com_pos_ref[i, :] = np.resize(sampleCom.pos(),3)
             # com_acc_ref[i, :] = np.resize(sampleCom.acc(),3)
             # com_acc_des[i, :] = np.resize(invdyn.comTask.getDesiredAcceleration,3)
-
-            sim.step(u) 
+            tau[-8:] = np.asarray(u)
+            sim.step(tau) 
             q += [sim.get_q()]
             sim_q[i+1,:] = np.resize(q[-1], robot.nq)
             v += [sim.get_v()]
@@ -193,14 +194,13 @@ if __name__=="__main__":
         print("Real-time factor:", t/time_spent)    
         # run only first simulation (test everything works)
         plt.figure('base_height')
-        plt.plot(tt[:-1], com_pos_ref[:,2], line_styles[i_ls], alpha=0.7, label='com_ref')
-        plt.plot(tt, sim_q[:,2], line_styles[i_ls+1], alpha=0.7, label=name)
+        plt.plot(tt, sim_q[:,2], line_styles[i_ls], alpha=0.7, label=name)
         plt.legend()
         plt.grid()
         plt.title('Base Height vs time ')
 
         i_ls += 1 
-        break  # do one simulation only 
+        
 
     consim.stop_watch_report(3)
     plt.show()
