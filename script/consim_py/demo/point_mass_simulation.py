@@ -6,13 +6,13 @@ from pinocchio.robot_wrapper import RobotWrapper
 import os, sys
 from os.path import dirname, join
 import matplotlib.pyplot as plt 
-import consim_py.utils.plot_utils as plut
+import utils.plot_utils as plut
 
 
 if __name__=="__main__":
     # build the point mass model 
-    urdf_path = os.path.abspath('../models/urdf/free_flyer.urdf')
-    mesh_path = os.path.abspath('../models')
+    urdf_path = os.path.abspath('../../models/urdf/free_flyer.urdf')
+    mesh_path = os.path.abspath('../../models')
     robot = RobotWrapper.BuildFromURDF(urdf_path, [mesh_path], pin.JointModelFreeFlyer()) 
     print('RobotWrapper Object Created Successfully!')
 
