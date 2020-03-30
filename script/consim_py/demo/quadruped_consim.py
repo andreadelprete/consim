@@ -56,7 +56,7 @@ if __name__=="__main__":
     mu = 0.3        # friction coefficient
     isSparse = False 
     isInvertible = False
-    unilateral_contacts = False 
+    unilateral_contacts = False      
     K = 1e5
     B = 3e2
     T = 1 #  1 second simution  
@@ -72,11 +72,12 @@ if __name__=="__main__":
     # load robot 
     robot = loadSolo()
     print(" Solo Loaded Successfully ".center(conf.LINE_WIDTH, '#'))
-
+    # lower q0 a little bit for bilateral contacts 
     q0 = conf.q0
-    # lower base height such that feet start below contact surface
-    # this is needed for bilateral contacts 
-    q0[2] -=  1.e-10  
+    q0[2] -= 1.e-10
+    # pin.framesForwardKinematics(robot.model, robot.data, q0)
+    # for cname in conf.contact_frames:
+    #     print robot.data.oMf[robot.model.getFrameId(cname)].translation 
     v0 = np.zeros(robot.nv) [:,None]
     tau = np.zeros(robot.nv) [:,None]
  
@@ -134,7 +135,6 @@ if __name__=="__main__":
         sampleCom = invdyn.trajCom.computeNext()
 
         # reset simulator 
-        pin.framesForwardKinematics(robot.model, robot.data, q0)
         sim.reset_state(q0, v0, True)
         print('Reset state done '.center(conf.LINE_WIDTH, '-'))
 
@@ -175,7 +175,7 @@ if __name__=="__main__":
             # com_vel[i, :] = np.resize(invdyn.robot.com_vel(invdyn.formulation.data()),3)
             # com_acc[i, :] = np.resize(invdyn.comTask.getAcceleration(sim.get_dv()),3)
             # com_vel_ref[i, :] = np.resize(sampleCom.vel(),3)
-            com_pos_ref[i, :] = np.resize(sampleCom.pos(),3)
+            # com_pos_ref[i, :] = np.resize(sampleCom.pos(),3)
             # com_acc_ref[i, :] = np.resize(sampleCom.acc(),3)
             # com_acc_des[i, :] = np.resize(invdyn.comTask.getDesiredAcceleration,3)
             tau[-8:] = np.asarray(u)
@@ -192,13 +192,19 @@ if __name__=="__main__":
         # end simulation loop
         time_spent = time.time() - time_start
         print("Real-time factor:", t/time_spent)    
-        # run only first simulation (test everything works)
+
+        # plot base trajectory 
         plt.figure('base_height')
         plt.plot(tt, sim_q[:,2], line_styles[i_ls], alpha=0.7, label=name)
         plt.legend()
-        plt.grid()
         plt.title('Base Height vs time ')
 
+        # plot contact forces 
+        for ci, ci_name in enumerate(conf.contact_frames):
+            plt.figure(ci_name+" normal force")
+            plt.plot(tt, sim_f[:, ci, 2], line_styles[i_ls], alpha=0.7, label=name)
+            plt.legend()
+            plt.title(ci_name+" normal force vs time")
         i_ls += 1 
         
 

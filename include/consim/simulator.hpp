@@ -1,5 +1,5 @@
 #include <Eigen/Eigen>
-
+#include<Eigen/Cholesky>
 #include <pinocchio/spatial/se3.hpp>
 #include <pinocchio/multibody/model.hpp>
 #include <pinocchio/multibody/data.hpp>
@@ -88,9 +88,7 @@ namespace consim {
       Eigen::VectorXd vMean_;
       Eigen::VectorXd tau_;
       unsigned int nc_=0;
-      unsigned int nk_ = 0;
       int nactive_; // number of active contacts
-      int nactive_prev;  // number of active contacts at previous time step 
       bool resetflag_ = false;
       /**
         * loops over contact points, checks active contacts and sets reference contact positions 
@@ -167,10 +165,6 @@ namespace consim {
        * sets a flag to to switch integration mode to include saturated forces 
        */
       void checkFrictionCone(); 
-      
-
-      void solveDenseExpSystem(); 
-      void solveSparseExpSystem(); 
 
       bool sparse_; 
       bool invertibleA_;
@@ -190,8 +184,11 @@ namespace consim {
       Eigen::VectorXd kp0_; 
       Eigen::VectorXd dv0_; 
 
+      
       void resizeVectorsAndMatrices();
       void computeFrameKinematics(unsigned int contact_id); 
+      // convenience method to compute terms needed in integration  
+      void computeIntegrationTerms();
 
       // contact acceleration components 
       Eigen::VectorXd dJv_;
@@ -226,7 +223,7 @@ namespace consim {
       bool cone_flag_ = false; // cone violation status 
       double cone_direction_; // angle of tangential(to contact surface) force 
       double ftan_; 
-      unsigned int i_active_; // index of the active contact     
+      unsigned int i_active_; // index of the active contact      
 
   }; // class ExponentialSimulator
 

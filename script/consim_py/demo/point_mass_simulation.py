@@ -8,6 +8,7 @@ from os.path import dirname, join
 import matplotlib.pyplot as plt 
 import utils.plot_utils as plut
 
+pin.setNumpyType(np.matrix)
 
 if __name__=="__main__":
     # build the point mass model 
@@ -88,14 +89,15 @@ if __name__=="__main__":
             for i, cp in enumerate(cpts):
                 fcnt[t+1,i,:] = np.resize(cp.f,3)
         print('Simulation done ')
-        
+
         qz = []
         dqz = []
         for i,qi in enumerate(q):
-            if(abs(qi[2,0])>1e2):
-                qi[2,0] = np.nan
-            qz += [qi[2,0]]
-            dqz += [dq[i][2,0]]
+            # print qi.shape 
+            if(abs(qi[2])>1e2):
+                qi[2] = np.nan
+            qz += [qi[2]]
+            dqz += [dq[i][2]]
         
         plt.figure('Ball Height')
         plt.plot(dt*np.arange(N+1), qz, line_styles[i_ls], alpha=0.7, label=name)
