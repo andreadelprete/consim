@@ -13,7 +13,7 @@ bool FloorObject::checkContact(ContactPoint &cp)
   // }
 
   // checks for penetration into the floor 
-  if (cp.x(2) > 0.) {
+  if (cp.x(2) > 0. && cp.unilateral) {
     return false;
   }
 
@@ -24,7 +24,9 @@ bool FloorObject::checkContact(ContactPoint &cp)
   cp.contact_surface_normal << 0., 0., 1.;
 
   // Ensure the starting position is at the top of the floor.
+  if(cp.unilateral){
   cp.x_start(2) = 0;
+  }
   return true;
 }
 

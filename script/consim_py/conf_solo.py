@@ -15,8 +15,8 @@ LINE_WIDTH = 60
 
 mu = 0.3                            # friction coefficient
 contact_frames = ['HL_FOOT', 'HR_FOOT', 'FL_FOOT', 'FR_FOOT']
-contact_frames += ['FL_UPPER_LEG', 'FL_LOWER_LEG', 'FR_UPPER_LEG', 'FR_LOWER_LEG',
-                   'HL_UPPER_LEG', 'HL_LOWER_LEG', 'HR_UPPER_LEG', 'HR_LOWER_LEG']
+# contact_frames += ['FL_UPPER_LEG', 'FL_LOWER_LEG', 'FR_UPPER_LEG', 'FR_LOWER_LEG',
+#                    'HL_UPPER_LEG', 'HL_LOWER_LEG', 'HR_UPPER_LEG', 'HR_LOWER_LEG']
 # contact_normal = np.matrix([0., 0., 1.]).T   # direction of the normal to the contact surface
 K = 1e5*np.asmatrix(np.diagflat([1., 1., 1.]))
 B = 3e2*np.asmatrix(np.diagflat([1., 1., 1.]))

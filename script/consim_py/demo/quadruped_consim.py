@@ -20,9 +20,6 @@ from numpy.linalg import norm as norm
 
 pin.setNumpyType(np.matrix)
 
-
-
-
 USE_CONTROLLER = True 
 # parameters used for CoM Sinusoid 
 offset = np.matrix([0.0, -0.0, 0.0]).T
@@ -39,12 +36,12 @@ if __name__=="__main__":
     simu_params += [{'name': 'euler 10',
                     'type': 'euler', 
                     'ndt': 10}]
-    simu_params += [{'name': 'exponential 100',
-                    'type': 'exponential', 
-                    'ndt': 100}]
-    # simu_params += [{'name': 'exponential 10',
+    # simu_params += [{'name': 'exponential 100',
     #                 'type': 'exponential', 
-    #                 'ndt': 10}]
+    #                 'ndt': 100}]
+    simu_params += [{'name': 'exponential 10',
+                    'type': 'exponential', 
+                    'ndt': 10}]
     # simu_params += [{'name': 'exponential 1',
     #                 'type': 'exponential', 
     #                 'ndt': 1}]
@@ -56,7 +53,7 @@ if __name__=="__main__":
     mu = 0.3        # friction coefficient
     isSparse = False 
     isInvertible = False
-    unilateral_contacts = False      
+    unilateral_contacts = False         
     K = 1e5
     B = 3e2
     T = 1 #  1 second simution  
@@ -74,10 +71,11 @@ if __name__=="__main__":
     print(" Solo Loaded Successfully ".center(conf.LINE_WIDTH, '#'))
     # lower q0 a little bit for bilateral contacts 
     q0 = conf.q0
-    q0[2] -= 1.e-10
-    # pin.framesForwardKinematics(robot.model, robot.data, q0)
-    # for cname in conf.contact_frames:
-    #     print robot.data.oMf[robot.model.getFrameId(cname)].translation 
+    # q0[2] -= 1.e-5
+    print(" Contact Frame Positions".center(conf.LINE_WIDTH, '-'))
+    pin.framesForwardKinematics(robot.model, robot.data, q0)
+    for cname in conf.contact_frames:
+        print robot.data.oMf[robot.model.getFrameId(cname)].translation 
     v0 = np.zeros(robot.nv) [:,None]
     tau = np.zeros(robot.nv) [:,None]
  
@@ -85,6 +83,7 @@ if __name__=="__main__":
     for simu_param in simu_params:
         ndt = simu_param['ndt']
         name = simu_param['name']
+        print(" Running %s Simulation ".center(conf.LINE_WIDTH, '#')%name)
         simu_type = simu_param['type']
         # build the simulator 
         if(simu_type=='exponential'):
@@ -104,7 +103,7 @@ if __name__=="__main__":
 
         # inverse dynamics controller 
         invdyn = TsidQuadruped(conf, robot, q0, viewer=False)
-        print(" TSID Initialized Successfully ".center(conf.LINE_WIDTH, '#'))
+        print(" TSID Initialized Successfully ".center(conf.LINE_WIDTH, '-'))
 
 
         # trajectory log 
@@ -122,9 +121,9 @@ if __name__=="__main__":
         contact_x = np.empty((N_SIMULATION+1,len(conf.contact_frames),3))*nan
         contact_v = np.empty((N_SIMULATION+1,len(conf.contact_frames),3))*nan
 
-        q = [q0]
+        q = [q0.copy()]
         sim_q[0,:] = np.resize(q[-1], robot.nq)
-        v = [v0]
+        v = [v0.copy()]
 
     
         offset += invdyn.robot.com(invdyn.formulation.data())
@@ -135,13 +134,17 @@ if __name__=="__main__":
         sampleCom = invdyn.trajCom.computeNext()
 
         # reset simulator 
-        sim.reset_state(q0, v0, True)
+        sim.reset_state(q[0], v[0], True)
         print('Reset state done '.center(conf.LINE_WIDTH, '-'))
 
         for ci, cp in enumerate(cpts):
                 sim_f[0,ci,:] = np.resize(cp.f,3)
                 contact_x[0,ci,:] = np.resize(cp.x,3)
                 contact_v[0,ci,:] = np.resize(cp.v,3)
+        
+        for ci, cframe in enumerate(conf.contact_frames):
+            print('initial contact position for contact '+cframe)
+            print(contact_x[0,ci,:])
 
         
 
@@ -199,13 +202,13 @@ if __name__=="__main__":
         plt.legend()
         plt.title('Base Height vs time ')
 
-        # plot contact forces 
-        for ci, ci_name in enumerate(conf.contact_frames):
-            plt.figure(ci_name+" normal force")
-            plt.plot(tt, sim_f[:, ci, 2], line_styles[i_ls], alpha=0.7, label=name)
-            plt.legend()
-            plt.title(ci_name+" normal force vs time")
-        i_ls += 1 
+        # # plot contact forces 
+        # for ci, ci_name in enumerate(conf.contact_frames):
+        #     plt.figure(ci_name+" normal force")
+        #     plt.plot(tt, sim_f[:, ci, 2], line_styles[i_ls], alpha=0.7, label=name)
+        #     plt.legend()
+        #     plt.title(ci_name+" normal force vs time")
+        # i_ls += 1 
         
 
     consim.stop_watch_report(3)

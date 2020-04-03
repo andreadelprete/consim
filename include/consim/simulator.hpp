@@ -182,7 +182,7 @@ namespace consim {
       Eigen::VectorXd intxt_;
       Eigen::VectorXd int2xt_;
       Eigen::VectorXd kp0_; 
-      Eigen::VectorXd dv0_; 
+      Eigen::VectorXd dv_bar; 
 
       
       void resizeVectorsAndMatrices();
@@ -191,22 +191,22 @@ namespace consim {
       void computeIntegrationTerms();
 
       // contact acceleration components 
-      Eigen::VectorXd dJv_;
+      Eigen::VectorXd dJv_;  
+      // contnact frame components
       pinocchio::Motion vilocal_ = pinocchio::Motion::Zero();
-
-      pinocchio::Motion dJvilocal_ = pinocchio::Motion::Zero(); // per frame
-      Eigen::VectorXd dJvi_; // per frame
+      pinocchio::Motion dJvilocal_ = pinocchio::Motion::Zero(); 
+      Eigen::VectorXd dJvi_; 
       pinocchio::SE3 frameSE3_ = pinocchio::SE3::Identity();
-      // keep the stiffness/damping matrices fixed to the total size of contact points
-      // worry about tracking index of Active sub-blocks later
+      //
       Eigen::MatrixXd K;
       Eigen::MatrixXd B;
       Eigen::MatrixXd D;
       Eigen::MatrixXd A; 
       Eigen::MatrixXd Minv_;
       Eigen::MatrixXd JMinv_;
+      Eigen::MatrixXd MinvJcT_;
       Eigen::MatrixXd Upsilon_;
-
+      Eigen::MatrixXd JcT_; 
       // expokit 
       expokit::LDSUtility<double, Dynamic> utilDense_;
       // 
@@ -215,7 +215,6 @@ namespace consim {
       Eigen::VectorXd temp02_;
       Eigen::VectorXd temp03_;
       Eigen::VectorXd temp04_;
-
       Eigen::MatrixXd tempStepMat_; 
       // friction cone 
       Eigen::VectorXd f_avg;  // average force for cone 
