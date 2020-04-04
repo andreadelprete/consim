@@ -1,4 +1,4 @@
-from utils_LDS_integral import compute_x_T
+from consim_py.utils_LDS_integral import compute_x_T
 import pinocchio as se3
 from pinocchio.utils import zero
 import numpy as np
@@ -12,7 +12,7 @@ import time
 import subprocess
 
 # , compute_x_T_and_two_integrals
-from utils_LDS_integral import compute_integral_x_T, compute_double_integral_x_T
+from consim_py.utils_LDS_integral import compute_integral_x_T, compute_double_integral_x_T
 
 
 class Contact:
@@ -377,16 +377,16 @@ class RobotSimulator:
                 self.f_log[:, i] = self.f
             self.q, self.v = self.step(u, dt/ndt, use_exponential_integrator, use_sparse_solver)
 
+        self.display(self.q)
+
+        return self.q, self.v, self.f
+        
+    def display(self, q):
         if(self.conf.use_viewer):
             self.display_counter -= 1
             if self.display_counter == 0:
-                self.robot_display.display(self.q)
+                self.robot_display.display(q)
                 self.display_counter = self.DISPLAY_N
-
-        #        time_spent = time.time() - time_start
-        #        if(time_spent < dt): time.sleep(dt-time_spent)
-
-        return self.q, self.v, self.f
 
 
 ''' Moved because of readability
