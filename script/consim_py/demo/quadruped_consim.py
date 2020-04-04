@@ -30,9 +30,9 @@ if __name__=="__main__":
     # simulation parameters 
     simu_params = []
 
-    simu_params += [{'name': 'exponential 10',
-                    'type': 'exponential', 
-                    'ndt': 10}]
+    # simu_params += [{'name': 'exponential 10',
+    #                 'type': 'exponential', 
+    #                 'ndt': 10}]
     
     simu_params += [{'name': 'euler 100',
                     'type': 'euler', 
@@ -42,9 +42,9 @@ if __name__=="__main__":
                     'type': 'exponential', 
                     'ndt': 100}]
         
-    simu_params += [{'name': 'euler 10',
-                    'type': 'euler', 
-                    'ndt': 10}]
+    # simu_params += [{'name': 'euler 10',
+    #                 'type': 'euler', 
+    #                 'ndt': 10}]
     
     
 
@@ -54,7 +54,7 @@ if __name__=="__main__":
     mu = 0.3        # friction coefficient
     isSparse = False 
     isInvertible = False
-    unilateral_contacts = False             
+    unilateral_contacts = False              
     K = 1e5
     B = 3e2
     T = 1 #  1 second simution  
@@ -72,7 +72,7 @@ if __name__=="__main__":
     print(" Solo Loaded Successfully ".center(conf.LINE_WIDTH, '#'))
     # lower q0 a little bit for bilateral contacts 
     q0 = conf.q0
-    # q0[2] -= 1.e-5
+    q0[2] -= 1.e-6
     # print(" Contact Frame Positions".center(conf.LINE_WIDTH, '-'))
     # pin.framesForwardKinematics(robot.model, robot.data, q0)
     # for cname in conf.contact_frames:
@@ -208,12 +208,6 @@ if __name__=="__main__":
         plt.plot(tt, sim_q[:,2], line_styles[i_ls], alpha=0.7, label=name)
         plt.legend()
         plt.title('Base Height vs time ')
-
-        # if name[:3] == "eul":
-        #     consim.del_euler_simulator(sim)
-        # elif name[:3] == "exp":
-        #     consim.del_exponential_simulator(sim)
-
 
         # plot contact forces 
         for ci, ci_name in enumerate(conf.contact_frames):
