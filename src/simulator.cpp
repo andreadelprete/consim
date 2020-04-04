@@ -28,11 +28,11 @@ model_(&model), data_(&data), dt_(dt), n_integration_steps_(n_integration_steps)
   q_.resize(model.nq); q_.setZero();
   v_.resize(model.nv); v_.setZero();
   dv_.resize(model.nv); dv_.setZero();
-  vMean_.resize(model.nv);
-  tau_.resize(model.nv);
-  frame_Jc_.resize(3, model.nv);
-  J_.resize(6, model.nv);
-  qnext_.resize(model.nq);
+  vMean_.resize(model.nv); vMean_.setZero();
+  tau_.resize(model.nv); tau_.setZero();
+  frame_Jc_.resize(3, model.nv); frame_Jc_.setZero();
+  J_.resize(6, model.nv); J_.setZero();
+  qnext_.resize(model.nq); qnext_.setZero();
 } 
 
 const ContactPoint &AbstractSimulator::addContactPoint(int frame_id, bool unilateral)
@@ -240,8 +240,8 @@ ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocc
   dvMean_.resize(model_->nv);
   Minv_.resize(model_->nv, model_->nv); Minv_.setZero();
   dv_bar.resize(model_->nv); dv_bar.setZero();
-  temp01_.resize(model_->nv);
-  temp02_.resize(model_->nv);
+  temp01_.resize(model_->nv); temp01_.setZero();
+  temp02_.resize(model_->nv); temp02_.setZero();
 }
 
 
@@ -255,7 +255,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
 
   for (int i = 0; i < n_integration_steps_; i++){
     CONSIM_START_PROFILER("exponential_simulator::substep");
-    tau_ += tau; 
+    tau_ += tau;  
     if (nactive_> 0){
       Eigen::internal::set_is_malloc_allowed(false);
       // if (sparse_){
@@ -339,9 +339,10 @@ void ExponentialSimulator::computeIntegrationTerms(){
   // CONSIM_START_PROFILER("exponential_simulator::MinvEigen");
   // Minv_ = data_->M.inverse();
   // CONSIM_STOP_PROFILER("exponential_simulator::MinvEigen");
-  JMinv_.noalias() = Jc_ * Minv_;
-  MinvJcT_.noalias() = JMinv_.transpose(); 
+  
   JcT_.noalias() = Jc_.transpose(); 
+  JMinv_.noalias() = Jc_ * Minv_;
+  MinvJcT_.noalias() = Minv_*JcT_; 
   Upsilon_.noalias() =  Jc_*MinvJcT_;
   temp01_.noalias() = JcT_ * kp0_;
   temp02_ = tau_ - data_->nle + temp01_;
@@ -357,6 +358,7 @@ void ExponentialSimulator::computeIntegrationTerms(){
   a_.tail(3*nactive_) = b_;
   x0_.head(3*nactive_) = p_; 
   x0_.tail(3*nactive_) = dp_; 
+
 }
 
 
@@ -395,6 +397,7 @@ void ExponentialSimulator::computeIntegrationTerms(){
     kp0_(2+3*i_active_) = contacts_[i]->optr->getNormalStiffness() * p0_(2+3*i_active_);
     i_active_ += 1;  
   }
+
 } // ExponentialSimulator::computeContactForces
 
 
@@ -418,7 +421,7 @@ void ExponentialSimulator::checkFrictionCone(){
   temp03_.noalias() = D*intxt_;
   f_avg= kp0_ + temp03_/sub_dt; 
   i_active_ = 0; 
-  cone_flag_ = true; 
+  cone_flag_ = false; 
   for(unsigned int i=0; i<nc_; i++){
     if (!contacts_[i]->active) continue;
     if (!contacts_[i]->unilateral) {
