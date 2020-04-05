@@ -29,11 +29,7 @@ controller_dt = 5.e-3
 if __name__=="__main__":
     # simulation parameters 
     simu_params = []
-
-    # simu_params += [{'name': 'exponential 10',
-    #                 'type': 'exponential', 
-    #                 'ndt': 10}]
-    
+  
     simu_params += [{'name': 'euler 100',
                     'type': 'euler', 
                     'ndt': 100}]
@@ -42,19 +38,29 @@ if __name__=="__main__":
                     'type': 'exponential', 
                     'ndt': 100}]
         
-    # simu_params += [{'name': 'euler 10',
-    #                 'type': 'euler', 
-    #                 'ndt': 10}]
-    
-    
+    simu_params += [{'name': 'euler 10',
+                    'type': 'euler', 
+                    'ndt': 10}]
 
-    line_styles = ['-', '--', '-.', '-..', ':']
+    simu_params += [{'name': 'exponential 10',
+                    'type': 'exponential', 
+                    'ndt': 10}]
+
+    simu_params += [{'name': 'exponential 1',
+                    'type': 'exponential', 
+                    'ndt': 1}]
+    
+    # simu_params += [{'name': 'euler 1',
+    #                 'type': 'euler', 
+    #                 'ndt': 1}]
+
+    line_styles = ['-', '--', '-.', '-..', ':','-o']
     i_ls = 0
     
     mu = 0.3        # friction coefficient
     isSparse = False 
     isInvertible = False
-    unilateral_contacts = False              
+    unilateral_contacts = True              
     K = 1e5
     B = 3e2
     T = 1 #  1 second simution  
@@ -81,7 +87,6 @@ if __name__=="__main__":
     tau = np.zeros(robot.nv) [:,None]
  
     # loop over simulations     
-    sims = []
     for simu_param in simu_params:
         offset = np.matrix([0.0, -0.0, 0.0]).T
         ndt = simu_param['ndt']
@@ -90,11 +95,11 @@ if __name__=="__main__":
         simu_type = simu_param['type']
         # build the simulator 
         if(simu_type=='exponential'):
-            sims += [consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
-                                        K, B ,K, B, mu, mu, isSparse, isInvertible)]
+            sim = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
+                                        K, B ,K, B, mu, mu, isSparse, isInvertible)
         else:
-            sims += [consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
-                                            K, B ,K, B, mu, mu)]
+            sim = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
+                                            K, B ,K, B, mu, mu)
 
         # trajectory log 
         com_pos = np.empty((N_SIMULATION, 3))*nan
@@ -122,11 +127,11 @@ if __name__=="__main__":
         for cname in conf.contact_frames:
             if not robot.model.existFrame(cname):
                 print(("ERROR: Frame", cname, "does not exist"))
-            cpts += [sims[-1].add_contact_point(robot.model.getFrameId(cname), unilateral_contacts)]
+            cpts += [sim.add_contact_point(robot.model.getFrameId(cname), unilateral_contacts)]
         print(" %s Contact Points Added ".center(conf.LINE_WIDTH, '-')%(len(cpts)))
 
         # reset simulator 
-        sims[-1].reset_state(q[0], v[0], True)
+        sim.reset_state(q[0], v[0], True)
         print('Reset state done '.center(conf.LINE_WIDTH, '-')) 
 
         # inverse dynamics controller 
@@ -148,11 +153,9 @@ if __name__=="__main__":
                 contact_x[0,ci,:] = np.resize(cp.x,3)
                 contact_v[0,ci,:] = np.resize(cp.v,3)
         
-        for ci, cframe in enumerate(conf.contact_frames):
-            print('initial contact position for contact '+cframe)
-            print(contact_x[0,ci,:])
-
-        
+        # for ci, cframe in enumerate(conf.contact_frames):
+        #     print('initial contact position for contact '+cframe)
+        #     print(contact_x[0,ci,:])
 
         t = 0.0   # used for control frequency  
         time_start = time.time()
@@ -188,10 +191,10 @@ if __name__=="__main__":
             # com_acc_ref[i, :] = np.resize(sampleCom.acc(),3)
             # com_acc_des[i, :] = np.resize(invdyn.comTask.getDesiredAcceleration,3)
             tau[-8:] = np.asarray(u)
-            sims[-1].step(tau) 
-            q += [sims[-1].get_q()]
+            sim.step(tau) 
+            q += [sim.get_q()]
             sim_q[i+1,:] = np.resize(q[-1], robot.nq)
-            v += [sims[-1].get_v()]
+            v += [sim.get_v()]
             for ci, cp in enumerate(cpts):
                 sim_f[i+1,ci,:] = np.resize(cp.f,3)
                 contact_x[i+1,ci,:] = np.resize(cp.x,3)
@@ -210,11 +213,13 @@ if __name__=="__main__":
         plt.title('Base Height vs time ')
 
         # plot contact forces 
-        for ci, ci_name in enumerate(conf.contact_frames):
-            plt.figure(ci_name+" normal force")
-            plt.plot(tt, sim_f[:, ci, 2], line_styles[i_ls], alpha=0.7, label=name)
-            plt.legend()
-            plt.title(ci_name+" normal force vs time")
+        # for ci, ci_name in enumerate(conf.contact_frames):
+        #     plt.figure(ci_name+" normal force")
+        #     plt.plot(tt, sim_f[:, ci, 2], line_styles[i_ls], alpha=0.7, label=name)
+        #     plt.legend()
+        #     plt.title(ci_name+" normal force vs time")
+        
+        
         i_ls += 1 
         
 
