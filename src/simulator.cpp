@@ -274,10 +274,8 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       // }
       computeIntegrationTerms();
       CONSIM_START_PROFILER("exponential_simulator::computeIntegralXt");
-      intxt_.fill(0); 
       utilDense_.ComputeIntegralXt(A, a_, x0_, sub_dt, intxt_);
       CONSIM_STOP_PROFILER("exponential_simulator::computeIntegralXt");
-      
       CONSIM_START_PROFILER("exponential_simulator::checkFrictionCone");
       checkFrictionCone();
       CONSIM_STOP_PROFILER("exponential_simulator::checkFrictionCone");
@@ -292,7 +290,6 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
         temp01_.noalias() = MinvJcT_ * temp03_;
         dvMean_.noalias() = dv_bar + temp01_/sub_dt ; 
         CONSIM_START_PROFILER("exponential_simulator::ComputeDoubleIntegralXt");
-        int2xt_.fill(0);
         utilDense_.ComputeDoubleIntegralXt(A, a_, x0_, sub_dt, int2xt_); 
         CONSIM_STOP_PROFILER("exponential_simulator::ComputeDoubleIntegralXt");
         temp03_.noalias() = D*int2xt_; 
@@ -319,6 +316,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
      * seems a bit inefficient to call forward kinematics twice   
     */
     
+    pinocchio::forwardKinematics(*model_, *data_, q_, v_, dv_);  // frame accelerations  
     CONSIM_START_PROFILER("exponential_simulator::computeContactState");
     computeContactState();  // this sets tau_ to zero 
     CONSIM_STOP_PROFILER("exponential_simulator::computeContactState");
@@ -375,22 +373,20 @@ void ExponentialSimulator::computeIntegrationTerms(){
   {
     tau_ -= joint_friction_.cwiseProduct(dq);
   }
-
-  pinocchio::forwardKinematics(*model_, *data_, q_, v_, dv_);  // frame accelerations  
   i_active_ = 0; 
   for(unsigned int i=0; i<nc_; i++){
     if (!contacts_[i]->active) continue;
+    // compute jacobian for active contact and store in frame_Jc_
+    contactLinearJacobian(contacts_[i]->frame_id); 
+    Jc_.block(3*i_active_,0,3,model_->nv) = frame_Jc_;
+    computeFrameKinematics(i); // important to call before contact model, updates contact velocity
+    dJv_.segment(3*i_active_,3) = dJvi_; // cross component of acceleration
     // compute force using the model  
     contacts_[i]->optr->contactModel(*contacts_[i]); 
     f_.segment(3*i_active_,3) = contacts_[i]->f; 
     p0_.segment(3*i_active_,3)=contacts_[i]->x_start; 
     p_.segment(3*i_active_,3)=contacts_[i]->x; 
     dp_.segment(3*i_active_,3)=contacts_[i]->v; 
-    // compute jacobian for active contact and store in frame_Jc_
-    contactLinearJacobian(contacts_[i]->frame_id); 
-    Jc_.block(3*i_active_,0,3,model_->nv) = frame_Jc_;
-    computeFrameKinematics(i); 
-    dJv_.segment(3*i_active_,3) = dJvi_; // cross component of acceleration
     // fill Kp0_ 
     kp0_(3*i_active_) = contacts_[i]->optr->getTangentialStiffness() * p0_(3*i_active_);
     kp0_(1+3*i_active_) = contacts_[i]->optr->getTangentialStiffness() * p0_(1+3*i_active_);
@@ -411,7 +407,7 @@ void ExponentialSimulator::computeFrameKinematics(unsigned int contact_id)
   dJvilocal_.linear() += vilocal_.angular().cross(vilocal_.linear());
   frameSE3_.rotation() = data_->oMf[contacts_[contact_id]->frame_id].rotation();
   dJvi_ = frameSE3_.act(dJvilocal_).linear();
-  contacts_[contact_id]->v.noalias() = frameSE3_.act(vilocal_).linear();
+  contacts_[contact_id]->v.noalias() = frameSE3_.rotation()*vilocal_.linear();
   CONSIM_STOP_PROFILER("exponential_simulator::computeFrameAcceleration");
 } //computeFrameAcceleration
 
