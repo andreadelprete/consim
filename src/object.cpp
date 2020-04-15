@@ -19,12 +19,16 @@ bool FloorObject::checkContact(ContactPoint &cp)
 
   if (!cp.active) {
     cp.x_start = cp.x;
+    // update basis only at switch  
+    cp.contact_surface_normal << 0., 0., 1.;
+    cp.contact_surface_basisA << 1., 0., 0.;
+    cp.contact_surface_basisB << 0., 1., 0.;
   }
 
-  cp.contact_surface_normal << 0., 0., 1.;
+  
 
   // Ensure the starting position is at the top of the floor.
-  cp.x_start(2) = 0;
+  // cp.x_start(2) = 0; //
   return true;
 }
 

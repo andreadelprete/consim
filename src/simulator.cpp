@@ -119,7 +119,7 @@ void AbstractSimulator::checkContact()
           nactive_ += 1; 
           cp->optr = optr;
           if(!cp->unilateral){
-            cp->x_start = cp->x;
+            // cp->x_start = cp->x;
             cout<<"Bilateral contact with object "<<optr->getName()<<" at point "<<cp->x.transpose()<<endl;
           }
           break;
@@ -334,9 +334,6 @@ void ExponentialSimulator::computeIntegrationTerms(){
   CONSIM_START_PROFILER("exponential_simulator::computeMinverse");
   Minv_ = pinocchio::computeMinverse(*model_, *data_, q_);
   CONSIM_STOP_PROFILER("exponential_simulator::computeMinverse");
-  // CONSIM_START_PROFILER("exponential_simulator::MinvEigen");
-  // Minv_ = data_->M.inverse();
-  // CONSIM_STOP_PROFILER("exponential_simulator::MinvEigen");
   
   JcT_.noalias() = Jc_.transpose(); 
   JMinv_.noalias() = Jc_ * Minv_;
@@ -429,6 +426,7 @@ void ExponentialSimulator::checkFrictionCone(){
     ftan_ = sqrt(sqr(f_avg(3*i_active_)) + sqr(f_avg(1+3*i_active_))); 
     if (ftan_<(f_avg(2+3*i_active_) * contacts_[i]->optr->getFrictionCoefficient())) // fi_tan < mu*fi_z 
     {
+      // no violation of cone, fill fpr_ anyways  
       fpr_.segment(3*i_active_,3) = f_avg.segment(3*i_active_,3); 
     } // no violation 
     else{
@@ -443,6 +441,18 @@ void ExponentialSimulator::checkFrictionCone(){
         fpr_(3*i_active_) = cos(cone_direction_)*f_avg(2+3*i_active_) * contacts_[i]->optr->getFrictionCoefficient();
         fpr_(1+3*i_active_) = sin(cone_direction_)*f_avg(2+3*i_active_) * contacts_[i]->optr->getFrictionCoefficient();
         fpr_(2+3*i_active_) = f_avg(2+3*i_active_); 
+        // best to update anchor point here 
+        // since K & B are diagonal, it makes sense to just use element wise operations, it flips the sign (D = [-K, -B]) 
+        xstart_new(0) = invK(3*i_active_, 3*i_active_) * (fpr_(3*i_active_) 
+                                      + K(3*i_active_, 3*i_active_)* p_(3*i_active_) 
+                                        + B(3*i_active_, 3*i_active_)* dp_(3*i_active_)); 
+        xstart_new(1) = invK(3*i_active_+1, 3*i_active_+1) * (fpr_(3*i_active_+1) 
+                                      + K(3*i_active_+1, 3*i_active_+1)* p_(3*i_active_+1) 
+                                        + B(3*i_active_+1, 3*i_active_+1)* dp_(3*i_active_+1));
+        xstart_new(2) = invK(3*i_active_+2, 3*i_active_+2) * (fpr_(3*i_active_+2) 
+                                      + K(3*i_active_+2, 3*i_active_+2)* p_(3*i_active_+2) 
+                                        + B(3*i_active_+2, 3*i_active_+2)* dp_(3*i_active_+2));
+        contacts_[i]->x_start = xstart_new;
       } 
       cone_flag_ = true; 
     } // project onto cone boundaries 
@@ -471,6 +481,7 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
     int2xt_.resize(6 * nactive_); int2xt_.setZero();
     kp0_.resize(3 * nactive_); kp0_.setZero();
     K.resize(3 * nactive_, 3 * nactive_); K.setZero();
+    invK.resize(3 * nactive_, 3 * nactive_); K.setZero();
     B.resize(3 * nactive_, 3 * nactive_); B.setZero();
     D.resize(3 * nactive_, 6 * nactive_); D.setZero();
     A.resize(6 * nactive_, 6 * nactive_); A.setZero();
@@ -497,12 +508,30 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
       B(3*i_active_, 3*i_active_) = contacts_[i]->optr->getTangentialDamping();
       B(3*i_active_ + 1, 3*i_active_ + 1) = contacts_[i]->optr->getTangentialDamping();
       B(3*i_active_ + 2, 3*i_active_ + 2) = contacts_[i]->optr->getNormalDamping();
+      // Kinv is required for slippling 
+      invK(3*i_active_, 3*i_active_) = 1/contacts_[i]->optr->getTangentialStiffness();
+      invK(3*i_active_ + 1, 3*i_active_ + 1) = 1/contacts_[i]->optr->getTangentialStiffness();
+      invK(3*i_active_ + 2, 3 * i_active_ + 2) = 1/contacts_[i]->optr->getNormalStiffness();
       i_active_ += 1; 
     }
     // fillout D 
     D.block(0,0, 3*nactive_, 3*nactive_).noalias() = -K;
     D.block(0,3*nactive_, 3*nactive_, 3*nactive_).noalias() = -B; 
+    
+
   } // nactive_ > 0
+  // qp resizing 
+  // constraints should account for both directions of friction 
+  // and positive normal force, this implies 5 constraints per active contact
+  // will be arranged as follows [normal, +ve_basisA, -ve_BasisA, +ve_BasisB, -ve_BasisB]
+  // qp.reset(3*nactive_, 0., 5 * nactive_); 
+  // Q_cone.resize(3 * nactive_, 3 * nactive_); Q_cone.setZero(); 
+  // Q_cone.noalias() = 2 * Eigen::MatrixXd::Identity(3*nactive_, 3*nactive_);
+  // g0_cone.resize(3*nactive_); g0_cone.setZero();
+  // Cineq_cone.resize(5 * nactive_,5 * nactive_); Cineq_cone.setZero();
+  // cineq_cone.resize(5 * nactive_);  cineq_cone.setZero();
+
+
   Eigen::internal::set_is_malloc_allowed(false);
 } // ExponentialSimulator::resizeVectorsAndMatrices
 

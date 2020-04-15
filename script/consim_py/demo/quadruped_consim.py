@@ -23,7 +23,7 @@ pin.setNumpyType(np.matrix)
 USE_CONTROLLER = True 
 # parameters used for CoM Sinusoid 
 amp = np.matrix([0.0, 0.0, 0.05]).T
-two_pi_f = 2*np.pi*np.matrix([0.0, .0, 2.0]).T
+two_pi_f = 2*np.pi*np.matrix([0.0, .0, 2.]).T # double frequency to get more slipping 
 controller_dt = 5.e-3 
 
 if __name__=="__main__":
@@ -46,9 +46,9 @@ if __name__=="__main__":
                     'type': 'exponential', 
                     'ndt': 10}]
 
-    simu_params += [{'name': 'exponential 1',
-                    'type': 'exponential', 
-                    'ndt': 1}]
+    # simu_params += [{'name': 'exponential 1',
+    #                 'type': 'exponential', 
+    #                 'ndt': 1}]
     
     # simu_params += [{'name': 'euler 1',
     #                 'type': 'euler', 
@@ -78,7 +78,7 @@ if __name__=="__main__":
     print(" Solo Loaded Successfully ".center(conf.LINE_WIDTH, '#'))
     # lower q0 a little bit for bilateral contacts 
     q0 = conf.q0
-    q0[2] -= 1.e-6
+    # q0[2] -= 1.e-6
     # print(" Contact Frame Positions".center(conf.LINE_WIDTH, '-'))
     # pin.framesForwardKinematics(robot.model, robot.data, q0)
     # for cname in conf.contact_frames:

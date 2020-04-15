@@ -42,6 +42,9 @@ struct ContactPoint {
 
   // \brief The normal of the contact surface in the world coordinate frame.
   Eigen::Vector3d contact_surface_normal;
+  // \brief basis of the tangent to thhe contact surface in thhe world coordinate frame 
+  Eigen::Vector3d contact_surface_basisA;
+  Eigen::Vector3d contact_surface_basisB;
 
   bool friction_flag;
 
@@ -99,6 +102,8 @@ private:
   double static_friction_damping_spring_coeff_;
   double static_friction_coeff_;
   double dynamic_friction_coeff_;
+
+   
 };
 
 

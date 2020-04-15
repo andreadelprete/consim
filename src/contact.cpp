@@ -41,6 +41,7 @@ void LinearPenaltyContactModel::computeForce(ContactPoint& cptr)
   double tangent_force = 0.;
   double normal_force = 0.;
   for (i = 0; i < 3; ++i) {
+    // TODO: Write as Vector Operation
     cptr.f(i) = normal_spring_const_ * cptr.normal(i) + normal_damping_coeff_ * cptr.normvel(i);
 
     // make sure the damping part does not attract a contact force with wrong sign
@@ -63,6 +64,7 @@ void LinearPenaltyContactModel::computeForce(ContactPoint& cptr)
   tangent_force = 0;
   viscvel = 1.e-10;
   for (i = 0; i < 3; ++i) {
+    // TODO: Write as Vector Operation
     temp(i) = -static_friction_spring_coeff_ * cptr.tangent(i) -
         static_friction_damping_spring_coeff_ * cptr.tanvel(i);
     tangent_force += sqr(temp(i));
@@ -79,6 +81,8 @@ void LinearPenaltyContactModel::computeForce(ContactPoint& cptr)
       i.e., when the viscvel becomes zero */
     cptr.friction_flag = true;
     for (i = 0; i < 3; ++i) {
+      // TODO: Write as Vector Operation
+      // TODO: Take x_start reset out of the loop ? anytime friction cone is violated, it is called 3 times
       cptr.f(i) += -dynamic_friction_coeff_ * normal_force * cptr.viscvel(i)/viscvel;
       if (viscvel < 0.01) {
         cptr.friction_flag = false;
@@ -87,6 +91,7 @@ void LinearPenaltyContactModel::computeForce(ContactPoint& cptr)
     }
   } 
   else {
+      // TODO: Write as Vector Operation
       for (i = 0; i < 3; ++i) {
         cptr.f(i) += temp(i);
       }

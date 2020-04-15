@@ -10,7 +10,7 @@
 
 #include "consim/object.hpp"
 #include "consim/contact.hpp"
-//#include "consim/dynamic_algebra.hpp"
+#include "eiquadprog/eiquadprog-fast.hpp"
 
 #define CONSIM_PROFILER
 #ifndef CONSIM_PROFILER
@@ -20,6 +20,8 @@
 #define CONSIM_START_PROFILER(name) getProfiler().start(name)
 #define CONSIM_STOP_PROFILER(name) getProfiler().stop(name)
 #endif
+
+
 
 
 
@@ -118,6 +120,14 @@ namespace consim {
 
       Eigen::VectorXd joint_friction_;
       bool joint_friction_flag_ = 0;
+      /**
+       * contact anchor point update type 
+       * 0: x_start = x  
+       * 1: every point is moved separately such that the force lies on the cone boundary 
+       * 2: qp solution to update contact points consistently 
+      **/
+
+      int contact_update = 1; 
 
   }; // class AbstractSimulator
 
@@ -223,6 +233,24 @@ namespace consim {
       double cone_direction_; // angle of tangential(to contact surface) force 
       double ftan_; 
       unsigned int i_active_; // index of the active contact      
+
+      /**
+       * solves a QP to update anchor points of sliding contacts 
+       * min || opt_p - p0 ||^2  written as  0.5* opt_p.T * Q * opt_p  + g0.T * opt_p
+       * s.t.  Cineq_ * opt_p  + cineq_ >= 0  (inner linear approximation of friction cone)
+      **/
+      eiquadprog::solvers::EiquadprogFast qp;
+      Eigen::MatrixXd Q_cone; 
+      Eigen::VectorXd g0_cone; 
+      Eigen::MatrixXd Cineq_cone; 
+      Eigen::VectorXd cineq_cone; 
+      Eigen::VectorXd optP_cone; 
+      Eigen::MatrixXd invK;
+      
+
+      Eigen::Vector3d xstart_new; // invK*cone_force_offset_03
+
+      // void updateAnchorPoint(const int &contact_index,const int &active_index); 
 
   }; // class ExponentialSimulator
 
