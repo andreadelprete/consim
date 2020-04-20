@@ -452,7 +452,7 @@ void ExponentialSimulator::checkFrictionCone(){
         xstart_new(2) = invK(3*i_active_+2, 3*i_active_+2) * (fpr_(3*i_active_+2) 
                                       + K(3*i_active_+2, 3*i_active_+2)* p_(3*i_active_+2) 
                                         + B(3*i_active_+2, 3*i_active_+2)* dp_(3*i_active_+2));
-        contacts_[i]->x_start = xstart_new;
+        // contacts_[i]->x_start = xstart_new;
       } 
       cone_flag_ = true; 
     } // project onto cone boundaries 
