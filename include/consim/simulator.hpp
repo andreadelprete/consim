@@ -1,3 +1,5 @@
+#pragma once
+
 #include <Eigen/Eigen>
 #include<Eigen/Cholesky>
 #include <pinocchio/spatial/se3.hpp>

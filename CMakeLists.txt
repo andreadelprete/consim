@@ -22,6 +22,7 @@ INCLUDE(cmake/eigen.cmake)
 INCLUDE(cmake/python.cmake)
 INCLUDE(cmake/ide.cmake)
 INCLUDE(cmake/apple.cmake)
+INCLUDE(cmake/test.cmake)
 
 SET(PROJECT_NAME consim)
 SET(PROJECT_DESCRIPTION "Efficient Contact Dynamics Simulation based on Pinocchio")
@@ -49,7 +50,7 @@ ELSE(WIN32)
 ENDIF(WIN32)
 
 # --- OPTIONS ----------------------------------------
-OPTION (BUILD_PYTHON_INTERFACE "Build the python binding" ON)
+OPTION (BUILD_PYTHON_INTERFACE "Build the python binding" OFF)
 OPTION (BUILD_UNIT_TESTS "Build the unitary tests" ON)
 OPTION (INITIALIZE_WITH_NAN "Initialize Eigen entries with NaN" OFF)
 OPTION (EIGEN_RUNTIME_NO_MALLOC "If ON, it can assert in case of runtime allocation" ON)
@@ -136,8 +137,8 @@ SET(${PROJECT_NAME}_ROBOTS_HEADERS
 
 SET(HEADERS
     include/consim/contact.hpp
-    include/consim/object.hpp
-    include/consim/simulator.hpp
+#    include/consim/object.hpp
+#    include/consim/simulator.hpp
 #    include/tsid/config.hpp
 #    include/tsid/deprecation.hpp
 #    include/consim/utils/statistics.hpp
@@ -170,7 +171,7 @@ IF(BUILD_PYTHON_INTERFACE)
   ADD_SUBDIRECTORY(bindings)
 ENDIF(BUILD_PYTHON_INTERFACE)
 # --- UNIT TESTS ---------------------------------------------------------------
-#ADD_SUBDIRECTORY(unittest)
+ADD_SUBDIRECTORY(tests)
 
 # --- PACKAGING ----------------------------------------------------------------
 PKG_CONFIG_APPEND_LIBS(${PROJECT_NAME})

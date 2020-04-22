@@ -37,8 +37,8 @@ SET(${LIBRARY_NAME}_ROBOTS_SOURCES
 
 SET(${LIBRARY_NAME}_SOURCES
     contact.cpp
-    object.cpp
-    simulator.cpp
+    #object.cpp
+    #simulator.cpp
 #    utils/statistics.cpp
     utils/stop-watch.cpp
 #    ${${LIBRARY_NAME}_MATH_SOURCES}

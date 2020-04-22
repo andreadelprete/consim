@@ -6,7 +6,7 @@ namespace consim {
 Object::Object(std::string name, ContactModel& contact_model):
     name_(name), contact_model_(&contact_model) { }
 
-bool FloorObject::checkContact(ContactPoint &cp)
+bool FloorObject::checkCollision(ContactPoint &cp)
 {
   // if(!cp.unilateral){
   //   return true;
@@ -20,15 +20,20 @@ bool FloorObject::checkContact(ContactPoint &cp)
   if (!cp.active) {
     cp.x_start = cp.x;
     // update basis only at switch  
-    cp.contact_surface_normal << 0., 0., 1.;
-    cp.contact_surface_basisA << 1., 0., 0.;
-    cp.contact_surface_basisB << 0., 1., 0.;
+    cp.contact_surface_normal = normal;
+    cp.contact_surface_basisA = tangentA;
+    cp.contact_surface_basisB = tangentB;
   }
 
-  
+  // Compute the normal displacement and velocities.
+  cp.normal = (cp.x_start - cp.x).dot(cp.contact_surface_normal) * cp.contact_surface_normal;
+  cp.normvel = (-cp.v).dot(cp.contact_surface_normal) * cp.contact_surface_normal;
 
-  // Ensure the starting position is at the top of the floor.
-  // cp.x_start(2) = 0; //
+  // Compute the tangential offset and velocity by removing the normal component.
+  // NOTE: The normal component has a different signs than the tangential one.
+  cp.tangent = (cp.x - cp.x_start) + cp.normal;
+  cp.tanvel = cp.v + cp.normvel;
+
   return true;
 }
 
@@ -48,7 +53,7 @@ void FloorObject::contactModel(ContactPoint &cp)
   //       shape.
   cp.viscvel = cp.tanvel;
 
-  contact_model_->computeForce(cp);
+  contact_model_->computeForce(cp); // call using this in the contact class 
 }
 
 }
