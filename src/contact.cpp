@@ -29,6 +29,18 @@ void ContactPoint::firstOrderContactKinematics(const pinocchio::Model &model, pi
   v.noalias() = frameSE3_.rotation()*vlocal_.linear();
   pinocchio::getFrameJacobian(model, data, frame_id, pinocchio::LOCAL_WORLD_ALIGNED, full_J_);
   world_J_ = full_J_.topRows<3>();
+  /** compute displacement relative to contact object
+   * dx: relative penetration 
+   * normal: penetration along normal to contact object
+   * tangent: penetration along tangent to contact object
+   * normalvel: velocity along normal to contact object
+   * tanvel: velocity along tangent to contact object
+   * */ 
+  dx = x_start - x; 
+  normal = dx.dot(optr->contact_normal) * optr->contact_normal; 
+  tangent = dx - normal; 
+  normvel = (v).dot(optr->contact_normal) * optr->contact_normal; 
+  tanvel = v - normvel; 
 }
 
 
@@ -51,13 +63,6 @@ stiffness_(stiffness), damping_(damping), friction_coeff_(frictionCoeff) {}
 void LinearPenaltyContactModel::computeForce(ContactPoint& cp)
 {
   cp.friction_flag = false; 
-  // compute displacement relative to contact object 
-  cp.dx = cp.x_start - cp.x; 
-  cp.normal = cp.dx.dot(cp.optr->contact_normal) * cp.optr->contact_normal; /*!< penetration along normal to contact object */
-  cp.tangent = cp.dx - cp.normal; /*!< penetration along tangent to contact object */
-  cp.normvel = (cp.v).dot(cp.optr->contact_normal) * cp.optr->contact_normal; /*!< velocity along normal to contact object */
-  cp.tanvel = cp.v - cp.normvel; /*!< velocity along tangent to contact object */
-
   /*!< force along normal to contact object */ 
   normalF_ = stiffness_ * cp.normal - damping_*cp.normvel; 
   if(cp.unilateral){
@@ -72,7 +77,6 @@ void LinearPenaltyContactModel::computeForce(ContactPoint& cp)
   tangentF_ = stiffness_ * cp.tangent - damping_*cp.tanvel;
   tangentNorm_ = sqrt(tangentF_.transpose()*tangentF_);
   cp.f = normalF_; 
-  // cp.f = stiffness_ * cp.dx - damping_ * cp.v; 
   //
   if (cp.unilateral && (tangentNorm_ > friction_coeff_*normalNorm_)){
     tangentDir_ = tangentF_/tangentNorm_; 

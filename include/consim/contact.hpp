@@ -23,7 +23,7 @@ class ContactPoint {
     ~ContactPoint() {};
 
     void updatePosition(const pinocchio::Model &model, pinocchio::Data &data);  /*!< updates cartesian position */ 
-    void firstOrderContactKinematics(const pinocchio::Model &model, pinocchio::Data &data);  /*!< computes world_J_ */ 
+    void firstOrderContactKinematics(const pinocchio::Model &model, pinocchio::Data &data);  /*!< computes c, world_J_ and relative penetration */ 
     void secondOrderContactKinematics(const pinocchio::Model &model, pinocchio::Data &data); /*!< computes dJv_ */
     void computeContactForce();  /*!< calls contact model from object pointer to compute the force  */
     
