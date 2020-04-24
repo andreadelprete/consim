@@ -23,8 +23,8 @@ if __name__=="__main__":
     isSparse = False 
     isInvertible = False
     unilateral_contacts = True 
-    K = 1e5
-    B = 3e2
+    K = 1e5 * np.eye(3)
+    B = 3e2 * np.eye(3)
     N = 1000 
     
     q0 = np.array([0., 0., 0., 0., 0., 0., 1.]) [:,None]
@@ -50,15 +50,15 @@ if __name__=="__main__":
     contact_names = ['root_joint']
     
     simu_params = []
-    simu_params += [{'name': 'exponential 100',
-                    'type': 'exponential', 
-                    'ndt': 100}]
-    simu_params += [{'name': 'exponential 10',
-                    'type': 'exponential', 
-                    'ndt': 10}]
-    simu_params += [{'name': 'exponential 1',
-                    'type': 'exponential', 
-                    'ndt': 1}]
+    # simu_params += [{'name': 'exponential 100',
+    #                 'type': 'exponential', 
+    #                 'ndt': 100}]
+    # simu_params += [{'name': 'exponential 10',
+    #                 'type': 'exponential', 
+    #                 'ndt': 10}]
+    # simu_params += [{'name': 'exponential 1',
+    #                 'type': 'exponential', 
+    #                 'ndt': 1}]
     simu_params += [{'name': 'euler 100',
                     'type': 'euler', 
                     'ndt': 100}]
@@ -77,13 +77,13 @@ if __name__=="__main__":
                                         K, B ,K, B, mu, mu, isSparse, isInvertible)
         else:
             sim = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
-                                            K, B ,K, B, mu, mu)
+                                            K, B, mu)
         
         cpts = []
         for cf in contact_names:
             if not robot.model.existFrame(cf):
                 print(("ERROR: Frame", cf, "does not exist"))
-            cpts += [sim.add_contact_point(robot.model.getFrameId(cf), unilateral_contacts)]
+            cpts += [sim.add_contact_point(cf, robot.model.getFrameId(cf), unilateral_contacts)]
         print('Contacts added to simulator Successfully!')
     
         fcnt = np.zeros([N+1, len(cpts), 3])

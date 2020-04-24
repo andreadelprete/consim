@@ -6,11 +6,13 @@ namespace consim {
 
 class FloorObject: public ContactObject
 {
+  public:
   FloorObject(std::string name, ContactModel& contact_model): ContactObject(name, contact_model) {
-    normal << 0., 0., 1.;
-    tangentA << 1., 0., 0.;
-    tangentB << 0., 1., 0.;
+    contact_tangentA << 1., 0., 0.;
+    contact_tangentB << 0., 1., 0.;
+    contact_normal << 0., 0., 1.;
    };
+   ~FloorObject(){};
 
   bool checkCollision(ContactPoint &cp); 
 };

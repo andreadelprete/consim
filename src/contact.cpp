@@ -13,27 +13,28 @@ ContactPoint::ContactPoint(std::string name, unsigned int frameId, unsigned int 
         name_(name), frame_id(frameId), unilateral(isUnilateral) {
           active = false; 
           friction_flag = false; 
+          f.fill(0);
           dJdt_.resize(3, nv); dJdt_.setZero();
           world_J_.resize(3, nv); world_J_.setZero();
           full_J_.resize(6, nv); full_J_.setZero();
         }
 
-void ContactPoint::firstOrderContactKinematics(pinocchio::Model &model, pinocchio::Data &data){
+void ContactPoint::updatePosition(const pinocchio::Model &model, pinocchio::Data &data){
   x = data.oMf[frame_id].translation(); 
+}
 
+void ContactPoint::firstOrderContactKinematics(const pinocchio::Model &model, pinocchio::Data &data){
   vlocal_ = pinocchio::getFrameVelocity(model, data, frame_id); 
   frameSE3_.rotation() = data.oMf[frame_id].rotation();
   v.noalias() = frameSE3_.rotation()*vlocal_.linear();
-
   pinocchio::getFrameJacobian(model, data, frame_id, pinocchio::LOCAL_WORLD_ALIGNED, full_J_);
   world_J_ = full_J_.topRows<3>();
 }
 
 
-void ContactPoint::secondOrderContactKinematics(pinocchio::Model &model, pinocchio::Data &data){
+void ContactPoint::secondOrderContactKinematics(const pinocchio::Model &model, pinocchio::Data &data){
   dJvlocal_ = pinocchio::getFrameAcceleration(model, data, frame_id); 
   dJvlocal_.linear() += vlocal_.angular().cross(vlocal_.linear());
-  frameSE3_.rotation() = data.oMf[frame_id].rotation();
   dJv_ = frameSE3_.act(dJvlocal_).linear();
 }
 
@@ -49,20 +50,42 @@ stiffness_(stiffness), damping_(damping), friction_coeff_(frictionCoeff) {}
 
 void LinearPenaltyContactModel::computeForce(ContactPoint& cp)
 {
+  cp.friction_flag = false; 
+  // compute displacement relative to contact object 
+  cp.dx = cp.x_start - cp.x; 
+  cp.normal = cp.dx.dot(cp.optr->contact_normal) * cp.optr->contact_normal; /*!< penetration along normal to contact object */
+  cp.tangent = cp.dx - cp.normal; /*!< penetration along tangent to contact object */
+  cp.normvel = (cp.v).dot(cp.optr->contact_normal) * cp.optr->contact_normal; /*!< velocity along normal to contact object */
+  cp.tanvel = cp.v - cp.normvel; /*!< velocity along tangent to contact object */
+
+  /*!< force along normal to contact object */ 
   normalF_ = stiffness_ * cp.normal - damping_*cp.normvel; 
+  if(cp.unilateral){
+    for (unsigned int i = 0; i < 3; ++i) {
+      // make sure the damping part does not attract a contact force with wrong sign
+      if (normalF_(i) * macro_sign(cp.normal(i) < 0)) {
+        normalF_(i) = 0.0;
+      }
+    }
+  } 
   normalNorm_ = sqrt(normalF_.transpose()*normalF_);
   tangentF_ = stiffness_ * cp.tangent - damping_*cp.tanvel;
   tangentNorm_ = sqrt(tangentF_.transpose()*tangentF_);
+  cp.f = normalF_; 
+  // cp.f = stiffness_ * cp.dx - damping_ * cp.v; 
   //
-  if (tangentNorm_ > friction_coeff_*normalNorm_){
+  if (cp.unilateral && (tangentNorm_ > friction_coeff_*normalNorm_)){
     tangentDir_ = tangentF_/tangentNorm_; 
-    cp.f =  normalF_ + friction_coeff_*normalNorm_*tangentDir_; 
-    delAnchor_ = (tangentNorm_ - friction_coeff_*normalNorm_)/stiffness_(0,0);
-    cp.x_start -= delAnchor_ * tangentDir_;  
+    cp.f += friction_coeff_*normalNorm_*tangentDir_; 
+    // TODO: different friction coefficient along x,y will have to do 
+    //       the update below in vector form  
+    delAnchor_ = (tangentNorm_ - friction_coeff_*normalNorm_)/stiffness_(0,0);  
+    cp.x_start -= delAnchor_ * tangentDir_; 
+    cp.friction_flag = true;  
   } // friction cone violation
   else{
-    cp.f = normalF_+tangentF_; 
-  } // force within friction cone 
+    cp.f += tangentF_;
+  }
 }
 
 // --------------------------------------------------------------------------------------------------------// 

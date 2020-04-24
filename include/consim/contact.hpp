@@ -21,9 +21,10 @@ class ContactPoint {
   public:
     ContactPoint(std::string name, unsigned int frameId, unsigned int nv, bool isUnilateral=true); 
     ~ContactPoint() {};
-   
-    void firstOrderContactKinematics(pinocchio::Model &model, pinocchio::Data &data);  /*!< computes world_J_ */ 
-    void secondOrderContactKinematics(pinocchio::Model &model, pinocchio::Data &data); /*!< computes dJv_ */
+
+    void updatePosition(const pinocchio::Model &model, pinocchio::Data &data);  /*!< updates cartesian position */ 
+    void firstOrderContactKinematics(const pinocchio::Model &model, pinocchio::Data &data);  /*!< computes world_J_ */ 
+    void secondOrderContactKinematics(const pinocchio::Model &model, pinocchio::Data &data); /*!< computes dJv_ */
     void computeContactForce();  /*!< calls contact model from object pointer to compute the force  */
     
     std::string name_;
@@ -50,6 +51,7 @@ class ContactPoint {
     pinocchio::SE3 frameSE3_ = pinocchio::SE3::Identity(); 
 
     // relative to contact object 
+    Eigen::Vector3d     dx;                      /*!< penetration into the object */
     Eigen::Vector3d     normal;                 /*!< normal displacement vector */
     Eigen::Vector3d     normvel;                /*!< normal velocity vector */
     Eigen::Vector3d     tangent;                /*!< tangential displacement vector */
@@ -74,9 +76,9 @@ public:
   
   void computeForce(ContactPoint& cp) override;
 
-  const Eigen::Matrix3d stiffness_; 
+  Eigen::Matrix3d stiffness_; 
   Eigen::Matrix3d invStiffness_;  
-  const Eigen::Matrix3d damping_; 
+  Eigen::Matrix3d damping_; 
   const double friction_coeff_;
 
   Eigen::Vector3d normalF_;
@@ -113,13 +115,11 @@ class ContactObject {
     const std::string & getName() const { return name_; }
     ContactModel* contact_model_;
     
-
-  protected:
     // \brief The normal of the contact surface in the world coordinate frame.
-    Eigen::Vector3d normal;
+    Eigen::Vector3d contact_normal;
     // \brief basis of the tangent to thhe contact surface in thhe world coordinate frame 
-    Eigen::Vector3d tangentA;
-    Eigen::Vector3d tangentB;
+    Eigen::Vector3d contact_tangentA;
+    Eigen::Vector3d contact_tangentB;
      
     std::string name_;
     
