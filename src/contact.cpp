@@ -31,16 +31,14 @@ void ContactPoint::firstOrderContactKinematics(pinocchio::Model &model, pinocchi
 
 
 void ContactPoint::secondOrderContactKinematics(pinocchio::Model &model, pinocchio::Data &data){
-
   dJvlocal_ = pinocchio::getFrameAcceleration(model, data, frame_id); 
   dJvlocal_.linear() += vlocal_.angular().cross(vlocal_.linear());
   frameSE3_.rotation() = data.oMf[frame_id].rotation();
   dJv_ = frameSE3_.act(dJvlocal_).linear();
-
 }
 
 void ContactPoint::computeContactForce(){
-
+  optr->contact_model_->computeForce(*this);
 }
 
 // --------------------------------------------------------------------------------------------------------// 
@@ -49,77 +47,28 @@ LinearPenaltyContactModel::LinearPenaltyContactModel(Eigen::Matrix3d stiffness, 
 stiffness_(stiffness), damping_(damping), friction_coeff_(frictionCoeff) {}
 
 
-
-// void LinearPenaltyContactModel::computeForce(ContactPoint& cptr)
-// {
-//   unsigned int i;
-//   double viscvel;
-//   Eigen::Vector3d temp;
-
-//   double tangent_force = 0.;
-//   double normal_force = 0.;
-//   for (i = 0; i < 3; ++i) {
-//     // TODO: Write as Vector Operation
-//     cptr.f(i) = normal_spring_const_ * cptr.normal(i) + normal_damping_coeff_ * cptr.normvel(i);
-
-//     // make sure the damping part does not attract a contact force with wrong sign
-//     if (cptr.unilateral && (cptr.f(i)) * macro_sign(cptr.normal(i)) < 0) {
-//       cptr.f(i) = 0.0;
-//     }
-
-//     normal_force += sqr(cptr.f(i));
-//   }
-//   normal_force = sqrt(normal_force);
-
-//   // project the spring force according to the information in the contact and object structures
-//   // TODO: Need to support force projection from SL. Doing no projection is the
-//   //       same as having "F_FULL" contact point.
-//   //
-//   // projectForce(cptr,optr);
-
-//   // the force due to static friction, modeled as horizontal damper, again
-//   // in object centered coordinates
-//   tangent_force = 0;
-//   viscvel = 1.e-10;
-//   for (i = 0; i < 3; ++i) {
-//     // TODO: Write as Vector Operation
-//     temp(i) = -static_friction_spring_coeff_ * cptr.tangent(i) -
-//         static_friction_damping_spring_coeff_ * cptr.tanvel(i);
-//     tangent_force += sqr(temp(i));
-//     viscvel += sqr(cptr.viscvel(i));
-//   }
-//   tangent_force = sqrt(tangent_force);
-//   viscvel = sqrt(viscvel);
-
-//   if(cptr.unilateral && (tangent_force > static_friction_coeff_ * normal_force || cptr.friction_flag)) 
-//   {
-//     /* If static friction too large -> spring breaks -> dynamic friction in
-//       the direction of the viscvel vector; we also reset the x_start
-//       vector such that static friction would be triggered appropriately,
-//       i.e., when the viscvel becomes zero */
-//     cptr.friction_flag = true;
-//     for (i = 0; i < 3; ++i) {
-//       // TODO: Write as Vector Operation
-//       // TODO: Take x_start reset out of the loop ? anytime friction cone is violated, it is called 3 times
-//       cptr.f(i) += -dynamic_friction_coeff_ * normal_force * cptr.viscvel(i)/viscvel;
-//       if (viscvel < 0.01) {
-//         cptr.friction_flag = false;
-//         cptr.x_start = cptr.x;
-//       }
-//     }
-//   } 
-//   else {
-//       // TODO: Write as Vector Operation
-//       for (i = 0; i < 3; ++i) {
-//         cptr.f(i) += temp(i);
-//       }
-//   }
-// }
-
-void LinearPenaltyContactModel::computeForce(ContactPoint& cptr)
+void LinearPenaltyContactModel::computeForce(ContactPoint& cp)
 {
-
+  normalF_ = stiffness_ * cp.normal - damping_*cp.normvel; 
+  normalNorm_ = sqrt(normalF_.transpose()*normalF_);
+  tangentF_ = stiffness_ * cp.tangent - damping_*cp.tanvel;
+  tangentNorm_ = sqrt(tangentF_.transpose()*tangentF_);
+  //
+  if (tangentNorm_ > friction_coeff_*normalNorm_){
+    tangentDir_ = tangentF_/tangentNorm_; 
+    cp.f =  normalF_ + friction_coeff_*normalNorm_*tangentDir_; 
+    delAnchor_ = (tangentNorm_ - friction_coeff_*normalNorm_)/stiffness_(0,0);
+    cp.x_start -= delAnchor_ * tangentDir_;  
+  } // friction cone violation
+  else{
+    cp.f = normalF_+tangentF_; 
+  } // force within friction cone 
 }
+
+// --------------------------------------------------------------------------------------------------------// 
+
+ContactObject::ContactObject(std::string name, ContactModel& contact_model):
+    name_(name), contact_model_(&contact_model) { }
 
 
 } // namespace consim

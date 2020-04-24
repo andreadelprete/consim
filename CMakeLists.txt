@@ -137,7 +137,7 @@ SET(${PROJECT_NAME}_ROBOTS_HEADERS
 
 SET(HEADERS
     include/consim/contact.hpp
-#    include/consim/object.hpp
+    include/consim/object.hpp
 #    include/consim/simulator.hpp
 #    include/tsid/config.hpp
 #    include/tsid/deprecation.hpp
