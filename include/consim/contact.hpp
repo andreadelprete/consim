@@ -67,7 +67,12 @@ class ContactPoint {
 
 class ContactModel {
 public:
+  ContactModel(){};
+  ~ContactModel(){};
   virtual void computeForce(ContactPoint &cp) = 0;
+  Eigen::Matrix3d stiffness_; 
+  Eigen::Matrix3d damping_; 
+  double friction_coeff_;
 };
 
 class LinearPenaltyContactModel: public ContactModel {
@@ -76,10 +81,9 @@ public:
   
   void computeForce(ContactPoint& cp) override;
 
-  Eigen::Matrix3d stiffness_; 
-  Eigen::Matrix3d invStiffness_;  
-  Eigen::Matrix3d damping_; 
-  const double friction_coeff_;
+  // Eigen::Matrix3d stiffness_; 
+  // Eigen::Matrix3d damping_; 
+  // double friction_coeff_;
 
   Eigen::Vector3d normalF_;
   Eigen::Vector3d tangentF_; 
@@ -107,8 +111,6 @@ class ContactObject {
     
     /** CheckCollision()
      * Checks if a given contact point is in collision with the object
-     * Computes contact point kinematics relative to contact object 
-     * and updates it in the contact point class 
      * A contact point can be in contact with one object only
      **/  
     virtual bool checkCollision(ContactPoint &cp) = 0;

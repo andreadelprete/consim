@@ -56,8 +56,11 @@ void ContactPoint::computeContactForce(){
 
 // --------------------------------------------------------------------------------------------------------// 
 
-LinearPenaltyContactModel::LinearPenaltyContactModel(Eigen::Matrix3d stiffness, Eigen::Matrix3d damping, double frictionCoeff):
-stiffness_(stiffness), damping_(damping), friction_coeff_(frictionCoeff) {}
+LinearPenaltyContactModel::LinearPenaltyContactModel(Eigen::Matrix3d stiffness, Eigen::Matrix3d damping, double frictionCoeff){
+  stiffness_=stiffness;
+  damping_=damping; 
+  friction_coeff_=frictionCoeff;
+ }
 
 
 void LinearPenaltyContactModel::computeForce(ContactPoint& cp)

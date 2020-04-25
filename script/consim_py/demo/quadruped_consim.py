@@ -60,9 +60,9 @@ if __name__=="__main__":
     mu = 0.3        # friction coefficient
     isSparse = False 
     isInvertible = False
-    unilateral_contacts = True              
-    K = 1e5
-    B = 3e2
+    unilateral_contacts = False               
+    K = 1e5 * np.eye(3)
+    B = 3e2 * np.eye(3)
     T = 1 #  1 second simution  
     dt = 1.e-3 
 
@@ -96,10 +96,10 @@ if __name__=="__main__":
         # build the simulator 
         if(simu_type=='exponential'):
             sim = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
-                                        K, B ,K, B, mu, mu, isSparse, isInvertible)
+                                        K, B , mu, isSparse, isInvertible)
         else:
             sim = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
-                                            K, B ,K, B, mu, mu)
+                                            K, B , mu)
 
         # trajectory log 
         com_pos = np.empty((N_SIMULATION, 3))*nan
@@ -127,7 +127,7 @@ if __name__=="__main__":
         for cname in conf.contact_frames:
             if not robot.model.existFrame(cname):
                 print(("ERROR: Frame", cname, "does not exist"))
-            cpts += [sim.add_contact_point(robot.model.getFrameId(cname), unilateral_contacts)]
+            cpts += [sim.add_contact_point(cname, robot.model.getFrameId(cname), unilateral_contacts)]
         print(" %s Contact Points Added ".center(conf.LINE_WIDTH, '-')%(len(cpts)))
 
         # reset simulator 

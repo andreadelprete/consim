@@ -22,7 +22,7 @@ if __name__=="__main__":
     mu = 0.3        # friction coefficient
     isSparse = False 
     isInvertible = False
-    unilateral_contacts = True 
+    unilateral_contacts = False  
     K = 1e5 * np.eye(3)
     B = 3e2 * np.eye(3)
     N = 1000 

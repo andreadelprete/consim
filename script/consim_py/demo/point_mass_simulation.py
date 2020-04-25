@@ -21,7 +21,7 @@ if __name__=="__main__":
     mu = 0.3        # friction coefficient
     isSparse = False 
     isInvertible = False
-    unilateral_contacts = False
+    unilateral_contacts = False 
     K = 1e5 * np.eye(3)
     B = 3e2 * np.eye(3)
     N = 20
@@ -35,9 +35,9 @@ if __name__=="__main__":
     # simu_params += [{'name': 'exponential 100',
     #                 'type': 'exponential', 
     #                 'ndt': 100}]
-    # simu_params += [{'name': 'exponential 10',
-    #                 'type': 'exponential', 
-    #                 'ndt': 10}]
+    simu_params += [{'name': 'exponential 10',
+                    'type': 'exponential', 
+                    'ndt': 10}]
     # simu_params += [{'name': 'exponential 1',
     #                 'type': 'exponential', 
     #                 'ndt': 1}]
@@ -59,7 +59,7 @@ if __name__=="__main__":
         simu_type = simu_param['type']
         if(simu_type=='exponential'):
             sim = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
-                                        K, B ,K, B, mu, mu, isSparse, isInvertible)
+                                        K, B , mu, isSparse, isInvertible)
         else:
             sim = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
                                             K, B, mu)
