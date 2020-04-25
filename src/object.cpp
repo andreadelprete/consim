@@ -5,10 +5,6 @@ namespace consim {
 
 bool FloorObject::checkCollision(ContactPoint &cp)
 {
-  // if(!cp.unilateral){
-  //   return true;
-  // }
-
   // checks for penetration into the floor 
   if (cp.x(2) > 0.) {
     return false;

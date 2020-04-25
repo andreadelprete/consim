@@ -65,9 +65,6 @@ namespace consim {
 
       void setJointFriction(const Eigen::VectorXd &joint_friction);
 
-      
-
-      
       /**
        * Convenience method to perform a single dt timestep of the simulation. 
        * Computes q, dq, ddq, and contact forces for a single time step 
@@ -79,20 +76,17 @@ namespace consim {
       const Eigen::VectorXd& get_q() const {return q_;};
       const Eigen::VectorXd& get_v() const {return v_;};
       const Eigen::VectorXd& get_dv() const {return dv_;};
-      // Eigen::VectorXd get_f() const {return f_};
 
-    
     protected:
 
       Eigen::VectorXd q_;  
       Eigen::VectorXd qnext_;
       Eigen::VectorXd v_;
       Eigen::VectorXd dv_;
-      // Eigen::VectorXd f_;
       Eigen::VectorXd vMean_;
       Eigen::VectorXd tau_;
       unsigned int nc_=0;
-      int nactive_; // number of active contacts
+      int nactive_; 
       bool resetflag_ = false;
       /**
         * loops over contact points, checks active contacts and sets reference contact positions 
@@ -227,7 +221,5 @@ namespace consim {
       Eigen::Vector3d xstart_new; // invK*cone_force_offset_03
       // void updateAnchorPoint(const int &contact_index,const int &active_index); 
   }; // class ExponentialSimulator
-
-
 
 } // namespace consim 

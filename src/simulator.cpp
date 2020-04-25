@@ -123,18 +123,14 @@ void AbstractSimulator::checkContact()
 void AbstractSimulator::computeContactState()
 {
   tau_.fill(0);
-
-  // Compute all the terms (mass matrix, jacobians, ...)
   data_->M.fill(0);
   CONSIM_START_PROFILER("pinocchio::computeAllTerms");
   pinocchio::computeAllTerms(*model_, *data_, q_, v_);
   pinocchio::updateFramePlacements(*model_, *data_);
   CONSIM_STOP_PROFILER("pinocchio::computeAllTerms");
-
-  // Contact handling: Detect contact, compute contact forces, compute resulting torques.
+  // loops over contact points to detect active contacts
   CONSIM_START_PROFILER("check_contact_state");
   checkContact();
-  // computeContactForces(v_);
   CONSIM_STOP_PROFILER("check_contact_state");
 }
 
@@ -187,14 +183,12 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
       CONSIM_START_PROFILER("pinocchio::aba");
       pinocchio::aba(*model_, *data_, q_, v_, tau_);
       CONSIM_STOP_PROFILER("pinocchio::aba");
-      // Integrate the system forward in time.
+      
       vMean_ = v_ + .5 * sub_dt * data_->ddq;
       pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
       q_ = qnext_;
       v_ += data_->ddq * sub_dt;
-      // Compute the new data values and contact information after the integration
-      // step. This way, if this method returns, the values computed in data and
-      // on the contact state are consistent with the q, dq and ddq values.
+      
       computeContactState();
       computeContactForces(v_);
       CONSIM_STOP_PROFILER("euler_simulator::substep");
