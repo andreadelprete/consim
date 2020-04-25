@@ -50,7 +50,7 @@ ELSE(WIN32)
 ENDIF(WIN32)
 
 # --- OPTIONS ----------------------------------------
-OPTION (BUILD_PYTHON_INTERFACE "Build the python binding" OFF)
+OPTION (BUILD_PYTHON_INTERFACE "Build the python binding" ON)
 OPTION (BUILD_UNIT_TESTS "Build the unitary tests" ON)
 OPTION (INITIALIZE_WITH_NAN "Initialize Eigen entries with NaN" OFF)
 OPTION (EIGEN_RUNTIME_NO_MALLOC "If ON, it can assert in case of runtime allocation" ON)
