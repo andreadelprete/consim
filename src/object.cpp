@@ -3,6 +3,11 @@
 
 namespace consim {
 
+ContactObject::ContactObject(std::string name, ContactModel& contact_model):
+    name_(name), contact_model_(&contact_model) { }
+
+// -------------------------------------------------------------------------------
+
 bool FloorObject::checkCollision(ContactPoint &cp)
 {
   // checks for penetration into the floor 
@@ -12,9 +17,27 @@ bool FloorObject::checkCollision(ContactPoint &cp)
 
   if (!cp.active) {
     cp.x_start = cp.x;
+    cp.contactNormal_ << 0.,0.,1.; 
+    cp.contactTangentA_ << 1.,0.,0.;
+    cp.contactTangentB_ << 0.,1.,0.;
   }
   //
   return true;
+}
+
+void FloorObject::computePenetration(ContactPoint &cp){
+  /** compute displacement relative to contact object
+   * delta_x: relative penetration 
+   * normal: penetration along normal to contact object
+   * tangent: penetration along tangent to contact object
+   * normalvel: velocity along normal to contact object
+   * tanvel: velocity along tangent to contact object
+   * */ 
+  cp.delta_x = cp.x_start - cp.x; 
+  cp.normal = cp.delta_x.dot(cp.contactNormal_) * cp.contactNormal_; 
+  cp.tangent = cp.delta_x - cp.normal; 
+  cp.normvel = (cp.v).dot(cp.contactNormal_) * cp.contactNormal_; 
+  cp.tanvel = cp.v - cp.normvel; 
 }
 
 }

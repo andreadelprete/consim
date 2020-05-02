@@ -23,8 +23,8 @@ if __name__=="__main__":
     isSparse = False 
     isInvertible = False
     unilateral_contacts = False  
-    K = 1e5 * np.eye(3)
-    B = 3e2 * np.eye(3)
+    K = 1e5 * np.ones([3,1])
+    B = 3e2 * np.ones([3,1])
     N = 1000 
     
     q0 = np.array([0., 0., 0., 0., 0., 0., 1.]) [:,None]

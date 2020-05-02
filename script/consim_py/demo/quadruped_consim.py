@@ -46,9 +46,9 @@ if __name__=="__main__":
                     'type': 'exponential', 
                     'ndt': 10}]
 
-    # simu_params += [{'name': 'exponential 1',
-    #                 'type': 'exponential', 
-    #                 'ndt': 1}]
+    simu_params += [{'name': 'exponential 1',
+                    'type': 'exponential', 
+                    'ndt': 1}]
     
     # simu_params += [{'name': 'euler 1',
     #                 'type': 'euler', 
@@ -60,9 +60,9 @@ if __name__=="__main__":
     mu = 0.3        # friction coefficient
     isSparse = False 
     isInvertible = False
-    unilateral_contacts = False               
-    K = 1e5 * np.eye(3)
-    B = 3e2 * np.eye(3)
+    unilateral_contacts = False                
+    K = 1e5 * np.ones([3,1])
+    B = 3e2 * np.ones([3,1])
     T = 1 #  1 second simution  
     dt = 1.e-3 
 

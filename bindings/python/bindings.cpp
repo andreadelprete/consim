@@ -25,15 +25,15 @@ class AbstractSimulatorWrapper : public AbstractSimulator, public boost::python:
       this->get_override("step")(tau);
     }
 
-  void computeContactForces(const Eigen::VectorXd &dq){
-    this->get_override("computeContactForces")(dq);
+  void computeContactForces(){
+    this->get_override("computeContactForces")();
   }
 
 };
 
 EulerSimulator* build_euler_simulator(
     float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data,
-    Eigen::Matrix3d stifness, Eigen::Matrix3d damping, double frictionCoefficient)
+    Eigen::Vector3d stifness, Eigen::Vector3d damping, double frictionCoefficient)
 {
   LinearPenaltyContactModel *contact_model = new LinearPenaltyContactModel(
       stifness, damping, frictionCoefficient);
@@ -53,7 +53,7 @@ EulerSimulator* build_euler_simulator(
 
 ExponentialSimulator* build_exponential_simulator(
     float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data,
-    Eigen::Matrix3d stifness, Eigen::Matrix3d damping, double frictionCoefficient,bool sparse, bool invertibleA)
+    Eigen::Vector3d stifness, Eigen::Vector3d damping, double frictionCoefficient,bool sparse, bool invertibleA)
 {
   LinearPenaltyContactModel *contact_model = new LinearPenaltyContactModel(
       stifness, damping, frictionCoefficient);
@@ -105,12 +105,12 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
             bp::return_value_policy<bp::manage_new_object>());
 
     bp::class_<ContactPoint>("Contact",
-                             "Contact struct",
-                          bp::init<std::string, unsigned int, unsigned int, bool >())
+                             "Contact Point",
+                          bp::init<pinocchio::Model &, std::string, unsigned int, unsigned int, bool >())
         .def("updatePosition", &ContactPoint::updatePosition, return_internal_reference<>())
         .def("firstOrderContactKinematics", &ContactPoint::firstOrderContactKinematics, return_internal_reference<>())
         .def("secondOrderContactKinematics", &ContactPoint::secondOrderContactKinematics, return_internal_reference<>())
-        .def("computeContactForce", &ContactPoint::computeContactForce, return_internal_reference<>())
+        // .def("computeContactForce", &ContactPoint::computeContactForce, return_internal_reference<>())
         .ADD_PROPERTY_RETURN_BY_VALUE("frame_id", &ContactPoint::frame_id)
         .ADD_PROPERTY_RETURN_BY_VALUE("x", &ContactPoint::x)
         .ADD_PROPERTY_RETURN_BY_VALUE("v", &ContactPoint::v)

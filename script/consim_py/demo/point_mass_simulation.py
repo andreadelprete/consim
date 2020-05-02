@@ -21,9 +21,9 @@ if __name__=="__main__":
     mu = 0.3        # friction coefficient
     isSparse = False 
     isInvertible = False
-    unilateral_contacts = False 
-    K = 1e5 * np.eye(3)
-    B = 3e2 * np.eye(3)
+    unilateral_contacts = False  
+    K = 1e5 * np.ones([3,1])
+    B = 3e2 * np.ones([3,1])
     N = 20
     
     q0 = np.array([0., 0., -1e-10, 0., 0., 0., 1.]) [:,None]
@@ -32,15 +32,15 @@ if __name__=="__main__":
     contact_names = ['root_joint']
     
     simu_params = []
-    # simu_params += [{'name': 'exponential 100',
-    #                 'type': 'exponential', 
-    #                 'ndt': 100}]
+    simu_params += [{'name': 'exponential 100',
+                    'type': 'exponential', 
+                    'ndt': 100}]
     simu_params += [{'name': 'exponential 10',
                     'type': 'exponential', 
                     'ndt': 10}]
-    # simu_params += [{'name': 'exponential 1',
-    #                 'type': 'exponential', 
-    #                 'ndt': 1}]
+    simu_params += [{'name': 'exponential 1',
+                    'type': 'exponential', 
+                    'ndt': 1}]
     simu_params += [{'name': 'euler 100',
                     'type': 'euler', 
                     'ndt': 100}]
@@ -107,7 +107,7 @@ if __name__=="__main__":
 
         plt.figure('normal contact forces')
         for i,cp in enumerate(cpts):
-            plt.plot(dt*np.arange(N+1), fcnt[:,i,2], alpha=0.7, label=name+' pnt %s'%i)
+            plt.plot(dt*np.arange(N+1), fcnt[:,i,2], line_styles[i_ls], alpha=0.7, label=name+' pnt %s'%i)
         plt.legend()
         plt.grid()
         plt.title('normal contact forces')

@@ -35,7 +35,7 @@ model_(&model), data_(&data), dt_(dt), n_integration_steps_(n_integration_steps)
 
 const ContactPoint &AbstractSimulator::addContactPoint(std::string name, int frame_id, bool unilateral)
 {
-  ContactPoint *cptr = new ContactPoint(name, frame_id, model_->nv, unilateral);
+  ContactPoint *cptr = new ContactPoint(*model_, name, frame_id, model_->nv, unilateral);
 	contacts_.push_back(cptr);
   nc_ += 1; // increase contact points count  
   resetflag_ = false; // enforce resetState() after adding a contact point
@@ -56,26 +56,23 @@ void AbstractSimulator::resetState(const Eigen::VectorXd& q, const Eigen::Vector
   q_ = q;
   v_ = dq;
   vMean_ = dq;
-
+  tau_.fill(0);
   if (reset_contact_state) {
     for (auto &cptr : contacts_) {
       cptr->active = false;
       cptr->f.fill(0);
-      cptr->friction_flag = false;
     }
   }
-
-  computeContactState();
-  computeContactForces(v_);
+  computeContactForces();
   resetflag_ = true;
 }
 
-void AbstractSimulator::checkContact()
+void AbstractSimulator::detectContacts()
 {
   nactive_ = 0; 
   // Loop over all the contact points, over all the objects.
   for (auto &cp : contacts_) {
-    cp->updatePosition(*model_, *data_);
+    cp->updatePosition(*data_);
     if(cp->active)
     {
       // for unilateral active contacts check if they are still in contact with same object
@@ -86,7 +83,7 @@ void AbstractSimulator::checkContact()
           // if not => set them to inactive and move forward to searching a colliding object
           cp->active = false;
           cp->f.fill(0);
-          cp->friction_flag = false;
+          // cp->friction_flag = false;
         } else {
           nactive_ += 1;
           // If the contact point is still active, then no need to search for
@@ -120,20 +117,6 @@ void AbstractSimulator::checkContact()
   }
 }
 
-void AbstractSimulator::computeContactState()
-{
-  tau_.fill(0);
-  data_->M.fill(0);
-  CONSIM_START_PROFILER("pinocchio::computeAllTerms");
-  pinocchio::computeAllTerms(*model_, *data_, q_, v_);
-  pinocchio::updateFramePlacements(*model_, *data_);
-  CONSIM_STOP_PROFILER("pinocchio::computeAllTerms");
-  // loops over contact points to detect active contacts
-  CONSIM_START_PROFILER("check_contact_state");
-  checkContact();
-  CONSIM_STOP_PROFILER("check_contact_state");
-}
-
 void AbstractSimulator::setJointFriction(const Eigen::VectorXd& joint_friction)
 {
   joint_friction_flag_= true;
@@ -147,22 +130,22 @@ void AbstractSimulator::setJointFriction(const Eigen::VectorXd& joint_friction)
 */
 
 EulerSimulator::EulerSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps):
-AbstractSimulator(model, data, dt, n_integration_steps), sub_dt(dt / ((double)n_integration_steps)) {
+AbstractSimulator(model, data, dt, n_integration_steps), sub_dt(dt / ((double)n_integration_steps)) {}
 
-}
 
-void EulerSimulator::computeContactForces(const Eigen::VectorXd &v) 
+void EulerSimulator::computeContactForces() 
 {
+  data_->M.fill(0);
+  CONSIM_START_PROFILER("pinocchio::computeAllTerms");
+  pinocchio::computeAllTerms(*model_, *data_, q_, v_);
+  pinocchio::updateFramePlacements(*model_, *data_);
+  detectContacts();
   CONSIM_START_PROFILER("compute_contact_forces");
-  // subtract joint frictions
-  if (joint_friction_flag_){
-    tau_ -= joint_friction_.cwiseProduct(v);
-  }
-
   for (auto &cp : contacts_) {
     if (!cp->active) continue;
-    cp->firstOrderContactKinematics(*model_, *data_);
-    cp->computeContactForce();
+    cp->firstOrderContactKinematics(*data_); // must be called before penetration, has velocity in it 
+    cp->optr->computePenetration(*cp); 
+    cp->optr->contact_model_->computeForce(*cp);
     tau_ += cp->world_J_.transpose() * cp->f; 
   }
   CONSIM_STOP_PROFILER("compute_contact_forces");
@@ -176,29 +159,28 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
   for (int i = 0; i < n_integration_steps_; i++)
     {
       CONSIM_START_PROFILER("euler_simulator::substep");
-      // TODO: Support friction models at the joints.
-      // Add the user torque;
+      // \brief add input control 
       tau_ += tau;
+      // \brief joint damping 
+      if (joint_friction_flag_){
+        tau_ -= joint_friction_.cwiseProduct(v_);
+      }
       // Compute the acceloration ddq.
       CONSIM_START_PROFILER("pinocchio::aba");
       pinocchio::aba(*model_, *data_, q_, v_, tau_);
       CONSIM_STOP_PROFILER("pinocchio::aba");
-      
       vMean_ = v_ + .5 * sub_dt * data_->ddq;
       pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
       q_ = qnext_;
       v_ += data_->ddq * sub_dt;
       
-      computeContactState();
-      computeContactForces(v_);
+      tau_.fill(0);
+      // \brief adds contact forces to tau_
+      computeContactForces(); 
       CONSIM_STOP_PROFILER("euler_simulator::substep");
     }
   CONSIM_STOP_PROFILER("euler_simulator::step");
 }
-
-
-
-
 
 /* ____________________________________________________________________________________________*/
 /** 
@@ -217,8 +199,6 @@ ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocc
 }
 
 
-
-
 void ExponentialSimulator::step(const Eigen::VectorXd &tau){
   CONSIM_START_PROFILER("exponential_simulator::step");
   if(!resetflag_){
@@ -227,7 +207,15 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
 
   for (int i = 0; i < n_integration_steps_; i++){
     CONSIM_START_PROFILER("exponential_simulator::substep");
-    tau_ += tau;  
+    // \brief add input control 
+    tau_.fill(0);
+    tau_ += tau;
+    // \brief joint damping 
+    if (joint_friction_flag_){
+      tau_ -= joint_friction_.cwiseProduct(v_);
+    } 
+
+  
     if (nactive_> 0){
       Eigen::internal::set_is_malloc_allowed(false);
       computeIntegrationTerms();
@@ -238,8 +226,9 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       checkFrictionCone();
       CONSIM_STOP_PROFILER("exponential_simulator::checkFrictionCone");
       if(cone_flag_){
+        computeSlipping();
         temp01_.noalias() = JcT_*fpr_; 
-        temp02_ = tau - data_->nle + temp01_;
+        temp02_ = tau_ - data_->nle + temp01_;
         dvMean_.noalias() = Minv_*temp02_; 
         vMean_ = v_ + sub_dt* dvMean_; 
       } // force violates friction cone 
@@ -267,20 +256,8 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     v_ += sub_dt*dvMean_;
     dv_ = dvMean_; 
     CONSIM_STOP_PROFILER("exponential_simulator::subIntegration");
-    /** 
-     * pinocchio::computeAllTerms already calls first order FK 
-     * https://github.com/stack-of-tasks/pinocchio/blob/3f4d9e8504ff4e05dbae0ede0bd808d025e4a6d8/src/algorithm/compute-all-terms.hpp#L20
-     * we need second order FK for pinocchio::getFrameAcceleration
-     * seems a bit inefficient to call forward kinematics twice   
-    */
-    
-    pinocchio::forwardKinematics(*model_, *data_, q_, v_, dv_);  // frame accelerations  
-    CONSIM_START_PROFILER("exponential_simulator::computeContactState");
-    computeContactState();  // this sets tau_ to zero 
-    CONSIM_STOP_PROFILER("exponential_simulator::computeContactState");
-    CONSIM_START_PROFILER("exponential_simulator::computeContactForces");
-    computeContactForces(v_);
-    CONSIM_STOP_PROFILER("exponential_simulator::computeContactForces");
+    // 
+    computeContactForces();
     CONSIM_STOP_PROFILER("exponential_simulator::substep");
     Eigen::internal::set_is_malloc_allowed(true);
   }  // sub_dt loop
@@ -289,10 +266,20 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
 
 
 void ExponentialSimulator::computeIntegrationTerms(){
+  i_active_ = 0; 
+  for(unsigned int i=0; i<nc_; i++){
+    if (!contacts_[i]->active) continue;
+    Jc_.block(3*i_active_,0,3,model_->nv) = contacts_[i]->world_J_;
+    dJv_.segment(3*i_active_,3) = contacts_[i]->dJv_; 
+    p0_.segment(3*i_active_,3)=contacts_[i]->x_start; 
+    p_.segment(3*i_active_,3)=contacts_[i]->x; 
+    dp_.segment(3*i_active_,3)=contacts_[i]->v;  
+    kp0_.segment(3*i_active_,3).noalias() = K.block(3*i_active_,3*i_active_,3,3)*p0_.segment(3*i_active_,3);
+    i_active_ += 1;  
+  }
   CONSIM_START_PROFILER("exponential_simulator::computeMinverse");
   Minv_ = pinocchio::computeMinverse(*model_, *data_, q_);
   CONSIM_STOP_PROFILER("exponential_simulator::computeMinverse");
-  
   JcT_.noalias() = Jc_.transpose(); 
   JMinv_.noalias() = Jc_ * Minv_;
   MinvJcT_.noalias() = Minv_*JcT_; 
@@ -311,40 +298,41 @@ void ExponentialSimulator::computeIntegrationTerms(){
   a_.tail(3*nactive_) = b_;
   x0_.head(3*nactive_) = p_; 
   x0_.tail(3*nactive_) = dp_; 
-
 }
 
 
 
-  void ExponentialSimulator::computeContactForces(const Eigen::VectorXd &v)
+  void ExponentialSimulator::computeContactForces()
 {
-  if (f_.size()!=3*nactive_){
+  data_->M.fill(0);
+  
+  CONSIM_START_PROFILER("pinocchio::computeAllTerms");
+  pinocchio::computeAllTerms(*model_, *data_, q_, v_);
+  CONSIM_STOP_PROFILER("pinocchio::computeAllTerms");
+  pinocchio::updateFramePlacements(*model_, *data_);
+  detectContacts();
+  
+  
+  
+  
+  if (nactive_>0){
+    if (f_.size()!=3*nactive_){
     CONSIM_START_PROFILER("exponential_simulator::resizeVectorsAndMatrices");
     resizeVectorsAndMatrices();
     CONSIM_STOP_PROFILER("exponential_simulator::resizeVectorsAndMatrices");
-  } // only reallocate memory if number of active contacts changes
-  // tau_ was already set to zero in checkContactStates()
-  if (joint_friction_flag_)
-  {
-    tau_ -= joint_friction_.cwiseProduct(v);
+    }
+    // pinocchio::forwardKinematics(*model_, *data_, q_, v_, dv_);   // needed for dJv_ 
+    i_active_ = 0; 
+    for(unsigned int i=0; i<nc_; i++){
+      if (!contacts_[i]->active) continue;
+      contacts_[i]->firstOrderContactKinematics(*data_);
+      contacts_[i]->optr->computePenetration(*contacts_[i]);
+      contacts_[i]->secondOrderContactKinematics(*data_);
+      contacts_[i]->optr->contact_model_->computeForce(*contacts_[i]);
+      f_.segment(3*i_active_,3) = contacts_[i]->f; 
+      i_active_ += 1;  
+    }
   }
-  i_active_ = 0; 
-  for(unsigned int i=0; i<nc_; i++){
-    if (!contacts_[i]->active) continue;
-
-    contacts_[i]->firstOrderContactKinematics(*model_, *data_);
-    Jc_.block(3*i_active_,0,3,model_->nv) = contacts_[i]->world_J_;
-    contacts_[i]->secondOrderContactKinematics(*model_, *data_);
-    dJv_.segment(3*i_active_,3) = contacts_[i]->dJv_; 
-    contacts_[i]->computeContactForce(); 
-    f_.segment(3*i_active_,3) = contacts_[i]->f; 
-    p0_.segment(3*i_active_,3)=contacts_[i]->x_start; 
-    p_.segment(3*i_active_,3)=contacts_[i]->x; 
-    dp_.segment(3*i_active_,3)=contacts_[i]->v;  
-    kp0_.segment(3*i_active_,3).noalias() = contacts_[i]->optr->contact_model_->stiffness_ * p0_.segment(3*i_active_,3);
-    i_active_ += 1;  
-  }
-
 } // ExponentialSimulator::computeContactForces
 
 
@@ -361,43 +349,42 @@ void ExponentialSimulator::checkFrictionCone(){
       i_active_ += 1; 
       continue;
     }
-
-    ftan_ = sqrt(sqr(f_avg(3*i_active_)) + sqr(f_avg(1+3*i_active_))); 
-    if (ftan_<(f_avg(2+3*i_active_) * contacts_[i]->optr->contact_model_->friction_coeff_)) // fi_tan < mu*fi_z 
-    {
-      // no violation of cone, fill fpr_ anyways  
-      fpr_.segment(3*i_active_,3) = f_avg.segment(3*i_active_,3); 
-    } // no violation 
-    else{
-      // if fi_z is pulling in world frame => fi_z < 0, this will also be activated  
-      if(f_avg(2+3*i_active_)<0){
-        fpr_(3*i_active_) =  0.; 
-        fpr_(1+3*i_active_) = 0.;
-        fpr_(2+3*i_active_) = 0.;
-      } // pulling force case 
-      else{
-        cone_direction_ = atan2(f_avg(1+3*i_active_), f_avg(3*i_active_)); 
-        fpr_(3*i_active_) = cos(cone_direction_)*f_avg(2+3*i_active_) * contacts_[i]->optr->contact_model_->friction_coeff_;
-        fpr_(1+3*i_active_) = sin(cone_direction_)*f_avg(2+3*i_active_) * contacts_[i]->optr->contact_model_->friction_coeff_;
-        fpr_(2+3*i_active_) = f_avg(2+3*i_active_); 
-        // best to update anchor point here 
-        // since K & B are diagonal, it makes sense to just use element wise operations, it flips the sign (D = [-K, -B]) 
-        // xstart_new(0) = invK(3*i_active_, 3*i_active_) * (fpr_(3*i_active_) 
-        //                               + K(3*i_active_, 3*i_active_)* p_(3*i_active_) 
-        //                                 + B(3*i_active_, 3*i_active_)* dp_(3*i_active_)); 
-        // xstart_new(1) = invK(3*i_active_+1, 3*i_active_+1) * (fpr_(3*i_active_+1) 
-        //                               + K(3*i_active_+1, 3*i_active_+1)* p_(3*i_active_+1) 
-        //                                 + B(3*i_active_+1, 3*i_active_+1)* dp_(3*i_active_+1));
-        // xstart_new(2) = invK(3*i_active_+2, 3*i_active_+2) * (fpr_(3*i_active_+2) 
-        //                               + K(3*i_active_+2, 3*i_active_+2)* p_(3*i_active_+2) 
-        //                                 + B(3*i_active_+2, 3*i_active_+2)* dp_(3*i_active_+2));
-        // contacts_[i]->x_start = xstart_new;
-      } 
+    
+    fnor_ = contacts_[i]->contactNormal_.dot(f_avg);
+    if (fnor_<0.){
+      /*!< check for pulling force at contact i */  
+      fpr_.segment(3*i_active_,3).fill(0); 
       cone_flag_ = true; 
-    } // project onto cone boundaries 
+    } else{
+      /*!< check for friction bounds  */  
+      normalFi_ = fnor_* contacts_[i]->contactNormal_; 
+      tangentFi_ = fpr_ - normalFi_; 
+      ftan_ = sqrt(tangentFi_.dot(tangentFi_));
+      if(ftan_ > (contacts_[i]->optr->contact_model_->friction_coeff_ * fnor_)){
+        /*!< cone violated */  
+        fpr_.segment(3*i_active_,3) = f_avg.segment(3*i_active_,3);   
+        cone_flag_ = true;
+      } else {
+        /*!< if not violated still fill out in case another contact violates the cone  */  
+        fpr_.segment(3*i_active_,3) = f_avg.segment(3*i_active_,3); 
+      }
+
+    }
+
     i_active_ += 1; 
   }
 } // ExponentialSimulator::checkFrictionCone
+
+
+
+
+void ExponentialSimulator::computeSlipping(){
+  /**
+   * Populate the constraints then solve the qp 
+   * update x_start 
+   * compute the projected contact forces for integration 
+   **/  
+}
 
 
 
@@ -441,8 +428,12 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
     i_active_ = 0; 
     for(unsigned int i=0; i<nc_; i++){
       if (!contacts_[i]->active) continue;
-      K.block(3*i_active_, 3*i_active_,3,3) = contacts_[i]->optr->contact_model_->stiffness_;
-      B.block(3*i_active_, 3*i_active_,3,3) = contacts_[i]->optr->contact_model_->damping_;
+      K(3*i_active_, 3*i_active_) = contacts_[i]->optr->contact_model_->stiffness_(0);
+      K(3*i_active_+1, 3*i_active_+1) = contacts_[i]->optr->contact_model_->stiffness_(1);
+      K(3*i_active_+2, 3*i_active_+2) = contacts_[i]->optr->contact_model_->stiffness_(2);
+      B(3*i_active_, 3*i_active_) = contacts_[i]->optr->contact_model_->damping_(0);
+      B(3*i_active_+1, 3*i_active_+1) = contacts_[i]->optr->contact_model_->damping_(1);
+      B(3*i_active_+2, 3*i_active_+2) = contacts_[i]->optr->contact_model_->damping_(2);
       // Kinv is required for slippling 
       invK(3*i_active_, 3*i_active_) = 1/K(3*i_active_, 3*i_active_);
       invK(3*i_active_ + 1, 3*i_active_ + 1) = 1/K(3*i_active_ + 1, 3*i_active_ + 1);

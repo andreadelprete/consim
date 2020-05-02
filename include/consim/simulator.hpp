@@ -91,13 +91,8 @@ namespace consim {
       /**
         * loops over contact points, checks active contacts and sets reference contact positions 
       */
-      void checkContact();
-      /**
-      * computes all relative dynamic and kinematic terms, then checks for the contacts  
-      */
-      void computeContactState();
-
-      virtual void computeContactForces(const Eigen::VectorXd &v)=0;
+      void detectContacts();
+      virtual void computeContactForces()=0;
 
       const pinocchio::Model *model_;
       pinocchio::Data *data_;
@@ -113,6 +108,9 @@ namespace consim {
   
   }; // class AbstractSimulator
 
+/*_______________________________________________________________________________*/
+
+
   class EulerSimulator : public AbstractSimulator
   {
     public: 
@@ -127,12 +125,11 @@ namespace consim {
 
     protected:
       const double sub_dt;
-      void computeContactForces(const Eigen::VectorXd &v) override;
-      
-      
-
+      void computeContactForces() override;
 
   }; // class EulerSimulator
+
+/*_______________________________________________________________________________*/
 
   class ExponentialSimulator : public AbstractSimulator
   {
@@ -147,7 +144,7 @@ namespace consim {
        * AbstractSimulator::computeContactState() must be called before  
        * calling ExponentialSimulator::computeContactForces()
        */
-      void computeContactForces(const Eigen::VectorXd &v) override; 
+      void computeContactForces() override; 
       /**
        * computes average contact force during one integration step 
        * loops over the average force to compute tangential and normal force per contact 
@@ -202,14 +199,19 @@ namespace consim {
       Eigen::VectorXd fpr_;   // projected force on cone boundaries 
       bool cone_flag_ = false; // cone violation status 
       double cone_direction_; // angle of tangential(to contact surface) force 
-      double ftan_; 
+
+      Eigen::Vector3d normalFi_; // normal component of contact force Fi at contact Ci  
+      Eigen::Vector3d tangentFi_; // normal component of contact force Fi at contact Ci  
+      double fnor_;   // norm of normalFi_  
+      double ftan_;   // norm of tangentFi_ 
       unsigned int i_active_; // index of the active contact      
 
       /**
-       * solves a QP to update anchor points of sliding contacts 
-       * min || opt_p - p0 ||^2  written as  0.5* opt_p.T * Q * opt_p  + g0.T * opt_p
-       * s.t.  Cineq_ * opt_p  + cineq_ >= 0  (inner linear approximation of friction cone)
-      **/
+       * solves a QP to update anchor points of sliding contacts
+       * min || dp0_avg || ^ 2 
+       * st. Fc \in Firction Cone
+       **/  
+      void computeSlipping(); 
       eiquadprog::solvers::EiquadprogFast qp;
       Eigen::MatrixXd Q_cone; 
       Eigen::VectorXd g0_cone; 
