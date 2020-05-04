@@ -26,7 +26,7 @@ class ContactPoint {
 
     void updatePosition(pinocchio::Data &data);  /*!< updates cartesian position */ 
     void firstOrderContactKinematics(pinocchio::Data &data);  /*!< computes c, world_J_ and relative penetration */ 
-    void secondOrderContactKinematics(pinocchio::Data &data); /*!< computes dJv_ */
+    void secondOrderContactKinematics(pinocchio::Data &data, Eigen::VectorXd &v); /*!< computes dJv_ */
     // void computeContactForce();  /*!< calls contact model from object pointer to compute the force  */
     
     std::string name_;
@@ -45,6 +45,7 @@ class ContactPoint {
 
     Eigen::MatrixXd     world_J_; 
     Eigen::MatrixXd     full_J_;  
+    Eigen::MatrixXd     dJdt_;  
 
     // velocity transformation from local to world 
     pinocchio::Motion vlocal_ = pinocchio::Motion::Zero();

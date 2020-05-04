@@ -6,6 +6,8 @@
 #include <pinocchio/algorithm/contact-dynamics.hpp>
 #include <pinocchio/algorithm/compute-all-terms.hpp>
 #include <pinocchio/algorithm/kinematics.hpp>
+#include <pinocchio/algorithm/rnea.hpp>
+#include <pinocchio/algorithm/jacobian.hpp>
 
 #include "consim/object.hpp"
 #include "consim/contact.hpp"
@@ -39,12 +41,17 @@ const ContactPoint &AbstractSimulator::addContactPoint(std::string name, int fra
 	contacts_.push_back(cptr);
   nc_ += 1; // increase contact points count  
   resetflag_ = false; // enforce resetState() after adding a contact point
-  return getContact(contacts_.size() - 1);
+  return getContact(name);
 }
 
-const ContactPoint &AbstractSimulator::getContact(int index)
+const ContactPoint &AbstractSimulator::getContact(std::string name)
 {
-  return *contacts_[index];
+  for (auto &cptr : contacts_) {
+    if (cptr->name_==name){
+      return *cptr; 
+    } 
+  }
+  throw std::runtime_error("Contact name not recongnized ");
 }
 
 void AbstractSimulator::addObject(ContactObject& obj) {
@@ -137,8 +144,11 @@ void EulerSimulator::computeContactForces()
 {
   data_->M.fill(0);
   CONSIM_START_PROFILER("pinocchio::computeAllTerms");
-  pinocchio::computeAllTerms(*model_, *data_, q_, v_);
+  pinocchio::forwardKinematics(*model_, *data_, q_, v_);
+  pinocchio::computeJointJacobians(*model_, *data_);
   pinocchio::updateFramePlacements(*model_, *data_);
+  pinocchio::crba(*model_, *data_, q_);
+  pinocchio::nonLinearEffects(*model_, *data_, q_, v_);
   detectContacts();
   CONSIM_START_PROFILER("compute_contact_forces");
   for (auto &cp : contacts_) {
@@ -154,6 +164,9 @@ void EulerSimulator::computeContactForces()
 
 void EulerSimulator::step(const Eigen::VectorXd &tau) 
 {
+  if(!resetflag_){
+    throw std::runtime_error("resetState() must be called first !");
+  }
   CONSIM_START_PROFILER("euler_simulator::step");
   assert(tau.size() == model_->nv);
   for (int i = 0; i < n_integration_steps_; i++)
@@ -266,6 +279,8 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
 
 
 void ExponentialSimulator::computeIntegrationTerms(){
+  pinocchio::crba(*model_, *data_, q_);
+  pinocchio::nonLinearEffects(*model_, *data_, q_, v_);
   i_active_ = 0; 
   for(unsigned int i=0; i<nc_; i++){
     if (!contacts_[i]->active) continue;
@@ -307,9 +322,13 @@ void ExponentialSimulator::computeIntegrationTerms(){
   data_->M.fill(0);
   
   CONSIM_START_PROFILER("pinocchio::computeAllTerms");
-  pinocchio::computeAllTerms(*model_, *data_, q_, v_);
-  CONSIM_STOP_PROFILER("pinocchio::computeAllTerms");
+  pinocchio::forwardKinematics(*model_, *data_, q_, v_);
+  pinocchio::computeJointJacobians(*model_, *data_);
   pinocchio::updateFramePlacements(*model_, *data_);
+  pinocchio::computeJointJacobiansTimeVariation(*model_, *data_, q_, v_);
+  // pinocchio::computeAllTerms(*model_, *data_, q_, v_);
+  CONSIM_STOP_PROFILER("pinocchio::computeAllTerms");
+  // pinocchio::updateFramePlacements(*model_, *data_);
   detectContacts();
   
   
@@ -321,13 +340,12 @@ void ExponentialSimulator::computeIntegrationTerms(){
     resizeVectorsAndMatrices();
     CONSIM_STOP_PROFILER("exponential_simulator::resizeVectorsAndMatrices");
     }
-    // pinocchio::forwardKinematics(*model_, *data_, q_, v_, dv_);   // needed for dJv_ 
     i_active_ = 0; 
     for(unsigned int i=0; i<nc_; i++){
       if (!contacts_[i]->active) continue;
       contacts_[i]->firstOrderContactKinematics(*data_);
       contacts_[i]->optr->computePenetration(*contacts_[i]);
-      contacts_[i]->secondOrderContactKinematics(*data_);
+      contacts_[i]->secondOrderContactKinematics(*data_, v_);
       contacts_[i]->optr->contact_model_->computeForce(*contacts_[i]);
       f_.segment(3*i_active_,3) = contacts_[i]->f; 
       i_active_ += 1;  

@@ -44,7 +44,7 @@ namespace consim {
         * Returns the contact points reference 
       */
 
-      const ContactPoint &getContact(int index);
+      const ContactPoint &getContact(std::string name);
 
       /**
         * Adds an object to the simulator for contact interaction checking.
