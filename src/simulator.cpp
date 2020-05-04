@@ -279,6 +279,11 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
 
 
 void ExponentialSimulator::computeIntegrationTerms(){
+  /**
+   * computes M, nle
+   * fills J, dJv, p0, p, dp, Kp0, and x0 
+   * computes A and b 
+   **/   
   pinocchio::crba(*model_, *data_, q_);
   pinocchio::nonLinearEffects(*model_, *data_, q_, v_);
   i_active_ = 0; 
@@ -319,6 +324,12 @@ void ExponentialSimulator::computeIntegrationTerms(){
 
   void ExponentialSimulator::computeContactForces()
 {
+  /**
+   * computes the kinematics at the end of the integration step, 
+   * runs contact detection 
+   * resizes matrices to match the number of active contacts if needed 
+   * compute the contact froces of the active contacts 
+   **/  
   data_->M.fill(0);
   
   CONSIM_START_PROFILER("pinocchio::computeAllTerms");
@@ -326,14 +337,9 @@ void ExponentialSimulator::computeIntegrationTerms(){
   pinocchio::computeJointJacobians(*model_, *data_);
   pinocchio::updateFramePlacements(*model_, *data_);
   pinocchio::computeJointJacobiansTimeVariation(*model_, *data_, q_, v_);
-  // pinocchio::computeAllTerms(*model_, *data_, q_, v_);
   CONSIM_STOP_PROFILER("pinocchio::computeAllTerms");
-  // pinocchio::updateFramePlacements(*model_, *data_);
   detectContacts();
-  
-  
-  
-  
+
   if (nactive_>0){
     if (f_.size()!=3*nactive_){
     CONSIM_START_PROFILER("exponential_simulator::resizeVectorsAndMatrices");
@@ -356,6 +362,12 @@ void ExponentialSimulator::computeIntegrationTerms(){
 
 
 void ExponentialSimulator::checkFrictionCone(){
+  /**
+   * computes the average force on the integration interval 
+   * checks for pulling force constraints
+   * checks for friction forces constraints 
+   * sets a flag needed to complete the integration step 
+   **/  
   temp03_.noalias() = D*intxt_;
   f_avg= kp0_ + temp03_/sub_dt; 
   i_active_ = 0; 
@@ -388,7 +400,6 @@ void ExponentialSimulator::checkFrictionCone(){
       }
 
     }
-
     i_active_ += 1; 
   }
 } // ExponentialSimulator::checkFrictionCone
