@@ -39,8 +39,8 @@ void ContactPoint::secondOrderContactKinematics(pinocchio::Data &data, Eigen::Ve
   // dJvlocal_.linear() += vlocal_.angular().cross(vlocal_.linear());
   dJvlocal_.linear() = dJdt_.topRows<3>() * v; 
   dJvlocal_.angular() = dJdt_.bottomRows<3>() * v; 
-  // std::cout<<"dJv acceleration component "<< dJvlocal_.linear() << std::endl;
   dJv_ = frameSE3_.act(dJvlocal_).linear();
+
 }
 
 

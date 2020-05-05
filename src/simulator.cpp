@@ -333,7 +333,7 @@ void ExponentialSimulator::computeIntegrationTerms(){
   data_->M.fill(0);
   
   CONSIM_START_PROFILER("pinocchio::computeAllTerms");
-  pinocchio::forwardKinematics(*model_, *data_, q_, v_);
+  pinocchio::forwardKinematics(*model_, *data_, q_, v_, dv_);
   pinocchio::computeJointJacobians(*model_, *data_);
   pinocchio::updateFramePlacements(*model_, *data_);
   pinocchio::computeJointJacobiansTimeVariation(*model_, *data_, q_, v_);
