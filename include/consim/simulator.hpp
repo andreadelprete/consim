@@ -78,7 +78,7 @@ namespace consim {
       const Eigen::VectorXd& get_dv() const {return dv_;};
 
     protected:
-
+      const double sub_dt;
       Eigen::VectorXd q_;  
       Eigen::VectorXd qnext_;
       Eigen::VectorXd v_;
@@ -124,7 +124,6 @@ namespace consim {
       void step(const Eigen::VectorXd &tau) override;
 
     protected:
-      const double sub_dt;
       void computeContactForces() override;
 
   }; // class EulerSimulator
@@ -159,7 +158,6 @@ namespace consim {
 
       bool sparse_; 
       bool invertibleA_;
-      const double sub_dt;
       
       Eigen::VectorXd f_;  // total force 
       Eigen::MatrixXd Jc_; // contact jacobian for all contacts 
@@ -214,13 +212,21 @@ namespace consim {
       void computeSlipping(); 
       eiquadprog::solvers::EiquadprogFast qp;
       Eigen::MatrixXd Q_cone; 
-      Eigen::VectorXd g0_cone; 
+      Eigen::VectorXd q_cone; 
       Eigen::MatrixXd Cineq_cone; 
       Eigen::VectorXd cineq_cone; 
-      Eigen::VectorXd optP_cone; 
-      Eigen::MatrixXd invK;
+      Eigen::MatrixXd Ceq_cone; 
+      Eigen::VectorXd ceq_cone; 
+      Eigen::VectorXd optdP_cone; 
       //
       Eigen::Vector3d xstart_new; // invK*cone_force_offset_03
+
+      Eigen::MatrixXd normal_constraints_;
+      Eigen::MatrixXd tangentA_constraints_;
+      Eigen::MatrixXd tangentB_constraints_;
+      Eigen::MatrixXd contact_position_integrator_; 
+      Eigen::MatrixXd D_intExpA_integrator; 
+
       // void updateAnchorPoint(const int &contact_index,const int &active_index); 
   }; // class ExponentialSimulator
 

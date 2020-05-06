@@ -86,10 +86,6 @@ public:
   
   void computeForce(ContactPoint& cp) override;
 
-  // Eigen::Matrix3d stiffness_; 
-  // Eigen::Matrix3d damping_; 
-  // double friction_coeff_;
-
   Eigen::Vector3d normalF_;
   Eigen::Vector3d tangentF_; 
   Eigen::Vector3d tangentDir_; 
