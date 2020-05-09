@@ -29,7 +29,13 @@ controller_dt = 5.e-3
 if __name__=="__main__":
     # simulation parameters 
     simu_params = []
-  
+    
+    simu_params += [{'name': 'euler 500',
+                    'type': 'euler', 
+                    'ndt': 500}]
+    simu_params += [{'name': 'euler 200',
+                    'type': 'euler', 
+                    'ndt': 200}]
     simu_params += [{'name': 'euler 100',
                     'type': 'euler', 
                     'ndt': 100}]
@@ -46,9 +52,9 @@ if __name__=="__main__":
                     'type': 'exponential', 
                     'ndt': 10}]
 
-    simu_params += [{'name': 'exponential 1',
-                    'type': 'exponential', 
-                    'ndt': 1}]
+    # simu_params += [{'name': 'exponential 1',
+    #                 'type': 'exponential', 
+    #                 'ndt': 1}]
     
     # simu_params += [{'name': 'euler 1',
     #                 'type': 'euler', 
@@ -60,7 +66,7 @@ if __name__=="__main__":
     mu = 0.3        # friction coefficient
     isSparse = False 
     isInvertible = False
-    unilateral_contacts = True                
+    unilateral_contacts = False                  
     K = 1e5 * np.ones([3,1])
     B = 3e2 * np.ones([3,1])
     T = 1 #  1 second simution  
