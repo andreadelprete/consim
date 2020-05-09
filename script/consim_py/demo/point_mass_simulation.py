@@ -6,7 +6,7 @@ from pinocchio.robot_wrapper import RobotWrapper
 import os, sys
 from os.path import dirname, join
 import matplotlib.pyplot as plt 
-import utils.plot_utils as plut
+import consim_py.utils.plot_utils as plut
 
 pin.setNumpyType(np.matrix)
 
@@ -35,12 +35,15 @@ if __name__=="__main__":
     simu_params += [{'name': 'exponential 100',
                     'type': 'exponential', 
                     'ndt': 100}]
-    simu_params += [{'name': 'exponential 10',
-                    'type': 'exponential', 
-                    'ndt': 10}]
+#    simu_params += [{'name': 'exponential 10',
+#                    'type': 'exponential', 
+#                    'ndt': 10}]
     simu_params += [{'name': 'exponential 1',
                     'type': 'exponential', 
                     'ndt': 1}]
+    simu_params += [{'name': 'euler 300',
+                    'type': 'euler', 
+                    'ndt': 300}]
     simu_params += [{'name': 'euler 100',
                     'type': 'euler', 
                     'ndt': 100}]
