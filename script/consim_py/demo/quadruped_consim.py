@@ -15,16 +15,16 @@ from consim_py.robot_simulator_exponential_integrator import RobotSimulator
 import consim_py.conf_solo_py as conf
 from example_robot_data.robots_loader import loadSolo
 
-import numpy.matlib as matlib
+#import numpy.matlib as matlib
 from numpy import nan
 from numpy.linalg import norm as norm
 
-pin.setNumpyType(np.matrix)
+#pin.setNumpyType(np.array)
 
 USE_CONTROLLER = True 
 # parameters used for CoM Sinusoid 
-amp = np.matrix([0.0, 0.0, 0.05]).T
-two_pi_f = 2*np.pi*np.matrix([0.0, .0, 2.0]).T
+amp = np.array([0.0, 0.0, 0.05])
+two_pi_f = 2*np.pi*np.array([0.0, .0, 2.0])
 controller_dt = 5.e-3 
 
 if __name__=="__main__":
@@ -94,7 +94,7 @@ if __name__=="__main__":
  
     # loop over simulations     
     for simu_param in simu_params:
-        offset = np.matrix([0.0, -0.0, 0.0]).T
+        offset = np.array([0.0, -0.0, 0.0])
         ndt = simu_param['ndt']
         name = simu_param['name']
         print((" Running %s Simulation ".center(conf.LINE_WIDTH, '#')%name))
@@ -159,8 +159,8 @@ if __name__=="__main__":
 
     
         offset = invdyn.robot.com(invdyn.formulation.data())
-        two_pi_f_amp = np.multiply(two_pi_f, amp)
-        two_pi_f_squared_amp = np.multiply(two_pi_f, two_pi_f_amp)
+        two_pi_f_amp = two_pi_f * amp
+        two_pi_f_squared_amp = two_pi_f * two_pi_f_amp
        
 
         sampleCom = invdyn.trajCom.computeNext()
@@ -185,9 +185,9 @@ if __name__=="__main__":
 
             if(USE_CONTROLLER):
                 # sinusoid trajectory 
-                sampleCom.pos(offset + np.multiply(amp, matlib.sin(two_pi_f*t)))
-                sampleCom.vel(np.multiply(two_pi_f_amp, matlib.cos(two_pi_f*t)))
-                sampleCom.acc(np.multiply(two_pi_f_squared_amp, -matlib.sin(two_pi_f*t)))
+                sampleCom.pos(offset + np.multiply(amp, np.sin(two_pi_f*t)))
+                sampleCom.vel(np.multiply(two_pi_f_amp, np.cos(two_pi_f*t)))
+                sampleCom.acc(np.multiply(two_pi_f_squared_amp, -np.sin(two_pi_f*t)))
                 invdyn.comTask.setReference(sampleCom)
 
                 HQPData = invdyn.formulation.computeProblemData(t, q[i], v[i])

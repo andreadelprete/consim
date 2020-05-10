@@ -9,7 +9,6 @@ Given x(0) and T I want to compute:
 from __future__ import print_function
 from scipy.sparse.linalg.matfuncs import _ExpmPadeHelper, _ell, _solve_P_Q
 import numpy as np
-from numpy import matlib
 from numpy.linalg import solve
 # rom scipy.linalg import expm
 from numpy.linalg import eigvals
@@ -73,7 +72,7 @@ def expm_times_v(A, v, use_exact_onenorm="auto", verbose=False):
 def compute_x_T(A, a, x0, T, dt=None, invertible_A=False):
     if(dt is not None):
         N = int(T/dt)
-        x = matlib.copy(x0)
+        x = np.copy(x0)
         for i in range(N):
             dx = A.dot(x) + a
             x += dt*dx
@@ -82,17 +81,17 @@ def compute_x_T(A, a, x0, T, dt=None, invertible_A=False):
     if(invertible_A):
         e_TA = expm(T*A)
         A_inv_a = solve(A, a)
-        return e_TA*(x0+A_inv_a) - A_inv_a
+        return e_TA@(x0+A_inv_a) - A_inv_a
 
     n = A.shape[0]
-    C = matlib.zeros((n+1, n+1))
+    C = np.zeros((n+1, n+1))
     C[0:n,     0:n] = A
     C[0:n,     n] = a
-    z0 = matlib.zeros((n+1, 1))
+    z0 = np.zeros(n+1)
     z0[:n, 0] = x0
     z0[-1, 0] = 1.0
     e_TC = expm(T*C, verbose=True)
-    z = e_TC*z0
+    z = e_TC@z0
 #    z = expm_times_v(T*C, z0, verbose=True)
     x_T = z[:n, 0]
     return x_T
@@ -111,21 +110,21 @@ def compute_integral_x_T(A, a, x0, T, dt=None, invertible_A=False):
         e_TA = expm(T*A)
         Ainv_a = solve(A, a)
         Ainv_x0_plus_Ainv_a = solve(A, x0+Ainv_a)
-        Id = matlib.eye(A.shape[0])
-        return (e_TA - Id)*Ainv_x0_plus_Ainv_a - T*Ainv_a
+        Id = np.eye(A.shape[0])
+        return (e_TA - Id)@Ainv_x0_plus_Ainv_a - T*Ainv_a
 
     n = A.shape[0]
-    C = matlib.zeros((n+2, n+2))
+    C = np.zeros((n+2, n+2))
     C[0:n,     0:n] = A
     C[0:n,     n] = a
     C[0:n,     n+1] = x0
     C[n:n+1, n+1:] = 1.0
-    z0 = matlib.zeros((n+2, 1))
-    z0[-1, 0] = 1.0
-#    e_TC = expm(T*C, verbose=True)
-#    z = e_TC*z0
+    z0 = np.zeros(n+2)
+    z0[-1] = 1.0
+#    e_TC = expm(T@C, verbose=True)
+#    z = e_TC@z0
     z = expm_times_v(T*C, z0, verbose=True)
-    int_x = z[:n, 0]
+    int_x = z[:n]
     return int_x
 #
 
@@ -133,7 +132,7 @@ def compute_integral_x_T(A, a, x0, T, dt=None, invertible_A=False):
 def compute_double_integral_x_T(A, a, x0, T, dt=None, compute_also_integral=False, invertible_A=False):
     if(dt is not None):
         N = int(T/dt)
-        int2_x = matlib.zeros_like(x0)
+        int2_x = np.zeros_like(x0)
         for i in range(1, N):
             int_x = compute_integral_x_T(A, a, x0, i*dt)
             int2_x += dt*int_x
@@ -144,25 +143,25 @@ def compute_double_integral_x_T(A, a, x0, T, dt=None, compute_also_integral=Fals
         Ainv_a = solve(A, a)
         Ainv_x0_plus_Ainv_a = solve(A, x0+Ainv_a)
         Ainv2_x0_plus_Ainv_a = solve(A, Ainv_x0_plus_Ainv_a)
-        Id = matlib.eye(A.shape[0])
-        int2_x = (e_TA - Id)*Ainv2_x0_plus_Ainv_a - T*Ainv_x0_plus_Ainv_a - 0.5*T*T*Ainv_a
+        Id = np.eye(A.shape[0])
+        int2_x = (e_TA - Id)@Ainv2_x0_plus_Ainv_a - T*Ainv_x0_plus_Ainv_a - 0.5*T*T*Ainv_a
         if compute_also_integral:
-            int_x = (e_TA - Id)*Ainv_x0_plus_Ainv_a - T*Ainv_a
+            int_x = (e_TA - Id)@Ainv_x0_plus_Ainv_a - T*Ainv_a
             return int_x, int2_x
         return int2_x
 
     n = A.shape[0]
-    C = matlib.zeros((n+3, n+3))
+    C = np.zeros((n+3, n+3))
     C[0:n,     0:n] = A
     C[0:n,     n] = a
     C[0:n,     n+1] = x0
-    C[n:n+2, n+1:] = matlib.eye(2)
-    z0 = matlib.zeros((n+3, 1))
-    z0[-1, 0] = 1.0
+    C[n:n+2, n+1:] = np.eye(2)
+    z0 = np.zeros(n+3)
+    z0[-1] = 1.0
 #    e_TC = expm(T*C, verbose=True)
-#    z = e_TC*z0
+#    z = e_TC@z0
     z = expm_times_v(T*C, z0, verbose=True)
-    int2_x = z[:n, 0]
+    int2_x = z[:n]
 
     # print("A\n", A)
     # print("a\n", a.T)
@@ -197,14 +196,14 @@ def compute_x_T_and_two_integrals(A, a, x0, T):
     with z(0) = (1, x(0), 0, 0)
     '''
     n = A.shape[0]
-    C = matlib.zeros((3*n+1, 3*n+1))
+    C = np.zeros((3*n+1, 3*n+1))
     C[1:1+n,   0] = a
     C[1:1+n,   1:1+n] = A
-    C[1+n:1+2*n, 1:1+n] = matlib.eye(n)
-    C[1+2*n:,      1+n:1+2*n] = matlib.eye(n)
-    z0 = np.vstack((1, x0, matlib.zeros((2*n, 1))))
+    C[1+n:1+2*n, 1:1+n] = np.eye(n)
+    C[1+2*n:,      1+n:1+2*n] = np.eye(n)
+    z0 = np.vstack((1, x0, np.zeros((2*n, 1))))
     e_TC = expm(T*C)
-    z = e_TC*z0
+    z = e_TC@z0
     x = z[1:1+n, 0]
     int_x = z[1+n:2*n+1, 0]
     int2_x = z[1+2*n:, 0]
@@ -216,20 +215,20 @@ def compute_integral_expm(A, T, dt=None):
     
     if(dt is not None):
         N = int(T/dt)
-        int_expm = matlib.zeros((n,n))
+        int_expm = np.zeros((n,n))
         for i in range(1, N):
             ex = expm(i*dt*A)
             int_expm += dt*ex
         return int_expm
     
-    C = matlib.zeros((n+n, n+n))
+    C = np.zeros((n+n, n+n))
     C[0:n,     0:n] = A
-    C[0:n,     n:] = matlib.identity(n)
-    z0 = matlib.zeros((n+n, n))
+    C[0:n,     n:] = np.identity(n)
+    z0 = np.zeros((n+n, n))
 #    z0[:n, 0] = x0
-    z0[-n:, :] = matlib.identity(n)
+    z0[-n:, :] = np.identity(n)
     e_TC = expm(T*C, verbose=True)
-    z = e_TC*z0
+    z = e_TC@z0
 #    z = expm_times_v(T*C, z0, verbose=True)
     res = z[:n, :]
     return res
@@ -248,15 +247,15 @@ if __name__ == '__main__':
     n2 = int(n/2)
     stiffness = 1e5
     damping = 1e2
-    x0 = matlib.rand((n, 1))
-    a = matlib.rand((n, 1))
-    U = matlib.rand((n2, n2))
-    Upsilon = U*U.T
-    K = matlib.eye(n2)*stiffness
-    B = matlib.eye(n2)*damping
-#    A = matlib.block([[matlib.zeros((n2, n2)), matlib.eye(n2)],
-#                      [-Upsilon*K,      -Upsilon*B]])
-    A  = matlib.rand((n, n))
+    x0 = np.rand((n, 1))
+    a = np.rand((n, 1))
+    U = np.rand((n2, n2))
+    Upsilon = U@U.T
+    K = np.eye(n2)*stiffness
+    B = np.eye(n2)*damping
+#    A = np.block([[np.zeros((n2, n2)), np.eye(n2)],
+#                      [-Upsilon@K,      -Upsilon@B]])
+    A  = np.rand((n, n))
     
 
     # print("x(0) is:", x0.T)

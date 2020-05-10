@@ -20,29 +20,25 @@ fMin = 1.0                          # minimum normal force
 fMax = 1000.0                       # maximum normal force
 contact_frames = ['HL_FOOT', 'HR_FOOT', 'FL_FOOT', 'FR_FOOT']
 # direction of the normal to the contact surface
-contact_normal = np.matrix([0., 0., 1.]).T
-K = 1e5*np.asmatrix(np.diagflat([1., 1., 1.]))
-B = 3e2*np.asmatrix(np.diagflat([1., 1., 1.]))
+contact_normal = np.array([0., 0., 1.])
+K = 1e5*np.asarray(np.diagflat([1., 1., 1.]))
+B = 3e2*np.asarray(np.diagflat([1., 1., 1.]))
 
 w_com = 1.0                     # weight of center of mass task
 w_posture = 1e-3                # weight of joint posture task
 w_forceRef = 1e-6               # weight of force regularization task
 
-kp_contact = 10.0               # proportional gain of contact constraint
-kp_com = 10.0                   # proportional gain of center of mass task
-kp_posture = 10.0               # proportional gain of joint posture task
+kp_contact = 1.0               # proportional gain of contact constraint
+kp_com = 2.0                   # proportional gain of center of mass task
+kp_posture = 2.0               # proportional gain of joint posture task
 
-PRINT_T = 0.2                   # print every PRINT_T
+PRINT_T = 0.5                   # print every PRINT_T
 DISPLAY_T = 0.1                 # update robot configuration in viwewer every DISPLAY_T
-T = 2.0
-
-amp = np.matrix([0.0, 0.02, 0.0]).T
-two_pi_f = 2*np.pi*np.matrix([0.0, .6, 0.0]).T
 
 # Starting resting joint position
-q0 = np.matrix([[0., 0., 0.223, 0., 0., 0., 1.,
+q0 = np.array([0., 0., 0.223, 0., 0., 0., 1.,
                  -0.8,  1.6, -0.8, 1.6,
-                 -0.8,  1.6, -0.8, 1.6]]).T
+                 -0.8,  1.6, -0.8, 1.6])
 
 use_viewer = 1
 CAMERA_TRANSFORM = [1.0910934209823608, -1.4611519575119019, 0.9074661731719971,

@@ -2,7 +2,6 @@ from consim_py.utils_LDS_integral import compute_x_T
 import pinocchio as se3
 from pinocchio.utils import zero
 import numpy as np
-import numpy.matlib as matlib
 # from numpy import nan
 from scipy.linalg import expm
 # from numpy.linalg import norm as norm
@@ -61,7 +60,7 @@ class Contact:
         #            if(not self.in_contact):
         #                self.in_contact = True
         #                print "\nINFO: contact %s made!"%(self.frame_name)
-        self.f = self.K*delta_p - self.B*v_world
+        self.f = self.K@delta_p - self.B@v_world
         self.v = v_world
         self.dJv = dJv_world
         return self.f
@@ -71,7 +70,7 @@ class Contact:
         M = self.data.oMf[self.frame_id]
         R = se3.SE3(M.rotation, 0*M.translation)
         J_local = se3.getFrameJacobian(self.model, self.data, self.frame_id, se3.ReferenceFrame.LOCAL)
-        self.J = (R.action * J_local)[:3, :]
+        self.J = (R.action @ J_local)[:3, :]
         return self.J
 
 
@@ -100,14 +99,14 @@ class RobotSimulator:
         self.t = 0.0
         self.ndt_force = 1  # number of contact force samples for each time step
         self.f = zero(0)
-        self.f_log = matlib.zeros((self.ndt_force, 0))
+        self.f_log = np.zeros((self.ndt_force, 0))
         nv = self.model.nv  # Dimension of joint velocities vector
         if root_joint is None:  # Basically if we have a floating base
             na = nv
         else:
             na = nv-6  # Remove 6 non-actuated velocities
         # Matrix S used as filter of vetor of inputs U
-        self.S = np.hstack((matlib.zeros((na, nv-na)), matlib.eye(na, na)))
+        self.S = np.hstack((np.zeros((na, nv-na)), np.eye(na, na)))
         self.contacts = []
         self.display_counter = self.DISPLAY_N
         self.init(conf.q0, None, True)
@@ -125,13 +124,13 @@ class RobotSimulator:
             except:
                 pass
             gepetto.corbaserver.Client()
-            self.robot_display.initViewer(loadModel=True)
+            self.robot_display.initViewer(windowName='gepetto', loadModel=True)
             self.robot_display.viewer.gui.createSceneWithFloor('world')
             self.robot_display.displayCollisions(False)
             self.robot_display.displayVisuals(True)
             self.robot_display.display(self.q)
             self.gui = self.robot_display.viewer.gui
-            self.gui.setCameraTransform(0, conf.CAMERA_TRANSFORM)
+            self.gui.setCameraTransform('gepetto', conf.CAMERA_TRANSFORM)
             self.gui.setLightingMode('world/floor', 'OFF')
 
     # Re-initialize the simulator
@@ -163,22 +162,22 @@ class RobotSimulator:
         self.nc = len(self.contacts)
         self.nk = 3*self.nc
         self.f = zero(self.nk)
-        self.f_log = matlib.zeros((self.nk, self.ndt_force))
-        self.Jc = matlib.zeros((self.nk, self.model.nv))
-        self.K = matlib.zeros((self.nk, self.nk))
-        self.B = matlib.zeros((self.nk, self.nk))
+        self.f_log = np.zeros((self.nk, self.ndt_force))
+        self.Jc = np.zeros((self.nk, self.model.nv))
+        self.K = np.zeros((self.nk, self.nk))
+        self.B = np.zeros((self.nk, self.nk))
         self.p0 = zero(self.nk)
         self.p = zero(self.nk)
         self.dp = zero(self.nk)
         self.dJv = zero(self.nk)
         self.a = zero(2*self.nk)
-        self.A = matlib.zeros((2*self.nk, 2*self.nk))
-        self.A[:self.nk, self.nk:] = matlib.eye(self.nk)
+        self.A = np.zeros((2*self.nk, 2*self.nk))
+        self.A[:self.nk, self.nk:] = np.eye(self.nk)
         i = 0
         for c in self.contacts:
             self.K[i:i+3, i:i+3] = c.K
             self.B[i:i+3, i:i+3] = c.B
-            self.p0[i:i+3, 0] = c.p0
+            self.p0[i:i+3] = c.p0
             i += 3
         self.D = np.hstack((-self.K, -self.B))
 
@@ -192,17 +191,17 @@ class RobotSimulator:
 
         i = 0
         for c in self.contacts:
-            self.f[i:i+3, 0] = c.compute_force()
+            self.f[i:i+3] = c.compute_force()
             i += 3
 
         return self.f
 
     def solve_dense_expo_system(self, U, K, B, a, x0, dt):
         n = U.shape[0]
-        A = matlib.zeros((2*n, 2*n))
-        A[:n, n:] = matlib.eye(n)
-        A[n:, :n] = -U*K
-        A[n:, n:] = -U*B
+        A = np.zeros((2*n, 2*n))
+        A[:n, n:] = np.eye(n)
+        A[n:, :n] = -U@K
+        A[n:, n:] = -U@B
 
 #        print "A", A
         if(self.assume_A_invertible):
@@ -223,7 +222,7 @@ class RobotSimulator:
         D_x = zero(self.nk)
         D_int_x = zero(self.nk)
         D_int2_x = zero(self.nk)
-        dx0 = self.A*x0
+        dx0 = self.A@x0
 
         # normalize rows of Upsilon
         U = self.Upsilon.copy()
@@ -250,14 +249,14 @@ class RobotSimulator:
             ax = zero(2*k)
             ax[:k] = dx0[ii]
             ax[k:] = dx0[self.nk+ii]
-            ax -= np.vstack((self.dp[ii], -Ux*Kx * self.p[ii] - Ux*Bx*self.dp[ii]))
+            ax -= np.vstack((self.dp[ii], -Ux@Kx @ self.p[ii] - Ux@Bx@self.dp[ii]))
             ax[k:] += b[ii]
             x0x = np.vstack((self.p[ii], self.dp[ii]))
             x, int_x, int2_x = self.solve_dense_expo_system(Ux, Kx, Bx, ax, x0x, dt)
             Dx = np.hstack((-Kx, -Bx))
-            D_x[ii] = Dx * x
-            D_int_x[ii] = Dx * int_x
-            D_int2_x[ii] = Dx * int2_x
+            D_x[ii] = Dx @ x
+            D_int_x[ii] = Dx @ int_x
+            D_int2_x[ii] = Dx @ int2_x
 
             try:
                 for i in ii:
@@ -294,33 +293,33 @@ class RobotSimulator:
             i += 3
 
         if(not use_exponential_integrator):
-            self.dv = np.linalg.solve(M, self.S.T*u - h + self.Jc.T*self.f)  # use last forces
+            self.dv = np.linalg.solve(M, self.S.T@u - h + self.Jc.T@self.f)  # use last forces
             v_mean = self.v + 0.5*dt*self.dv
             self.v += self.dv*dt
             self.q = se3.integrate(self.model, self.q, v_mean*dt)
         else:
-            K_p0 = self.K*self.p0
-            dv_bar = np.linalg.solve(M, self.S.T*u - h + self.Jc.T*K_p0)
+            K_p0 = self.K@self.p0
+            dv_bar = np.linalg.solve(M, self.S.T@u - h + self.Jc.T@K_p0)
             i = 0
             for c in self.contacts:
-                self.f[i:i+3, 0] = c.compute_force()
-                self.p[i:i+3, 0] = c.p
-                self.dp[i:i+3, 0] = c.v
-                self.dJv[i:i+3, 0] = c.dJv
+                self.f[i:i+3] = c.compute_force()
+                self.p[i:i+3] = c.p
+                self.dp[i:i+3] = c.v
+                self.dJv[i:i+3] = c.dJv
                 i += 3
-            x0 = np.vstack((self.p, self.dp))
+            x0 = np.concatenate((self.p, self.dp))
             JMinv = np.linalg.solve(M, self.Jc.T).T
-            self.Upsilon = self.Jc*JMinv.T
-            b = JMinv*(self.S.T*u-h) + self.dJv + self.Upsilon*K_p0
-            self.A[self.nk:, :self.nk] = -self.Upsilon*self.K
-            self.A[self.nk:, self.nk:] = -self.Upsilon*self.B
+            self.Upsilon = self.Jc@JMinv.T
+            b = JMinv@(self.S.T@u-h) + self.dJv + self.Upsilon@K_p0
+            self.A[self.nk:, :self.nk] = -self.Upsilon@self.K
+            self.A[self.nk:, self.nk:] = -self.Upsilon@self.B
 
             if(use_sparse_solver):
                 D_x, D_int_x, D_int2_x = self.solve_sparse_exp(x0, b, dt)
                 # Code about matrix expoitation was here
 
             else:
-                self.a[self.nk:, 0] = b
+                self.a[self.nk:] = b
 
                 # I know, file is opened and closed at each iteration, but this is Python who cares
                 if (self.logFileName is not None):
@@ -339,23 +338,23 @@ class RobotSimulator:
                     int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt, invertible_A=False)
                     #                x, int_x, int2_x = compute_x_T_and_two_integrals(self.A, self.a, x0, dt)
 
-                D_int_x = self.D * int_x
-                D_int2_x = self.D * int2_x
+                D_int_x = self.D @ int_x
+                D_int2_x = self.D @ int2_x
 
                 n = self.A.shape[0]
-                C = matlib.zeros((n+1, n+1))
+                C = np.zeros((n+1, n+1))
                 C[0:n,     0:n] = self.A
                 C[0:n,     n] = self.a
-                z = matlib.zeros((n+1, 1))
+                z = np.zeros((n+1, 1))
                 z[:n, 0] = x0
                 z[-1, 0] = 1.0
                 e_TC = expm(dt/self.ndt_force*C)
                 for i in range(self.ndt_force):
-                    self.f_log[:, i] = K_p0 + self.D * z[:n, 0]
-                    z = e_TC*z
+                    self.f_log[:, i] = K_p0 + self.D @ z[:n, 0]
+                    z = e_TC@z
 
-            v_mean = self.v + 0.5*dt*dv_bar + JMinv.T*D_int2_x/dt
-            dv_mean = dv_bar + JMinv.T*D_int_x/dt
+            v_mean = self.v + 0.5*dt*dv_bar + JMinv.T@D_int2_x/dt
+            dv_mean = dv_bar + JMinv.T@D_int_x/dt
             self.v += dt*dv_mean
             self.q = se3.integrate(self.model, self.q, v_mean*dt)
             self.dv = dv_mean
@@ -399,13 +398,13 @@ class RobotSimulator:
                            Kx = self.K[0::3, 0::3]
                            Bx = self.B[0::3, 0::3]
                            ax = dx0[0::3, 0]
-                           ax -= np.vstack((self.dp[0::3,0], -Ux*Kx*self.p[0::3,0] -Ux*Bx*self.dp[0::3,0]))
+                           ax -= np.vstack((self.dp[0::3,0], -Ux@Kx@self.p[0::3,0] -Ux@Bx@self.dp[0::3,0]))
                            ax[4:,0] += b[0::3, 0]
                            x0x = np.vstack((self.p[0::3,0], self.dp[0::3,0]))
                            x, int_x, int2_x = self.solve_dense_expo_system(Ux, Kx, Bx, ax, x0x, dt)
-                           D_x[0::3,0] = np.hstack((-Kx, -Bx)) * x
-                           D_int_x[0::3,0] = np.hstack((-Kx, -Bx)) * int_x
-                           D_int2_x[0::3,0] = np.hstack((-Kx, -Bx)) * int2_x
+                           D_x[0::3,0] = np.hstack((-Kx, -Bx)) @ x
+                           D_int_x[0::3,0] = np.hstack((-Kx, -Bx)) @ int_x
+                           D_int2_x[0::3,0] = np.hstack((-Kx, -Bx)) @ int2_x
 
                            for i in range(4):
                                ii = 3*i+1
@@ -415,11 +414,11 @@ class RobotSimulator:
                                ax = zero(4)
                                ax[:2,0] = dx0[ii:ii+2, 0]
                                ax[2:,0] = dx0[self.nk+ii:self.nk+ii+2, 0]
-                               ax -= np.vstack((self.dp[ii:ii+2,0], -Ux*Kx*self.p[ii:ii+2,0] -Ux*Bx*self.dp[ii:ii+2,0]))
+                               ax -= np.vstack((self.dp[ii:ii+2,0], -Ux@Kx@self.p[ii:ii+2,0] -Ux@Bx@self.dp[ii:ii+2,0]))
                                ax[2:,0] += b[ii:ii+2, 0]
                                x0x = np.vstack((self.p[ii:ii+2,0], self.dp[ii:ii+2,0]))
                                x, int_x, int2_x = self.solve_dense_expo_system(Ux, Kx, Bx, ax, x0x, dt)
-                               D_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) * x
-                               D_int_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) * int_x
-                               D_int2_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) * int2_x
+                               D_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) @ x
+                               D_int_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) @ int_x
+                               D_int2_x[ii:ii+2,0] = np.hstack((-Kx, -Bx)) @ int2_x
 '''

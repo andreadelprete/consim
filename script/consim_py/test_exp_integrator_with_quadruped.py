@@ -8,59 +8,76 @@ from example_robot_data.robots_loader import loadSolo
 import utils.plot_utils as plut
 
 import numpy as np
-import numpy.matlib as matlib
 from numpy import nan
 from numpy.linalg import norm as norm
 
 import pinocchio as se3
-se3.setNumpyType(np.matrix)
 
 
 print("".center(conf.LINE_WIDTH, '#'))
 print("Test Exponential Integrator with Quadruped Robot ".center(conf.LINE_WIDTH, '#'))
 print("".center(conf.LINE_WIDTH, '#'))
 
-simu_params_standard = {
-    'name': 'euler',
-    'use_exp_int': 0,
-    'ndt': 100,
-    'sparse': 0
-}
-simu_params_exp_int = {
-    'name': 'exp',
+SIMU_PARAMS = []
+SIMU_PARAMS += [{
+    'name': 'exp5',
     'use_exp_int': 1,
-    'ndt': 1,
+    'ndt': 5,
     'sparse': 0
-}
-simu_params_exp_int_sparse = {
-    'name': 'exp sparse',
-    'use_exp_int': 1,
-    'ndt': 1,
-    'sparse': 1
-}
-# SIMU_PARAMS = [simu_params_standard, simu_params_exp_int]
-SIMU_PARAMS = [simu_params_exp_int]
+}]
+#SIMU_PARAMS += [{
+#    'name': 'exp20',
+#    'use_exp_int': 1,
+#    'ndt': 20,
+#    'sparse': 0
+#}]
+#SIMU_PARAMS += [{
+#    'name': 'exp50',
+#    'use_exp_int': 1,
+#    'ndt': 50,
+#    'sparse': 0
+#}]
+#SIMU_PARAMS += [{
+#    'name': 'euler100',
+#    'use_exp_int': 0,
+#    'ndt': 100,
+#    'sparse': 0
+#}]
+#SIMU_PARAMS += [{
+#    'name': 'euler1000',
+#    'use_exp_int': 0,
+#    'ndt': 1000,
+#    'sparse': 0
+#}]
+
+#SIMU_PARAMS += [{
+#    'name': 'exp sparse',
+#    'use_exp_int': 1,
+#    'ndt': 1,
+#    'sparse': 1
+#}]
+
 ASSUME_A_INVERTIBLE = 0
-USE_CONTROLLER = 1
-ndt_force = simu_params_standard['ndt']
+USE_CONTROLLER = 0
+ndt_force = 1000
 dt = 0.005                      # controller time step
 T = 1
 
-offset = np.matrix([0.0, -0.0, 0.0]).T
-amp = np.matrix([0.0, 0.0, 0.05]).T
-two_pi_f = 2*np.pi*np.matrix([0.0, .0, 2.0]).T
+offset = np.array([0.0, -0.0, 0.0])
+amp = np.array([0.0, 0.0, 0.05])
+two_pi_f = 2*np.pi*np.array([0.0, .0, 2.0])
 
 N_SIMULATION = int(T/dt)        # number of time steps simulated
 PRINT_N = int(conf.PRINT_T/dt)
 DISPLAY_N = int(conf.DISPLAY_T/dt)
 
 solo = loadSolo()
-
+nq, nv = solo.nq, solo.nv
 simu = RobotSimulator(conf, solo, se3.JointModelFreeFlyer())
 # simu = RobotSimulator(conf, solo, se3.JointModelFreeFlyer(), 'logStuff')  # With logger enabled
 simu.assume_A_invertible = ASSUME_A_INVERTIBLE
 simu.ndt_force = ndt_force
-q0, v0 = np.asmatrix(matlib.copy(simu.q)), np.asmatrix(matlib.copy(simu.v))
+q0, v0 = np.copy(simu.q), np.copy(simu.v)
 
 for name in conf.contact_frames:
     simu.add_contact(name, conf.contact_normal, conf.K, conf.B)
@@ -68,35 +85,41 @@ for name in conf.contact_frames:
 invdyn = TsidQuadruped(conf, solo, q0, viewer=False)
 robot = invdyn.robot
 
-com_pos = matlib.empty((3, N_SIMULATION))*nan
-com_vel = matlib.empty((3, N_SIMULATION))*nan
-com_acc = matlib.empty((3, N_SIMULATION))*nan
-com_pos_ref = matlib.empty((3, N_SIMULATION))*nan
-com_vel_ref = matlib.empty((3, N_SIMULATION))*nan
-com_acc_ref = matlib.empty((3, N_SIMULATION))*nan
+com_pos = np.empty((3, N_SIMULATION))*nan
+com_vel = np.empty((3, N_SIMULATION))*nan
+com_acc = np.empty((3, N_SIMULATION))*nan
+com_pos_ref = np.empty((3, N_SIMULATION))*nan
+com_vel_ref = np.empty((3, N_SIMULATION))*nan
+com_acc_ref = np.empty((3, N_SIMULATION))*nan
 # acc_des = acc_ref - Kp*pos_err - Kd*vel_err
-com_acc_des = matlib.empty((3, N_SIMULATION))*nan
+com_acc_des = np.empty((3, N_SIMULATION))*nan
 offset += invdyn.robot.com(invdyn.formulation.data())
-two_pi_f_amp = np.multiply(two_pi_f, amp)
-two_pi_f_squared_amp = np.multiply(two_pi_f, two_pi_f_amp)
+two_pi_f_amp = two_pi_f * amp
+two_pi_f_squared_amp = two_pi_f * two_pi_f_amp
 sampleCom = invdyn.trajCom.computeNext()
-
 
 def run_simulation(q, v, simu_params):
     simu.init(q0, v0)
     t = 0.0
     time_start = time.time()
-    f = np.zeros((3*len(conf.contact_frames), N_SIMULATION))
-    f_log = np.zeros((3*len(conf.contact_frames), N_SIMULATION*ndt_force))
+    q = np.zeros((nq, N_SIMULATION+1))*np.nan
+    v = np.zeros((nv, N_SIMULATION+1))*np.nan
+    f = np.zeros((3*len(conf.contact_frames), N_SIMULATION+1))*np.nan
+    f_log = np.zeros((3*len(conf.contact_frames), N_SIMULATION*ndt_force))*np.nan
+    
+    q[:,0] = np.copy(simu.q)
+    v[:,0] = np.copy(simu.v)
+#    f[:,0] = np.copy(simu.f)
+    
     for i in range(0, N_SIMULATION):
 
         if(USE_CONTROLLER):
-            sampleCom.pos(offset + np.multiply(amp, matlib.sin(two_pi_f*t)))
-            sampleCom.vel(np.multiply(two_pi_f_amp, matlib.cos(two_pi_f*t)))
-            sampleCom.acc(np.multiply(two_pi_f_squared_amp, -matlib.sin(two_pi_f*t)))
+            sampleCom.pos(offset + amp * np.sin(two_pi_f*t))
+            sampleCom.vel(two_pi_f_amp * np.cos(two_pi_f*t))
+            sampleCom.acc(-two_pi_f_squared_amp * np.sin(two_pi_f*t))
             invdyn.comTask.setReference(sampleCom)
 
-            HQPData = invdyn.formulation.computeProblemData(t, q, v)
+            HQPData = invdyn.formulation.computeProblemData(t, q[:,i], v[:,i])
             sol = invdyn.solver.solve(HQPData)
             if(sol.status != 0):
                 print("[%d] QP problem could not be solved! Error code:" % (i), sol.status)
@@ -105,15 +128,15 @@ def run_simulation(q, v, simu_params):
             u = invdyn.formulation.getActuatorForces(sol)
             #            dv_des = invdyn.formulation.getAccelerations(sol)
         else:
-            invdyn.formulation.computeProblemData(t, q, v)
+            invdyn.formulation.computeProblemData(t, q[:,i], v[:,i])
             #        robot.computeAllTerms(invdyn.data(), q, v)
-            u = -0.03*conf.kp_posture*v[6:, 0]
+            u = -0.03*conf.kp_posture*v[6:, i]
 
-        q, v, f_i = simu.simulate(u, dt, simu_params['ndt'],
+        q[:,i+1], v[:,i+1], f_i = simu.simulate(u, dt, simu_params['ndt'],
                                   simu_params['use_exp_int'],
                                   simu_params['sparse'])
         if(i+1 < N_SIMULATION):
-            f[:, i+1] = f_i.A1
+            f[:, i+1] = f_i
         f_log[:, i*ndt_force:(i+1)*ndt_force] = simu.f_log
         dv = simu.dv
 
@@ -127,35 +150,38 @@ def run_simulation(q, v, simu_params):
 
         if i % PRINT_N == 0:
             print("Time %.3f" % (t))
-            print("\tNormal forces:         ", f_i[2::3].T)
-            if(USE_CONTROLLER):
-                print("\tDesired normal forces: ")
-                for contact in invdyn.contacts:
-                    if invdyn.formulation.checkContact(contact.name, sol):
-                        f_des = invdyn.formulation.getContactForce(contact.name, sol)
-                        print("%4.1f" % (contact.getNormalForce(f_des)))
-
-                print("\n\ttracking err %s: %.3f" % (invdyn.comTask.name.ljust(20, '.'),
-                                                     norm(invdyn.comTask.position_error, 2)))
-                print("\t||v||: %.3f\t ||dv||: %.3f" % (norm(v, 2), norm(dv)))
+#            print("\tNormal forces:         ", f_i[2::3].T)
+#            if(USE_CONTROLLER):
+#                print("\tDesired normal forces: ")
+#                for contact in invdyn.contacts:
+#                    if invdyn.formulation.checkContact(contact.name, sol):
+#                        f_des = invdyn.formulation.getContactForce(contact.name, sol)
+#                        print("%4.1f" % (contact.getNormalForce(f_des)))
+#
+#                print("\n\ttracking err %s: %.3f" % (invdyn.comTask.name.ljust(20, '.'),
+#                                                     norm(invdyn.comTask.position_error, 2)))
+#                print("\t||v||: %.3f\t ||dv||: %.3f" % (norm(v, 2), norm(dv)))
 
         t += dt
 
     time_spent = time.time() - time_start
     print("Real-time factor:", t/time_spent)
-    return f, f_log
+    return q, v, f, f_log
 
 
 # import cProfile
 # cProfile.run('run_simulation(q0, v0)')
+Q, V = {}, {}
 forces = {}
 forces_log = {}
 for simu_params in SIMU_PARAMS:
     name = simu_params['name']
-    forces[name], forces_log[name] = run_simulation(q0, v0, simu_params)
+    print("\nStart simulation", name)
+    Q[name], V[name], forces[name], forces_log[name] = run_simulation(q0, v0, simu_params)
 
 # PLOT STUFF
-tt = np.arange(0.0, N_SIMULATION*dt, dt)
+line_styles = 3*['-', '--', '-.', ':']
+tt = np.arange(0.0, (N_SIMULATION+1)*dt, dt)[:N_SIMULATION+1]
 tt_log = np.arange(0.0, N_SIMULATION*dt, dt/ndt_force)
 
 PLOT_UPSILON = 0
@@ -172,11 +198,31 @@ if(PLOT_UPSILON):
 
 (ff, ax) = plut.create_empty_figure(2, 2)
 ax = ax.reshape(4)
+j = 0
 for (name, f) in forces.items():
     for i in range(4):
-        ax[i].plot(tt, f[2+3*i, :].squeeze(), '--',   label=name+' '+str(i))
+        ax[i].plot(tt, f[2+3*i, :], line_styles[j], alpha=0.7, label=name+' '+str(i))
         ax[i].set_xlabel('Time [s]')
         ax[i].set_ylabel('Force Z [N]')
+    j += 1
+    leg = ax[0].legend()
+    leg.get_frame().set_alpha(0.5)
+
+
+nplots = 1
+plot_offset = 2
+(ff, ax) = plut.create_empty_figure(nplots, 1)
+if(nplots==1):
+    ax = [ax]
+else:
+    ax = ax.reshape(nplots)
+j = 0
+for (name, q) in Q.items():
+    for i in range(nplots):
+        ax[i].plot(tt, q[plot_offset+i, :], line_styles[j], alpha=0.7, label=name+' '+str(i))
+        ax[i].set_xlabel('Time [s]')
+        ax[i].set_ylabel('q [rad]')
+    j += 1
     leg = ax[0].legend()
     leg.get_frame().set_alpha(0.5)
 
@@ -195,8 +241,8 @@ for (name, f) in forces.items():
 
 # (ff, ax) = plut.create_empty_figure(3,1)
 # for i in range(3):
-#    ax[i].plot(tt, com_pos[i,:].A1, label='CoM '+str(i))
-#    ax[i].plot(tt, com_pos_ref[i,:].A1, 'r:', label='CoM Ref '+str(i))
+#    ax[i].plot(tt, com_pos[i,:], label='CoM '+str(i))
+#    ax[i].plot(tt, com_pos_ref[i,:], 'r:', label='CoM Ref '+str(i))
 #    ax[i].set_xlabel('Time [s]')
 #    ax[i].set_ylabel('CoM [m]')
 #    leg = ax[i].legend()
@@ -204,8 +250,8 @@ for (name, f) in forces.items():
 #
 # (f, ax) = plut.create_empty_figure(3,1)
 # for i in range(3):
-#    ax[i].plot(tt, com_vel[i,:].A1, label='CoM Vel '+str(i))
-#    ax[i].plot(tt, com_vel_ref[i,:].A1, 'r:', label='CoM Vel Ref '+str(i))
+#    ax[i].plot(tt, com_vel[i,:], label='CoM Vel '+str(i))
+#    ax[i].plot(tt, com_vel_ref[i,:], 'r:', label='CoM Vel Ref '+str(i))
 #    ax[i].set_xlabel('Time [s]')
 #    ax[i].set_ylabel('CoM Vel [m/s]')
 #    leg = ax[i].legend()
@@ -213,9 +259,9 @@ for (name, f) in forces.items():
 #
 # (f, ax) = plut.create_empty_figure(3,1)
 # for i in range(3):
-#    ax[i].plot(tt, com_acc[i,:].A1, label='CoM Acc '+str(i))
-#    ax[i].plot(tt, com_acc_ref[i,:].A1, 'r:', label='CoM Acc Ref '+str(i))
-#    ax[i].plot(tt, com_acc_des[i,:].A1, 'g--', label='CoM Acc Des '+str(i))
+#    ax[i].plot(tt, com_acc[i,:], label='CoM Acc '+str(i))
+#    ax[i].plot(tt, com_acc_ref[i,:], 'r:', label='CoM Acc Ref '+str(i))
+#    ax[i].plot(tt, com_acc_des[i,:], 'g--', label='CoM Acc Des '+str(i))
 #    ax[i].set_xlabel('Time [s]')
 #    ax[i].set_ylabel('CoM Acc [m/s^2]')
 #    leg = ax[i].legend()
