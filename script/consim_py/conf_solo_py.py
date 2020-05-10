@@ -33,7 +33,7 @@ kp_com = 2.0                   # proportional gain of center of mass task
 kp_posture = 2.0               # proportional gain of joint posture task
 
 PRINT_T = 0.5                   # print every PRINT_T
-DISPLAY_T = 0.1                 # update robot configuration in viwewer every DISPLAY_T
+DISPLAY_T = 0.05                 # update robot configuration in viwewer every DISPLAY_T
 
 # Starting resting joint position
 q0 = np.array([0., 0., 0.223, 0., 0., 0., 1.,

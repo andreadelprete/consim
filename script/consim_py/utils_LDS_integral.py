@@ -10,7 +10,6 @@ from __future__ import print_function
 from scipy.sparse.linalg.matfuncs import _ExpmPadeHelper, _ell, _solve_P_Q
 import numpy as np
 from numpy.linalg import solve
-# rom scipy.linalg import expm
 from numpy.linalg import eigvals
 # import matplotlib.pyplot as plt
 
@@ -18,6 +17,8 @@ np.set_printoptions(precision=2, linewidth=200, suppress=True)
 
 
 def expm(A, use_exact_onenorm="auto", verbose=False):
+    from scipy.linalg import expm as expm_scipy
+    return expm_scipy(A)
     # Core of expm, separated to allow testing exact and approximate
     # algorithms.
     # Hardcode a matrix order threshold for exact vs. estimated one-norms.
@@ -88,12 +89,12 @@ def compute_x_T(A, a, x0, T, dt=None, invertible_A=False):
     C[0:n,     0:n] = A
     C[0:n,     n] = a
     z0 = np.zeros(n+1)
-    z0[:n, 0] = x0
-    z0[-1, 0] = 1.0
+    z0[:n] = x0
+    z0[-1] = 1.0
     e_TC = expm(T*C, verbose=True)
     z = e_TC@z0
 #    z = expm_times_v(T*C, z0, verbose=True)
-    x_T = z[:n, 0]
+    x_T = z[:n]
     return x_T
 
 
@@ -201,12 +202,12 @@ def compute_x_T_and_two_integrals(A, a, x0, T):
     C[1:1+n,   1:1+n] = A
     C[1+n:1+2*n, 1:1+n] = np.eye(n)
     C[1+2*n:,      1+n:1+2*n] = np.eye(n)
-    z0 = np.vstack((1, x0, np.zeros((2*n, 1))))
+    z0 = np.concatenate((np.ones(1), x0, np.zeros(2*n)))
     e_TC = expm(T*C)
     z = e_TC@z0
-    x = z[1:1+n, 0]
-    int_x = z[1+n:2*n+1, 0]
-    int2_x = z[1+2*n:, 0]
+    x = z[1:1+n]
+    int_x = z[1+n:2*n+1]
+    int2_x = z[1+2*n:]
     return x, int_x, int2_x
 
 
@@ -235,27 +236,28 @@ def compute_integral_expm(A, T, dt=None):
     
     
 def print_error(x_exact, x_approx):
-    print("Approximation error: ", np.max(np.abs(x_exact-x_approx).A1 / np.abs(x_exact).A1))
+    print("Approximation error: ", np.max(np.abs(x_exact-x_approx) / np.abs(x_exact)))
 
 
 if __name__ == '__main__':
     import time
-    N_TESTS = 1000
+    from numpy.random import random as rand
+    N_TESTS = 100
     T = 0.001
     dt = 1e-7
-    n = 4*3*2
+    n = 1*3*2
     n2 = int(n/2)
     stiffness = 1e5
     damping = 1e2
-    x0 = np.rand((n, 1))
-    a = np.rand((n, 1))
-    U = np.rand((n2, n2))
+    x0 = rand(n)
+    a = rand(n)
+    U = rand((n2, n2))
     Upsilon = U@U.T
     K = np.eye(n2)*stiffness
     B = np.eye(n2)*damping
 #    A = np.block([[np.zeros((n2, n2)), np.eye(n2)],
 #                      [-Upsilon@K,      -Upsilon@B]])
-    A  = np.rand((n, n))
+    A  = rand((n, n))
     
 
     # print("x(0) is:", x0.T)

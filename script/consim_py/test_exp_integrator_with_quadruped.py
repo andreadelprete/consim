@@ -19,10 +19,16 @@ print("Test Exponential Integrator with Quadruped Robot ".center(conf.LINE_WIDTH
 print("".center(conf.LINE_WIDTH, '#'))
 
 SIMU_PARAMS = []
+#SIMU_PARAMS += [{
+#    'name': 'exp2',
+#    'use_exp_int': 1,
+#    'ndt': 2,
+#    'sparse': 0
+#}]
 SIMU_PARAMS += [{
     'name': 'exp5',
     'use_exp_int': 1,
-    'ndt': 5,
+    'ndt': 1,
     'sparse': 0
 }]
 #SIMU_PARAMS += [{
@@ -38,9 +44,21 @@ SIMU_PARAMS += [{
 #    'sparse': 0
 #}]
 #SIMU_PARAMS += [{
-#    'name': 'euler100',
+#    'name': 'exp200',
+#    'use_exp_int': 1,
+#    'ndt': 200,
+#    'sparse': 0
+#}]
+SIMU_PARAMS += [{
+    'name': 'euler50',
+    'use_exp_int': 0,
+    'ndt': 10,
+    'sparse': 0
+}]
+#SIMU_PARAMS += [{
+#    'name': 'euler200',
 #    'use_exp_int': 0,
-#    'ndt': 100,
+#    'ndt': 200,
 #    'sparse': 0
 #}]
 #SIMU_PARAMS += [{
@@ -59,9 +77,9 @@ SIMU_PARAMS += [{
 
 ASSUME_A_INVERTIBLE = 0
 USE_CONTROLLER = 0
-ndt_force = 1000
-dt = 0.005                      # controller time step
-T = 1
+ndt_force = 10
+dt = 0.001                      # controller time step
+T = 0.5
 
 offset = np.array([0.0, -0.0, 0.0])
 amp = np.array([0.0, 0.0, 0.05])
@@ -130,7 +148,7 @@ def run_simulation(q, v, simu_params):
         else:
             invdyn.formulation.computeProblemData(t, q[:,i], v[:,i])
             #        robot.computeAllTerms(invdyn.data(), q, v)
-            u = -0.03*conf.kp_posture*v[6:, i]
+            u = -0.01*conf.kp_posture*v[6:, i]
 
         q[:,i+1], v[:,i+1], f_i = simu.simulate(u, dt, simu_params['ndt'],
                                   simu_params['use_exp_int'],
@@ -208,34 +226,31 @@ for (name, f) in forces.items():
     leg = ax[0].legend()
     leg.get_frame().set_alpha(0.5)
 
+for ((name,f),(nname,f_log)) in zip(forces.items(), forces_log.items()):
+   (ff, ax) = plut.create_empty_figure(2,2)
+   ax = ax.reshape(4)
+   for i in range(4):
+       ax[i].plot(tt, f[2+3*i,:], ' o', markersize=12, label=name+' '+str(i))
+       ax[i].plot(tt_log, f_log[2+3*i,:], ' x', label=name+' pred '+str(i))
+       ax[i].set_xlabel('Time [s]')
+       ax[i].set_ylabel('Force Z [N]')
+   leg = ax[0].legend()
+   leg.get_frame().set_alpha(0.5)
 
-nplots = 1
-plot_offset = 2
-(ff, ax) = plut.create_empty_figure(nplots, 1)
-if(nplots==1):
-    ax = [ax]
-else:
-    ax = ax.reshape(nplots)
-j = 0
-for (name, q) in Q.items():
-    for i in range(nplots):
-        ax[i].plot(tt, q[plot_offset+i, :], line_styles[j], alpha=0.7, label=name+' '+str(i))
-        ax[i].set_xlabel('Time [s]')
-        ax[i].set_ylabel('q [rad]')
-    j += 1
-    leg = ax[0].legend()
-    leg.get_frame().set_alpha(0.5)
-
-# for ((name,f),(nname,f_log)) in zip(forces.iteritems(),
-#       forces_log.iteritems()):
-#    (ff, ax) = plut.create_empty_figure(2,2)
-#    ax = ax.reshape(4)
-#    for i in range(4):
-#        ax[i].plot(tt, f[2+3*i,:].squeeze(), '--',   label=name+' '+str(i))
-#        ax[i].plot(tt_log, f_log[2+3*i,:].squeeze(), '--',
-#       label=name+' '+str(i))
+#nplots = 1
+#plot_offset = 0
+#(ff, ax) = plut.create_empty_figure(nplots, 1)
+#if(nplots==1):
+#    ax = [ax]
+#else:
+#    ax = ax.reshape(nplots)
+#j = 0
+#for (name, q) in Q.items():
+#    for i in range(nplots):
+#        ax[i].plot(tt, q[plot_offset+i, :], line_styles[j], alpha=0.7, label=name+' '+str(i))
 #        ax[i].set_xlabel('Time [s]')
-#        ax[i].set_ylabel('Force Z [N]')
+#        ax[i].set_ylabel('q [rad]')
+#    j += 1
 #    leg = ax[0].legend()
 #    leg.get_frame().set_alpha(0.5)
 
