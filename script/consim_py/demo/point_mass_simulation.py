@@ -72,6 +72,8 @@ if __name__=="__main__":
         print('Contacts added to simulator Successfully!')
     
         fcnt = np.zeros([N+1, len(cpts), 3])
+        pred_f = np.zeros([N+1, len(cpts), 3])
+        pred_x = np.zeros([N+1, len(cpts), 3])
     
         robot.forwardKinematics(q0)
         sim.reset_state(q0, dq0, True)
@@ -79,6 +81,8 @@ if __name__=="__main__":
     
         for i, cp in enumerate(cpts):
             fcnt[0,i,:] = np.resize(cp.f,3)
+            pred_f[0,i,:] = np.resize(cp.predicted_f,3)
+            pred_x[0,i,:] = np.resize(cp.predicted_x,3)
     
         q = [q0]
         dq = [dq0]
@@ -88,6 +92,8 @@ if __name__=="__main__":
             dq += [sim.get_v()]
             for i, cp in enumerate(cpts):
                 fcnt[t+1,i,:] = np.resize(cp.f,3)
+                pred_f[t+1,i,:] = np.resize(cp.predicted_f,3)
+                pred_x[t+1,i,:] = np.resize(cp.predicted_x,3)
         print('Simulation done ')
 
         qz = []
@@ -101,6 +107,9 @@ if __name__=="__main__":
         
         plt.figure('Ball Height')
         plt.plot(dt*np.arange(N+1), qz, line_styles[i_ls], alpha=0.7, label=name)
+        if(simu_type=='exponential'):
+            for i,cp in enumerate(cpts):
+                plt.plot(dt*np.arange(N+1), pred_x[:,i,2], line_styles[i_ls+1], alpha=0.7, label=name+'  predicted')
         plt.legend()
         plt.grid()
         plt.title('Ball Height vs time ')
@@ -108,6 +117,8 @@ if __name__=="__main__":
         plt.figure('normal contact forces')
         for i,cp in enumerate(cpts):
             plt.plot(dt*np.arange(N+1), fcnt[:,i,2], line_styles[i_ls], alpha=0.7, label=name+' pnt %s'%i)
+            if(simu_type=='exponential'):
+                plt.plot(dt*np.arange(N+1), pred_f[:,i,2], line_styles[i_ls], alpha=0.7, label=name+' pnt %s predicted'%i)
         plt.legend()
         plt.grid()
         plt.title('normal contact forces')

@@ -227,7 +227,13 @@ namespace consim {
       Eigen::MatrixXd contact_position_integrator_; 
       Eigen::MatrixXd D_intExpA_integrator; 
 
-      // void updateAnchorPoint(const int &contact_index,const int &active_index); 
+      void computePredictedForces();
+      Eigen::MatrixXd C; 
+      Eigen::VectorXd z; 
+      Eigen::VectorXd nextZ; 
+      Eigen::MatrixXd expDtC;
+      Eigen::VectorXd predictedForce_;  
+      expokit::MatrixExponential<double, Dynamic> utilD; // Dynamic
   }; // class ExponentialSimulator
 
 } // namespace consim 

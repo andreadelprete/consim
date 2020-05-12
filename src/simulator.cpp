@@ -71,6 +71,9 @@ void AbstractSimulator::resetState(const Eigen::VectorXd& q, const Eigen::Vector
     }
   }
   computeContactForces();
+  for (unsigned int i=0; i<nc_; ++i){
+    contacts_[i]->predictedX_ = data_->oMf[contacts_[i]->frame_id].translation(); 
+  }
   resetflag_ = true;
 }
 
@@ -231,7 +234,6 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
   
     if (nactive_> 0){
       Eigen::internal::set_is_malloc_allowed(false);
-      computeIntegrationTerms();
       CONSIM_START_PROFILER("exponential_simulator::computeIntegralXt");
       utilDense_.ComputeIntegralXt(A, a_, x0_, sub_dt, intxt_);
       CONSIM_STOP_PROFILER("exponential_simulator::computeIntegralXt");
@@ -269,8 +271,8 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     q_ = qnext_;
     v_ += sub_dt*dvMean_;
     dv_ = dvMean_; 
-    CONSIM_STOP_PROFILER("exponential_simulator::subIntegration");
-    // 
+    CONSIM_STOP_PROFILER("exponential_simulator::subIntegration"); 
+    //
     computeContactForces();
     CONSIM_STOP_PROFILER("exponential_simulator::substep");
     Eigen::internal::set_is_malloc_allowed(true);
@@ -319,6 +321,10 @@ void ExponentialSimulator::computeIntegrationTerms(){
   a_.tail(3*nactive_) = b_;
   x0_.head(3*nactive_) = p_; 
   x0_.tail(3*nactive_) = dp_; 
+  // \brief compute the predicted contact forces at end of the step before recomputing contacts  
+  CONSIM_START_PROFILER("exponential_simulator::predictedForces");  
+  computePredictedForces(); 
+  CONSIM_STOP_PROFILER("exponential_simulator::predictedForces"); 
 }
 
 
@@ -358,6 +364,7 @@ void ExponentialSimulator::computeIntegrationTerms(){
       i_active_ += 1;  
     }
   }
+  computeIntegrationTerms();
 } // ExponentialSimulator::computeContactForces
 
 
@@ -451,6 +458,34 @@ void ExponentialSimulator::computeSlipping(){
 }
 
 
+void ExponentialSimulator::computePredictedForces(){
+  /*!< prefictedF_ = kp0 + D x(t)
+  doesn't have to be updated at each sub_step, only at the end of the integration step 
+  contact location of Inactive Contacts caonnot be predicted here, only through forward kinematics 
+  */ 
+  z(6*nactive_) = 1;
+  z.head(6*nactive_) = x0_;  
+  C.setZero();
+  C.topLeftCorner(6 * nactive_, 6 * nactive_) = sub_dt*A; 
+  C.block(0, 6*nactive_, 6*nactive_,1) = sub_dt* a_;
+  utilD.compute(C,expDtC); 
+  nextZ = expDtC * z; 
+  predictedForce_ = kp0_ + D * nextZ.head(6*nactive_); 
+  
+  // 
+  i_active_ = 0; 
+  for(unsigned int i=0; i<nc_; i++){
+    if (!contacts_[i]->active) {
+      contacts_[i]->predictedF_.fill(0);
+      contacts_[i]->predictedX_ = data_->oMf[contacts_[i]->frame_id].translation(); 
+      continue;
+    }
+    contacts_[i]->predictedF_ = predictedForce_.segment(3*i_active_,3);
+    contacts_[i]->predictedX_ = nextZ.segment(3*i_active_,3);
+    i_active_ += 1; 
+  }
+}
+
 
 void ExponentialSimulator::resizeVectorsAndMatrices()
 {
@@ -487,6 +522,16 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
     tempStepMat_.resize(3 * nactive_, 3 * nactive_); tempStepMat_.setZero();
     temp03_.resize(3*nactive_); temp03_.setZero();
     temp04_.resize(3*nactive_); temp04_.setZero();
+
+    // predictedF_ resizing 
+    C.resize(1+6*nactive_,1+6*nactive_); C.setZero(); 
+    expDtC.resize(1+6*nactive_,1+6*nactive_); expDtC.setZero(); 
+    z.resize(1+6*nactive_); z.setZero(); 
+    nextZ.resize(1+6*nactive_); nextZ.setZero(); 
+    predictedForce_.resize(3*nactive_); predictedForce_.setZero();
+    utilD.resize(1+6*nactive_);
+
+
 
     // qp resizing 
     // constraints should account for both directions of friction 

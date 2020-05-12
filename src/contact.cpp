@@ -13,6 +13,8 @@ ContactPoint::ContactPoint(const pinocchio::Model &model, std::string name, unsi
         model_(&model), name_(name), frame_id(frameId), unilateral(isUnilateral) {
           active = false; 
           f.fill(0);
+          predictedF_.fill(0);
+          predictedX_.fill(0);
           world_J_.resize(3, nv); world_J_.setZero();
           full_J_.resize(6, nv); full_J_.setZero();
           dJdt_.resize(6, nv); dJdt_.setZero();
