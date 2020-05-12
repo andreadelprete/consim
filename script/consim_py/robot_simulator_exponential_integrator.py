@@ -196,79 +196,6 @@ class RobotSimulator:
 
         return self.f
 
-    def solve_dense_expo_system(self, U, K, B, a, x0, dt):
-        n = U.shape[0]
-        A = np.zeros((2*n, 2*n))
-        A[:n, n:] = np.eye(n)
-        A[n:, :n] = -U@K
-        A[n:, n:] = -U@B
-
-#        print "A", A
-        if(self.assume_A_invertible):
-            int_x, int2_x = compute_double_integral_x_T(A, a, x0, dt,
-                                                        compute_also_integral=True,
-                                                        invertible_A=True)
-        else:
-            x = compute_x_T(A, a, x0, dt, invertible_A=False)
-            int_x = compute_integral_x_T(A, a, x0, dt, invertible_A=False)
-            int2_x = compute_double_integral_x_T(A, a, x0, dt, invertible_A=False)
-        return x, int_x, int2_x
-
-    def solve_sparse_exp(self, x0, b, dt):
-        debug = False
-        if(int(self.t*1e3) % 100 == 0):
-            debug = True
-
-        D_x = zero(self.nk)
-        D_int_x = zero(self.nk)
-        D_int2_x = zero(self.nk)
-        dx0 = self.A@x0
-
-        # normalize rows of Upsilon
-        U = self.Upsilon.copy()
-        for i in range(U.shape[0]):
-            U[i, :] = np.abs(U[i, :])/np.sum(np.abs(U[i, :]))
-
-        done = False
-        left = range(self.nk)
-#        if debug: print "\nU\n", U
-        while not done:
-            # find elements have at least 10% effect of current item derivative (compared to sum of all elements)
-            #            if debug: print "Analyze row", left[0], ':', U[left[0],:]
-            ii = np.where(U[left[0], :].A1 > 0.1)[0]
-#            ii = np.array([left[0]])
-#            ii = np.array([left[0], left[1], left[2]])
-#            ii = np.array(left)
-            if debug:
-                print("Select elements:", ii, "which give %.1f %% coverage" % (1e2*np.sum(U[left[0], ii])))
-
-            k = ii.shape[0]
-            Ux = self.Upsilon[ii, :][:, ii]
-            Kx = self.K[ii, :][:, ii]
-            Bx = self.B[ii, :][:, ii]
-            ax = zero(2*k)
-            ax[:k] = dx0[ii]
-            ax[k:] = dx0[self.nk+ii]
-            ax -= np.vstack((self.dp[ii], -Ux@Kx @ self.p[ii] - Ux@Bx@self.dp[ii]))
-            ax[k:] += b[ii]
-            x0x = np.vstack((self.p[ii], self.dp[ii]))
-            x, int_x, int2_x = self.solve_dense_expo_system(Ux, Kx, Bx, ax, x0x, dt)
-            Dx = np.hstack((-Kx, -Bx))
-            D_x[ii] = Dx @ x
-            D_int_x[ii] = Dx @ int_x
-            D_int2_x[ii] = Dx @ int2_x
-
-            try:
-                for i in ii:
-                    left.remove(i)
-            except:
-                print("\nU\n", U)
-                raise
-
-            if len(left) == 0:
-                done = True
-
-        return D_x, D_int_x, D_int2_x
 
     def step(self, u, dt=None, use_exponential_integrator=True, use_sparse_solver=1, dt_force_pred=None, ndt_force_pred=None):
         if dt is None:
@@ -376,65 +303,65 @@ class RobotSimulator:
             self.dJv = np.copy(self.debug_dJv_fd)
             b = JMinv@(self.S.T@u-h) + self.dJv + self.Upsilon@K_p0
 
-            if(use_sparse_solver):
-                D_x, D_int_x, D_int2_x = self.solve_sparse_exp(x0, b, dt)
-                # Code about matrix expoitation was here
+#            if(use_sparse_solver):
+#                D_x, D_int_x, D_int2_x = self.solve_sparse_exp(x0, b, dt)
+#                # Code about matrix expoitation was here
+#
+#            else:
+            self.a[self.nk:] = b
 
+            # I know, file is opened and closed at each iteration, but this is Python who cares
+            if (self.logFileName is not None):
+                # Writing down A
+                with open(self.logFileName + 'A', 'a+') as f:
+                    np.savetxt(f, self.A.flatten(), '%.18f', '\t')
+                with open(self.logFileName + 'b', 'a+') as f:
+                    np.savetxt(f, [np.asarray(self.a)[:, 0]], '%.18f', '\t')  # All this mess to print it as a row, and no transposing does not help
+                with open(self.logFileName + 'xInit', 'a+') as f:
+                    np.savetxt(f, [np.asarray(x0)[:, 0]], '%.18f', '\t')
+
+            if(self.assume_A_invertible):
+                int_x, int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt, compute_also_integral=True, invertible_A=True)
             else:
-                self.a[self.nk:] = b
+                int_x = compute_integral_x_T(self.A, self.a, x0, dt, invertible_A=False)
+                int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt, invertible_A=False)
+                # x, int_x, int2_x = compute_x_T_and_two_integrals(self.A, self.a, x0, dt)
 
-                # I know, file is opened and closed at each iteration, but this is Python who cares
-                if (self.logFileName is not None):
-                    # Writing down A
-                    with open(self.logFileName + 'A', 'a+') as f:
-                        np.savetxt(f, self.A.flatten(), '%.18f', '\t')
-                    with open(self.logFileName + 'b', 'a+') as f:
-                        np.savetxt(f, [np.asarray(self.a)[:, 0]], '%.18f', '\t')  # All this mess to print it as a row, and no transposing does not help
-                    with open(self.logFileName + 'xInit', 'a+') as f:
-                        np.savetxt(f, [np.asarray(x0)[:, 0]], '%.18f', '\t')
+            D_int_x = self.D @ int_x
+            D_int2_x = self.D @ int2_x
+            
+            v_mean = self.v + 0.5*dt*dv_bar + JMinv.T@D_int2_x/dt
+            dv_mean = dv_bar + JMinv.T@D_int_x/dt
 
-                if(self.assume_A_invertible):
-                    int_x, int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt, compute_also_integral=True, invertible_A=True)
-                else:
-                    int_x = compute_integral_x_T(self.A, self.a, x0, dt, invertible_A=False)
-                    int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt, invertible_A=False)
-                    # x, int_x, int2_x = compute_x_T_and_two_integrals(self.A, self.a, x0, dt)
-
+            if(dt_force_pred is not None):
+                # predict intermediate forces using linear dynamical system (i.e. matrix exponential)
+                n = self.A.shape[0]
+                C = np.zeros((n+1, n+1))
+                C[0:n,     0:n] = self.A
+                C[0:n,     n] = self.a
+                z = np.zeros(n+1)
+                z[:n] = x0
+                z[-1] = 1.0
+                e_TC = expm(dt_force_pred/ndt_force_pred*C)
+                for i in range(ndt_force_pred):
+                    f_pred[:, i] = K_p0 + self.D @ z[:n]
+                    z = e_TC @ z
+                    
+                # predict also what forces we would get by integrating with the force prediction
+                int_x = compute_integral_x_T(self.A, self.a, x0, dt_force_pred, invertible_A=False)
+                int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt_force_pred, invertible_A=False)
                 D_int_x = self.D @ int_x
                 D_int2_x = self.D @ int2_x
+                v_mean_pred = self.v + 0.5*dt_force_pred*dv_bar + JMinv.T@D_int2_x/dt_force_pred
+                dv_mean_pred = dv_bar + JMinv.T@D_int_x/dt_force_pred
+                v_pred = self.v + dt_force_pred*dv_mean_pred
+                q_pred = se3.integrate(self.model, self.q, v_mean_pred*dt_force_pred)
                 
-                v_mean = self.v + 0.5*dt*dv_bar + JMinv.T@D_int2_x/dt
-                dv_mean = dv_bar + JMinv.T@D_int_x/dt
-
-                if(dt_force_pred is not None):
-                    # predict intermediate forces using linear dynamical system (i.e. matrix exponential)
-                    n = self.A.shape[0]
-                    C = np.zeros((n+1, n+1))
-                    C[0:n,     0:n] = self.A
-                    C[0:n,     n] = self.a
-                    z = np.zeros(n+1)
-                    z[:n] = x0
-                    z[-1] = 1.0
-                    e_TC = expm(dt_force_pred/ndt_force_pred*C)
-                    for i in range(ndt_force_pred):
-                        f_pred[:, i] = K_p0 + self.D @ z[:n]
-                        z = e_TC @ z
-                        
-                    # predict also what forces we would get by integrating with the force prediction
-                    int_x = compute_integral_x_T(self.A, self.a, x0, dt_force_pred, invertible_A=False)
-                    int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt_force_pred, invertible_A=False)
-                    D_int_x = self.D @ int_x
-                    D_int2_x = self.D @ int2_x
-                    v_mean_pred = self.v + 0.5*dt_force_pred*dv_bar + JMinv.T@D_int2_x/dt_force_pred
-                    dv_mean_pred = dv_bar + JMinv.T@D_int_x/dt_force_pred
-                    v_pred = self.v + dt_force_pred*dv_mean_pred
-                    q_pred = se3.integrate(self.model, self.q, v_mean_pred*dt_force_pred)
-                    
-                    se3.forwardKinematics(self.model, self.data, q_pred, v_pred)
-                    se3.updateFramePlacements(self.model, self.data)
-                    f_pred_int = np.zeros(self.nk)
-                    for (i,c) in enumerate(self.contacts):
-                        f_pred_int[3*i:3*i+3] = c.compute_force()
+                se3.forwardKinematics(self.model, self.data, q_pred, v_pred)
+                se3.updateFramePlacements(self.model, self.data)
+                f_pred_int = np.zeros(self.nk)
+                for (i,c) in enumerate(self.contacts):
+                    f_pred_int[3*i:3*i+3] = c.compute_force()
                     
                 # DEBUG: predict forces integrating contact point dynamics while updating robot dynamics M and h
 #                t = dt_force_pred/ndt_force_pred
@@ -506,8 +433,6 @@ class RobotSimulator:
 #                    f_pred[:, i] = f0 + t*df
 #                    t += dt_force_pred/ndt_force_pred
 
-#            v_mean = self.v + 0.5*dt*dv_bar + JMinv.T@D_int2_x/dt
-#            dv_mean = dv_bar + JMinv.T@D_int_x/dt
             self.v += dt*dv_mean
             self.q = se3.integrate(self.model, self.q, v_mean*dt)
             self.dv = dv_mean
@@ -558,6 +483,82 @@ class RobotSimulator:
             if self.display_counter == 0:
                 self.robot_display.display(q)
                 self.display_counter = self.DISPLAY_N
+
+'''
+def solve_dense_expo_system(self, U, K, B, a, x0, dt):
+        n = U.shape[0]
+        A = np.zeros((2*n, 2*n))
+        A[:n, n:] = np.eye(n)
+        A[n:, :n] = -U@K
+        A[n:, n:] = -U@B
+
+#        print "A", A
+        if(self.assume_A_invertible):
+            int_x, int2_x = compute_double_integral_x_T(A, a, x0, dt,
+                                                        compute_also_integral=True,
+                                                        invertible_A=True)
+        else:
+            x = compute_x_T(A, a, x0, dt, invertible_A=False)
+            int_x = compute_integral_x_T(A, a, x0, dt, invertible_A=False)
+            int2_x = compute_double_integral_x_T(A, a, x0, dt, invertible_A=False)
+        return x, int_x, int2_x
+
+    def solve_sparse_exp(self, x0, b, dt):
+        debug = False
+        if(int(self.t*1e3) % 100 == 0):
+            debug = True
+
+        D_x = zero(self.nk)
+        D_int_x = zero(self.nk)
+        D_int2_x = zero(self.nk)
+        dx0 = self.A@x0
+
+        # normalize rows of Upsilon
+        U = self.Upsilon.copy()
+        for i in range(U.shape[0]):
+            U[i, :] = np.abs(U[i, :])/np.sum(np.abs(U[i, :]))
+
+        done = False
+        left = range(self.nk)
+#        if debug: print "\nU\n", U
+        while not done:
+            # find elements have at least 10% effect of current item derivative (compared to sum of all elements)
+            #            if debug: print "Analyze row", left[0], ':', U[left[0],:]
+            ii = np.where(U[left[0], :].A1 > 0.1)[0]
+#            ii = np.array([left[0]])
+#            ii = np.array([left[0], left[1], left[2]])
+#            ii = np.array(left)
+            if debug:
+                print("Select elements:", ii, "which give %.1f %% coverage" % (1e2*np.sum(U[left[0], ii])))
+
+            k = ii.shape[0]
+            Ux = self.Upsilon[ii, :][:, ii]
+            Kx = self.K[ii, :][:, ii]
+            Bx = self.B[ii, :][:, ii]
+            ax = zero(2*k)
+            ax[:k] = dx0[ii]
+            ax[k:] = dx0[self.nk+ii]
+            ax -= np.vstack((self.dp[ii], -Ux@Kx @ self.p[ii] - Ux@Bx@self.dp[ii]))
+            ax[k:] += b[ii]
+            x0x = np.vstack((self.p[ii], self.dp[ii]))
+            x, int_x, int2_x = self.solve_dense_expo_system(Ux, Kx, Bx, ax, x0x, dt)
+            Dx = np.hstack((-Kx, -Bx))
+            D_x[ii] = Dx @ x
+            D_int_x[ii] = Dx @ int_x
+            D_int2_x[ii] = Dx @ int2_x
+
+            try:
+                for i in ii:
+                    left.remove(i)
+            except:
+                print("\nU\n", U)
+                raise
+
+            if len(left) == 0:
+                done = True
+
+        return D_x, D_int_x, D_int2_x
+'''
 
 
 ''' Moved because of readability
