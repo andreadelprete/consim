@@ -29,9 +29,9 @@ SIMU_PARAMS = []
 #    'sparse': 0
 #}]
 SIMU_PARAMS += [{
-    'name': 'exp50',
+    'name': 'exp20',
     'use_exp_int': 1,
-    'ndt': 50,
+    'ndt': 20,
     'sparse': 0
 }]
 #SIMU_PARAMS += [{
@@ -81,7 +81,7 @@ SIMU_PARAMS += [{
 ASSUME_A_INVERTIBLE = 0
 USE_CONTROLLER = 1
 #ndt_force = 50
-dt = 0.005                      # controller time step
+dt = 0.002                      # controller time step
 T = 0.4
 
 offset = np.array([0.0, -0.0, 0.0])
@@ -153,7 +153,9 @@ def run_simulation(q, v, simu_params):
                 print("[%d] QP problem could not be solved! Error code:" % (i), sol.status)
                 break
 
-            u = invdyn.formulation.getActuatorForces(sol)
+            # TMP: update control every 2 time steps
+            if(i%2==0):
+                u = invdyn.formulation.getActuatorForces(sol)
             #            dv_des = invdyn.formulation.getAccelerations(sol)
         else:
             invdyn.formulation.computeProblemData(t, q[:,i], v[:,i])

@@ -10,7 +10,6 @@ import gepetto.corbaserver
 import time
 import subprocess
 
-# , compute_x_T_and_two_integrals
 from consim_py.utils_LDS_integral import compute_integral_x_T, compute_double_integral_x_T
 
 
@@ -28,22 +27,17 @@ class Contact:
     def reset_contact_position(self):
         # Initial (0-load) position of the spring
         self.p0 = self.data.oMf[self.frame_id].translation.copy()
-        #        print 'Contact %s p0='%(self.frame_name), self.p0.T
         self.in_contact = True
 
     def compute_force(self):
         M = self.data.oMf[self.frame_id]
         self.p = M.translation
         delta_p = self.p0 - self.p
-        #        print 'Contact %s p='%(self.frame_name), M.translation.T
-        #        print 'Contact %s delta_p='%(self.frame_name), delta_p.T
 
         R = se3.SE3(M.rotation, 0*M.translation)
-        #        v_local = self.model.frames[self.frame_id].placement.inverse()*self.data.v[self.joint_id]
         v_local = se3.getFrameVelocity(self.model, self.data, self.frame_id)
         v_world = (R.act(v_local)).linear
 
-        # Doubt: should I use classic or spatial acceleration here?!
         dJv_local = se3.getFrameAcceleration(self.model, self.data, self.frame_id)
         dJv_local.linear += np.cross(v_local.angular, v_local.linear, axis=0)
         dJv_world = (R.act(dJv_local)).linear
@@ -66,11 +60,6 @@ class Contact:
         return self.f
 
     def getJacobianWorldFrame(self):
-        #        se3.framesForwardKinematics(self.model,self.data,q)
-#        M = self.data.oMf[self.frame_id]
-#        R = se3.SE3(M.rotation, 0*M.translation)
-#        J_local = se3.getFrameJacobian(self.model, self.data, self.frame_id, se3.ReferenceFrame.LOCAL)
-#        self.J = (R.action @ J_local)[:3, :]
         J_local = se3.getFrameJacobian(self.model, self.data, self.frame_id, se3.ReferenceFrame.LOCAL_WORLD_ALIGNED)
         self.J = J_local[:3, :]
         return self.J
@@ -182,6 +171,7 @@ class RobotSimulator:
             i += 3
         self.D = np.hstack((-self.K, -self.B))
 
+
     def compute_forces(self, compute_data=True):
         '''Compute the contact forces from q, v and elastic model'''
         if compute_data:            
@@ -196,6 +186,26 @@ class RobotSimulator:
 
         return self.f
 
+
+    def compute_exponential_LDS(self, u):
+        ''' Compute matrix A and vector a that define the Linear Dynamical System to
+            integrate with the matrix exponential.
+        '''
+        K_p0 = self.K@self.p0
+        M = self.data.M
+        h = self.data.nle
+        dv_bar = np.linalg.solve(M, self.S.T@u - h + self.Jc.T@K_p0)
+        for (i,c) in enumerate(self.contacts):
+            self.p[  3*i:3*i+3] = c.p
+            self.dp[ 3*i:3*i+3] = c.v
+            self.dJv[3*i:3*i+3] = c.dJv
+        x0 = np.concatenate((self.p, self.dp))
+        JMinv = np.linalg.solve(M, self.Jc.T).T
+        self.Upsilon = self.Jc @ JMinv.T
+        self.a[self.nk:] = JMinv@(self.S.T@u-h) + self.dJv + self.Upsilon@K_p0
+        self.A[self.nk:, :self.nk] = -self.Upsilon@self.K
+        self.A[self.nk:, self.nk:] = -self.Upsilon@self.B
+        return K_p0, x0, dv_bar, JMinv
 
     def step(self, u, dt=None, use_exponential_integrator=True, use_sparse_solver=1, dt_force_pred=None, ndt_force_pred=None):
         if dt is None:
@@ -228,24 +238,8 @@ class RobotSimulator:
         
         if(not use_exponential_integrator):            
             if(dt_force_pred is not None):
-    #            for i in range(ndt_force_pred):
-    #                f_pred[:,i] = self.f
-                
                 # predict forces using Exponential integrator
-                K_p0 = self.K@self.p0
-                dv_bar = np.linalg.solve(M, self.S.T@u - h + self.Jc.T@K_p0)
-                i = 0
-                for c in self.contacts:
-                    self.p[i:i+3] = c.p
-                    self.dp[i:i+3] = c.v
-                    self.dJv[i:i+3] = c.dJv
-                    i += 3
-                x0 = np.concatenate((self.p, self.dp))
-                JMinv = np.linalg.solve(M, self.Jc.T).T
-                self.Upsilon = self.Jc @ JMinv.T
-                self.a[self.nk:] = JMinv@(self.S.T@u-h) + self.dJv + self.Upsilon@K_p0
-                self.A[self.nk:, :self.nk] = -self.Upsilon@self.K
-                self.A[self.nk:, self.nk:] = -self.Upsilon@self.B
+                K_p0, x0, dv_bar, JMinv = self.compute_exponential_LDS(u)
                 
                 # predict intermediate forces using linear dynamical system (i.e. matrix exponential)
                 dt_fp = dt_force_pred/ndt_force_pred
@@ -260,55 +254,19 @@ class RobotSimulator:
             self.q = se3.integrate(self.model, self.q, v_mean*dt)
             
         else:
-            K_p0 = self.K@self.p0
-            dv_bar = np.linalg.solve(M, self.S.T@u - h + self.Jc.T@K_p0)
-            i = 0
-            for c in self.contacts:
-                # it shouldn't be necessary to compute forces here
-                self.p[i:i+3] = c.p
-                self.dp[i:i+3] = c.v
-                self.dJv[i:i+3] = c.dJv
-                i += 3
-            x0 = np.concatenate((self.p, self.dp))
-            JMinv = np.linalg.solve(M, self.Jc.T).T
-            self.Upsilon = self.Jc @ JMinv.T
-            b = JMinv@(self.S.T@u-h) + self.dJv + self.Upsilon@K_p0
-            self.A[self.nk:, :self.nk] = -self.Upsilon@self.K
-            self.A[self.nk:, self.nk:] = -self.Upsilon@self.B
-            
+            K_p0, x0, dv_bar, JMinv = self.compute_exponential_LDS(u)
             
             # Sanity check on contact point Jacobian and dJv
-            dv = np.linalg.solve(M, self.S.T@u - h + self.Jc.T@self.f)
-            dv *= 0     # set joint acc to zero to compute dJv
-            self.debug_dp = self.Jc @ self.v
-            self.debug_dJv = self.dJv
-            eps = 1e-8
-            q_next = se3.integrate(self.model, self.q, (self.v+0.5*eps*dv)*eps)
-            v_next = self.v + eps*dv
-            se3.forwardKinematics(self.model, self.data, q_next, v_next, np.zeros(self.model.nv))
-            se3.computeJointJacobians(self.model, self.data)
-            se3.updateFramePlacements(self.model, self.data)
-            i = 0
-            p_next = np.zeros_like(self.p)
-            dp_next = np.zeros_like(self.dp)
-            for c in self.contacts:
-                c.compute_force()
-                p_next[i:i+3] = c.p
-                dp_next[i:i+3] = c.v
-                i += 3
-            self.debug_dp_fd  = (p_next-self.p)/eps
-            self.debug_dJv_fd = (dp_next-self.dp)/eps
-            
+            self.compute_dJv_finite_difference()
             # USE THE VALUE COMPUTED WITH FINITE DIFFERENCING FOR NOW
-            self.dJv = np.copy(self.debug_dJv_fd)
-            b = JMinv@(self.S.T@u-h) + self.dJv + self.Upsilon@K_p0
+#            self.dJv = np.copy(self.debug_dJv_fd)
+#            self.a[self.nk:] = JMinv@(self.S.T@u-h) + self.dJv + self.Upsilon@K_p0
 
 #            if(use_sparse_solver):
 #                D_x, D_int_x, D_int2_x = self.solve_sparse_exp(x0, b, dt)
 #                # Code about matrix expoitation was here
 #
 #            else:
-            self.a[self.nk:] = b
 
             # I know, file is opened and closed at each iteration, but this is Python who cares
             if (self.logFileName is not None):
@@ -337,11 +295,9 @@ class RobotSimulator:
                 # predict intermediate forces using linear dynamical system (i.e. matrix exponential)
                 n = self.A.shape[0]
                 C = np.zeros((n+1, n+1))
-                C[0:n,     0:n] = self.A
+                C[0:n,   0:n] = self.A
                 C[0:n,     n] = self.a
-                z = np.zeros(n+1)
-                z[:n] = x0
-                z[-1] = 1.0
+                z = np.concatenate((x0, [1.0]))
                 e_TC = expm(dt_force_pred/ndt_force_pred*C)
                 for i in range(ndt_force_pred):
                     f_pred[:, i] = K_p0 + self.D @ z[:n]
@@ -483,6 +439,26 @@ class RobotSimulator:
             if self.display_counter == 0:
                 self.robot_display.display(q)
                 self.display_counter = self.DISPLAY_N
+                
+    
+    def compute_dJv_finite_difference(self):
+        # Sanity check on contact point Jacobian and dJv
+        self.debug_dp = self.Jc @ self.v
+        self.debug_dJv = self.dJv
+        eps = 1e-8
+        q_next = se3.integrate(self.model, self.q, (self.v)*eps)
+        v_next = self.v
+        se3.forwardKinematics(self.model, self.data, q_next, v_next, np.zeros(self.model.nv))
+        se3.computeJointJacobians(self.model, self.data)
+        se3.updateFramePlacements(self.model, self.data)
+        p_next = np.zeros_like(self.p)
+        dp_next = np.zeros_like(self.dp)
+        for (i,c) in enumerate(self.contacts):
+            c.compute_force()
+            p_next[ 3*i:3*i+3] = c.p
+            dp_next[3*i:3*i+3] = c.v
+        self.debug_dp_fd  = (p_next-self.p)/eps
+        self.debug_dJv_fd = (dp_next-self.dp)/eps
 
 '''
 def solve_dense_expo_system(self, U, K, B, a, x0, dt):
