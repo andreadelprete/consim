@@ -52,12 +52,12 @@ SIMU_PARAMS += [{
 #    'ndt': 200,
 #    'sparse': 0
 #}]
-SIMU_PARAMS += [{
-    'name': 'euler50',
-    'use_exp_int': 0,
-    'ndt': 50,
-    'sparse': 0
-}]
+#SIMU_PARAMS += [{
+#    'name': 'euler50',
+#    'use_exp_int': 0,
+#    'ndt': 50,
+#    'sparse': 0
+#}]
 #SIMU_PARAMS += [{
 #    'name': 'euler200',
 #    'use_exp_int': 0,
@@ -127,6 +127,7 @@ def run_simulation(q, v, simu_params):
     q = np.zeros((nq, N_SIMULATION+1))*np.nan
     v = np.zeros((nv, N_SIMULATION+1))*np.nan
     f = np.zeros((3*len(conf.contact_frames), N_SIMULATION+1))
+    f_pred_int = np.zeros((3*len(conf.contact_frames), N_SIMULATION+1))
     f_inner = np.zeros((3*len(conf.contact_frames), N_SIMULATION*ndt))
     f_pred = np.zeros((3*len(conf.contact_frames), N_SIMULATION*ndt))
     dp = np.zeros((simu.nk, N_SIMULATION+1))
@@ -164,8 +165,9 @@ def run_simulation(q, v, simu_params):
                                   simu_params['sparse'])
         if(i+1 < N_SIMULATION):
             f[:, i+1] = f_i
+        f_pred_int[:,i+1] = simu.f_pred_int        
         f_inner[:, i*ndt:(i+1)*ndt] = simu.f_inner
-        f_pred[:, i*ndt:(i+1)*ndt] = simu.f_pred
+        f_pred[:, i*ndt:(i+1)*ndt] = simu.f_pred        
         dv = simu.dv
 
         com_pos[:, i] = invdyn.robot.com(invdyn.formulation.data())
@@ -205,6 +207,7 @@ def run_simulation(q, v, simu_params):
     results.f = f
     results.f_inner = f_inner
     results.f_pred = f_pred
+    results.f_pred_int = f_pred_int
     results.dp = dp
     results.dp_fd = dp_fd
     results.dJv = dJv
@@ -259,6 +262,7 @@ for (name,d) in data.items():
    tt_log = np.arange(d.f_pred.shape[1]) * T / d.f_pred.shape[1]
    for i in range(4):
        ax[i].plot(tt, d.f[2+3*i,:], ' o', markersize=8, label=name+' '+str(i))
+       ax[i].plot(tt, d.f_pred_int[2+3*i,:], ' s', markersize=8, label=name+' pred int'+str(i))
        ax[i].plot(tt_log, d.f_pred[2+3*i,:], 'r v', markersize=6, label=name+' pred '+str(i))
        ax[i].plot(tt_log, d.f_inner[2+3*i,:], 'b x', markersize=6, label=name+' real '+str(i))
        ax[i].set_xlabel('Time [s]')

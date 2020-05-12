@@ -297,6 +297,7 @@ class RobotSimulator:
             f_pred = np.empty((self.nk,ndt_force_pred))*nan
         else:
             f_pred = None
+        f_pred_int = None
         
         if(not use_exponential_integrator):            
             if(dt_force_pred is not None):
@@ -418,6 +419,22 @@ class RobotSimulator:
                     for i in range(ndt_force_pred):
                         f_pred[:, i] = K_p0 + self.D @ z[:n]
                         z = e_TC @ z
+                        
+                    # predict also what forces we would get by integrating with the force prediction
+                    int_x = compute_integral_x_T(self.A, self.a, x0, dt_force_pred, invertible_A=False)
+                    int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt_force_pred, invertible_A=False)
+                    D_int_x = self.D @ int_x
+                    D_int2_x = self.D @ int2_x
+                    v_mean_pred = self.v + 0.5*dt_force_pred*dv_bar + JMinv.T@D_int2_x/dt_force_pred
+                    dv_mean_pred = dv_bar + JMinv.T@D_int_x/dt_force_pred
+                    v_pred = self.v + dt_force_pred*dv_mean_pred
+                    q_pred = se3.integrate(self.model, self.q, v_mean_pred*dt_force_pred)
+                    
+                    se3.forwardKinematics(self.model, self.data, q_pred, v_pred)
+                    se3.updateFramePlacements(self.model, self.data)
+                    f_pred_int = np.zeros(self.nk)
+                    for (i,c) in enumerate(self.contacts):
+                        f_pred_int[3*i:3*i+3] = c.compute_force()
                     
                 # DEBUG: predict forces integrating contact point dynamics while updating robot dynamics M and h
 #                t = dt_force_pred/ndt_force_pred
@@ -498,7 +515,7 @@ class RobotSimulator:
         # compute forces at the end so that user has access to updated forces
         self.compute_forces()
         self.t += dt
-        return self.q, self.v, f_pred
+        return self.q, self.v, f_pred, f_pred_int
 
     def reset(self):
         self.first_iter = True
@@ -524,10 +541,11 @@ class RobotSimulator:
         
         for i in range(ndt):
             if(i==0):
-                self.q, self.v, self.f_pred = self.step(u, dt/ndt, use_exponential_integrator, use_sparse_solver, dt, ndt)
+                self.q, self.v, self.f_pred, self.f_pred_int = self.step(u, dt/ndt, 
+                                                    use_exponential_integrator, use_sparse_solver, dt, ndt)
                 self.f_inner[:,0] = self.f_pred[:,0]
             else:
-                self.q, self.v, f_pred = self.step(u, dt/ndt, use_exponential_integrator, use_sparse_solver)
+                self.q, self.v, tmp1, tmp2 = self.step(u, dt/ndt, use_exponential_integrator, use_sparse_solver)
                 self.f_inner[:,i] = np.copy(self.f)
 
         self.display(self.q)
