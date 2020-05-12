@@ -4,7 +4,7 @@ from pinocchio.utils import zero
 import numpy as np
 from numpy import nan
 from scipy.linalg import expm
-# from numpy.linalg import norm as norm
+from numpy.linalg import norm
 import os
 import gepetto.corbaserver
 import time
@@ -67,10 +67,12 @@ class Contact:
 
     def getJacobianWorldFrame(self):
         #        se3.framesForwardKinematics(self.model,self.data,q)
-        M = self.data.oMf[self.frame_id]
-        R = se3.SE3(M.rotation, 0*M.translation)
-        J_local = se3.getFrameJacobian(self.model, self.data, self.frame_id, se3.ReferenceFrame.LOCAL)
-        self.J = (R.action @ J_local)[:3, :]
+#        M = self.data.oMf[self.frame_id]
+#        R = se3.SE3(M.rotation, 0*M.translation)
+#        J_local = se3.getFrameJacobian(self.model, self.data, self.frame_id, se3.ReferenceFrame.LOCAL)
+#        self.J = (R.action @ J_local)[:3, :]
+        J_local = se3.getFrameJacobian(self.model, self.data, self.frame_id, se3.ReferenceFrame.LOCAL_WORLD_ALIGNED)
+        self.J = J_local[:3, :]
         return self.J
 
 
@@ -162,7 +164,6 @@ class RobotSimulator:
         self.nc = len(self.contacts)
         self.nk = 3*self.nc
         self.f = zero(self.nk)
-        self.f_log = np.zeros((self.nk, self.ndt_force))
         self.Jc = np.zeros((self.nk, self.model.nv))
         self.K = np.zeros((self.nk, self.nk))
         self.B = np.zeros((self.nk, self.nk))
@@ -269,7 +270,7 @@ class RobotSimulator:
 
         return D_x, D_int_x, D_int2_x
 
-    def step(self, u, dt=None, use_exponential_integrator=True, use_sparse_solver=1, ndt_force_pred=1):
+    def step(self, u, dt=None, use_exponential_integrator=True, use_sparse_solver=1, dt_force_pred=None, ndt_force_pred=None):
         if dt is None:
             dt = self.dt
 
@@ -292,32 +293,87 @@ class RobotSimulator:
             i += 3
 
         # array containing the forces predicting during the time step (meaningful only for exponential integrator)
-        f_pred = np.empty((self.nk,ndt_force_pred))*nan
+        if(dt_force_pred is not None):
+            f_pred = np.empty((self.nk,ndt_force_pred))*nan
+        else:
+            f_pred = None
         
-        if(not use_exponential_integrator):
+        if(not use_exponential_integrator):            
+            if(dt_force_pred is not None):
+    #            for i in range(ndt_force_pred):
+    #                f_pred[:,i] = self.f
+                
+                # predict forces using Exponential integrator
+                K_p0 = self.K@self.p0
+                dv_bar = np.linalg.solve(M, self.S.T@u - h + self.Jc.T@K_p0)
+                i = 0
+                for c in self.contacts:
+                    self.p[i:i+3] = c.p
+                    self.dp[i:i+3] = c.v
+                    self.dJv[i:i+3] = c.dJv
+                    i += 3
+                x0 = np.concatenate((self.p, self.dp))
+                JMinv = np.linalg.solve(M, self.Jc.T).T
+                self.Upsilon = self.Jc @ JMinv.T
+                self.a[self.nk:] = JMinv@(self.S.T@u-h) + self.dJv + self.Upsilon@K_p0
+                self.A[self.nk:, :self.nk] = -self.Upsilon@self.K
+                self.A[self.nk:, self.nk:] = -self.Upsilon@self.B
+                
+                # predict intermediate forces using linear dynamical system (i.e. matrix exponential)
+                dt_fp = dt_force_pred/ndt_force_pred
+                f_pred[:, 0] = K_p0 + self.D @ x0
+                for j in range(1, ndt_force_pred):
+                    x_i = compute_x_T(self.A, self.a, np.copy(x0), j*dt_fp)
+                    f_pred[:, j] = K_p0 + self.D @ x_i
+    
             self.dv = np.linalg.solve(M, self.S.T@u - h + self.Jc.T@self.f)  # use last forces
             v_mean = self.v + 0.5*dt*self.dv
             self.v += self.dv*dt
             self.q = se3.integrate(self.model, self.q, v_mean*dt)
-            for i in range(ndt_force_pred):
-                f_pred[:,i] = self.f
+            
         else:
             K_p0 = self.K@self.p0
             dv_bar = np.linalg.solve(M, self.S.T@u - h + self.Jc.T@K_p0)
             i = 0
             for c in self.contacts:
                 # it shouldn't be necessary to compute forces here
-#                self.f[i:i+3] = c.compute_force()
                 self.p[i:i+3] = c.p
                 self.dp[i:i+3] = c.v
                 self.dJv[i:i+3] = c.dJv
                 i += 3
             x0 = np.concatenate((self.p, self.dp))
             JMinv = np.linalg.solve(M, self.Jc.T).T
-            self.Upsilon = self.Jc@JMinv.T
+            self.Upsilon = self.Jc @ JMinv.T
             b = JMinv@(self.S.T@u-h) + self.dJv + self.Upsilon@K_p0
             self.A[self.nk:, :self.nk] = -self.Upsilon@self.K
             self.A[self.nk:, self.nk:] = -self.Upsilon@self.B
+            
+            
+            # Sanity check on contact point Jacobian and dJv
+            dv = np.linalg.solve(M, self.S.T@u - h + self.Jc.T@self.f)
+            dv *= 0     # set joint acc to zero to compute dJv
+            self.debug_dp = self.Jc @ self.v
+            self.debug_dJv = self.dJv
+            eps = 1e-8
+            q_next = se3.integrate(self.model, self.q, (self.v+0.5*eps*dv)*eps)
+            v_next = self.v + eps*dv
+            se3.forwardKinematics(self.model, self.data, q_next, v_next, np.zeros(self.model.nv))
+            se3.computeJointJacobians(self.model, self.data)
+            se3.updateFramePlacements(self.model, self.data)
+            i = 0
+            p_next = np.zeros_like(self.p)
+            dp_next = np.zeros_like(self.dp)
+            for c in self.contacts:
+                c.compute_force()
+                p_next[i:i+3] = c.p
+                dp_next[i:i+3] = c.v
+                i += 3
+            self.debug_dp_fd  = (p_next-self.p)/eps
+            self.debug_dJv_fd = (dp_next-self.dp)/eps
+            
+            # USE THE VALUE COMPUTED WITH FINITE DIFFERENCING FOR NOW
+            self.dJv = np.copy(self.debug_dJv_fd)
+            b = JMinv@(self.S.T@u-h) + self.dJv + self.Upsilon@K_p0
 
             if(use_sparse_solver):
                 D_x, D_int_x, D_int2_x = self.solve_sparse_exp(x0, b, dt)
@@ -345,22 +401,96 @@ class RobotSimulator:
 
                 D_int_x = self.D @ int_x
                 D_int2_x = self.D @ int2_x
+                
+                v_mean = self.v + 0.5*dt*dv_bar + JMinv.T@D_int2_x/dt
+                dv_mean = dv_bar + JMinv.T@D_int_x/dt
 
-                # predict intermediate forces using linear dynamical system (i.e. matrix exponential)
-                n = self.A.shape[0]
-                C = np.zeros((n+1, n+1))
-                C[0:n,     0:n] = self.A
-                C[0:n,     n] = self.a
-                z = np.zeros((n+1, 1))
-                z[:n, 0] = x0
-                z[-1, 0] = 1.0
-                e_TC = expm(dt/ndt_force_pred*C)
-                for i in range(ndt_force_pred):
-                    f_pred[:, i] = K_p0 + self.D @ z[:n, 0]
-                    z = e_TC@z
+                if(dt_force_pred is not None):
+                    # predict intermediate forces using linear dynamical system (i.e. matrix exponential)
+                    n = self.A.shape[0]
+                    C = np.zeros((n+1, n+1))
+                    C[0:n,     0:n] = self.A
+                    C[0:n,     n] = self.a
+                    z = np.zeros(n+1)
+                    z[:n] = x0
+                    z[-1] = 1.0
+                    e_TC = expm(dt_force_pred/ndt_force_pred*C)
+                    for i in range(ndt_force_pred):
+                        f_pred[:, i] = K_p0 + self.D @ z[:n]
+                        z = e_TC @ z
+                    
+                # DEBUG: predict forces integrating contact point dynamics while updating robot dynamics M and h
+#                t = dt_force_pred/ndt_force_pred
+#                f_pred[:, 0] = K_p0 + self.D @ x0
+#                x = np.copy(x0)
+#                q, v = np.copy(self.q), np.copy(self.v)
+#                for i in range(1,ndt_force_pred):
+#                    # integrate robot state
+#                    dv = np.linalg.solve(M, self.S.T@u - h + self.Jc.T@f_pred[:,i-1])
+#                    v_tmp = v + 0.5*dt*dv
+#                    v += dv*dt
+#                    q = se3.integrate(self.model, q, v_tmp*dt)
+#                    # update kinematics
+#                    se3.forwardKinematics(self.model, self.data, q, v, np.zeros(self.model.nv))
+#                    se3.computeJointJacobians(self.model, self.data)
+#                    se3.updateFramePlacements(self.model, self.data)
+#                    ii = 0
+#                    for c in self.contacts:
+#                        J = c.getJacobianWorldFrame()
+#                        self.Jc[ii:ii+3, :] = J
+#                        self.p[i:i+3] = c.p
+#                        self.dp[i:i+3] = c.v
+#                        self.dJv[i:i+3] = c.dJv
+#                        ii += 3
+#                    x0 = np.concatenate((self.p, self.dp))
+#                    # update M and h
+#                    se3.crba(self.model, self.data, q)
+#                    se3.nonLinearEffects(self.model, self.data, q, v)
+#                    M = self.data.M
+#                    h = self.data.nle
+#                    # recompute A and a
+#                    JMinv = np.linalg.solve(M, self.Jc.T).T
+#                    self.Upsilon = self.Jc@JMinv.T
+#                    self.a[self.nk:] = JMinv@(self.S.T@u - h) + self.dJv + self.Upsilon@K_p0
+#                    self.A[self.nk:, :self.nk] = -self.Upsilon@self.K
+#                    self.A[self.nk:, self.nk:] = -self.Upsilon@self.B
+#                    # integrate LDS
+#                    dx = self.A @ x + self.a
+#                    x += t * dx
+#                    f_pred[:, i] = f_pred[:,i-1] + t*self.D @ dx
+                    
+                # DEBUG: predict forces integrating contact point dynamics with Euler
+#                t = dt_force_pred/ndt_force_pred
+#                f_pred[:, 0] = K_p0 + self.D @ x0
+#                x = np.copy(x0)
+#                for i in range(1,ndt_force_pred):
+#                    dx = self.A @ x + self.a
+#                    x += t * dx
+#                    f_pred[:, i] = f_pred[:,i-1] + t*self.D @ dx
+                    
+                # DEBUG: predict forces assuming constant contact point acceleration (works really bad)
+#                df_debug = self.D @ (self.A @ x0 + self.a)
+#                dv = np.linalg.solve(M, self.S.T@u - h + self.Jc.T@self.f)
+#                ddp = self.Jc @ dv + self.dJv
+#                df = -self.K @ self.dp - self.B @ ddp
+#                if(norm(df - df_debug)>1e-6):
+#                    print("Error:", norm(df - df_debug))
+#                f0 = K_p0 + self.D @ x0
+#                t = 0.0
+#                for i in range(ndt_force_pred):
+#                    f_pred[:, i] = f0 + t*df
+#                    t += dt_force_pred/ndt_force_pred
+                    
+                # DEBUG: predict forces assuming constant contact point velocity (works reasonably well)
+#                df = -self.K @ self.dp
+#                f0 = K_p0 + self.D @ x0
+#                t = 0.0
+#                for i in range(ndt_force_pred):
+#                    f_pred[:, i] = f0 + t*df
+#                    t += dt_force_pred/ndt_force_pred
 
-            v_mean = self.v + 0.5*dt*dv_bar + JMinv.T@D_int2_x/dt
-            dv_mean = dv_bar + JMinv.T@D_int_x/dt
+#            v_mean = self.v + 0.5*dt*dv_bar + JMinv.T@D_int2_x/dt
+#            dv_mean = dv_bar + JMinv.T@D_int_x/dt
             self.v += dt*dv_mean
             self.q = se3.integrate(self.model, self.q, v_mean*dt)
             self.dv = dv_mean
@@ -377,15 +507,28 @@ class RobotSimulator:
         ''' Perform ndt steps, each lasting dt/ndt seconds '''
         #        time_start = time.time()
         
+        # APPROACH 1
         # I have to compute ndt inner simulation steps
         # I have to log force values for ndt_force time steps, with ndt_force>=ndt
         # this means that for each simulation step I have to compute ndt_force/ndt forces
         # to simplify things I will assume that ndt_force/ndt is an integer
-        n_f_pred = int(self.ndt_force/ndt)
+#        n_f_pred = int(self.ndt_force/ndt)
+        
+        # APPROACH 2:
+        # Predict all forces during first inner simulation step
+        
+        # forces computed in the inner simulation steps (ndt)
+        self.f_inner = np.zeros((self.nk, ndt))
+        # forces predicted at the first of the inner simulation steps
+#        self.f_pred = np.zeros((self.nk, self.ndt_force))
         
         for i in range(ndt):
-            self.q, self.v, f_pred = self.step(u, dt/ndt, use_exponential_integrator, use_sparse_solver, n_f_pred)
-            self.f_log[:,i*n_f_pred:(i+1)*n_f_pred] = f_pred
+            if(i==0):
+                self.q, self.v, self.f_pred = self.step(u, dt/ndt, use_exponential_integrator, use_sparse_solver, dt, ndt)
+                self.f_inner[:,0] = self.f_pred[:,0]
+            else:
+                self.q, self.v, f_pred = self.step(u, dt/ndt, use_exponential_integrator, use_sparse_solver)
+                self.f_inner[:,i] = np.copy(self.f)
 
         self.display(self.q)
 
