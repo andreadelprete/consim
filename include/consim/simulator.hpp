@@ -13,6 +13,7 @@
 #include "consim/object.hpp"
 #include "consim/contact.hpp"
 #include "eiquadprog/eiquadprog-fast.hpp"
+#include <Eigen/Cholesky>
 
 #define CONSIM_PROFILER
 #ifndef CONSIM_PROFILER
@@ -125,6 +126,9 @@ namespace consim {
 
     protected:
       void computeContactForces() override;
+      Eigen::LLT<MatrixXd> lltM_;
+      Eigen::MatrixXd inverseM_; 
+      Eigen::VectorXd mDv_; 
 
   }; // class EulerSimulator
 
@@ -228,12 +232,13 @@ namespace consim {
       Eigen::MatrixXd D_intExpA_integrator; 
 
       void computePredictedForces();
-      Eigen::MatrixXd C; 
-      Eigen::VectorXd z; 
-      Eigen::VectorXd nextZ; 
-      Eigen::MatrixXd expDtC;
-      Eigen::VectorXd predictedForce_;  
-      expokit::MatrixExponential<double, Dynamic> utilD; // Dynamic
+      // Eigen::MatrixXd C; 
+      // Eigen::VectorXd z; 
+      // Eigen::VectorXd nextZ; 
+      // Eigen::MatrixXd expDtC;
+      // Eigen::VectorXd predictedForce_;  
+      // expokit::MatrixExponential<double, Dynamic> utilD; // Dynamic
+      Eigen::VectorXd fkDv_; // filled with zeros for second order kinematics  
   }; // class ExponentialSimulator
 
 } // namespace consim 

@@ -140,7 +140,11 @@ void AbstractSimulator::setJointFriction(const Eigen::VectorXd& joint_friction)
 */
 
 EulerSimulator::EulerSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps):
-AbstractSimulator(model, data, dt, n_integration_steps) {}
+AbstractSimulator(model, data, dt, n_integration_steps) 
+{
+  inverseM_.resize(model.nv, model.nv); inverseM_.setZero();
+  mDv_.resize(model.nv); mDv_.setZero();
+}
 
 
 void EulerSimulator::computeContactForces() 
@@ -182,13 +186,21 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
         tau_ -= joint_friction_.cwiseProduct(v_);
       }
       // Compute the acceloration ddq.
-      CONSIM_START_PROFILER("pinocchio::aba");
-      pinocchio::aba(*model_, *data_, q_, v_, tau_);
-      CONSIM_STOP_PROFILER("pinocchio::aba");
-      vMean_ = v_ + .5 * sub_dt * data_->ddq;
+      // CONSIM_START_PROFILER("pinocchio::aba");
+      inverseM_ = pinocchio::computeMinverse(*model_, *data_, q_); //data_->M.inverse();
+      // lltM_.compute(data_->M);
+      mDv_ = tau_ - data_->nle; 
+      // dv_ = lltM_.solve(mDv_);
+      dv_ = inverseM_*mDv_; 
+      vMean_ = v_ + .5 * sub_dt*dv_;
+
+      // pinocchio::aba(*model_, *data_, q_, v_, tau_);
+      // CONSIM_STOP_PROFILER("pinocchio::aba");
+      // vMean_ = v_ + .5 * sub_dt * data_->ddq;
       pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
       q_ = qnext_;
-      v_ += data_->ddq * sub_dt;
+      // v_ += data_->ddq * sub_dt;
+      v_ += dv_ * sub_dt;
       
       tau_.fill(0);
       // \brief adds contact forces to tau_
@@ -212,6 +224,7 @@ ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocc
   dv_bar.resize(model_->nv); dv_bar.setZero();
   temp01_.resize(model_->nv); temp01_.setZero();
   temp02_.resize(model_->nv); temp02_.setZero();
+  fkDv_.resize(model_->nv); fkDv_.setZero();
 }
 
 
@@ -230,10 +243,10 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     if (joint_friction_flag_){
       tau_ -= joint_friction_.cwiseProduct(v_);
     } 
-
   
     if (nactive_> 0){
       Eigen::internal::set_is_malloc_allowed(false);
+      computeIntegrationTerms();
       CONSIM_START_PROFILER("exponential_simulator::computeIntegralXt");
       utilDense_.ComputeIntegralXt(A, a_, x0_, sub_dt, intxt_);
       CONSIM_STOP_PROFILER("exponential_simulator::computeIntegralXt");
@@ -322,9 +335,9 @@ void ExponentialSimulator::computeIntegrationTerms(){
   x0_.head(3*nactive_) = p_; 
   x0_.tail(3*nactive_) = dp_; 
   // \brief compute the predicted contact forces at end of the step before recomputing contacts  
-  CONSIM_START_PROFILER("exponential_simulator::predictedForces");  
-  computePredictedForces(); 
-  CONSIM_STOP_PROFILER("exponential_simulator::predictedForces"); 
+  // CONSIM_START_PROFILER("exponential_simulator::predictedForces");  
+  // computePredictedForces(); 
+  // CONSIM_STOP_PROFILER("exponential_simulator::predictedForces"); 
 }
 
 
@@ -340,10 +353,10 @@ void ExponentialSimulator::computeIntegrationTerms(){
   data_->M.fill(0);
   
   CONSIM_START_PROFILER("pinocchio::computeAllTerms");
-  pinocchio::forwardKinematics(*model_, *data_, q_, v_, dv_);
+  pinocchio::forwardKinematics(*model_, *data_, q_, v_, fkDv_);
   pinocchio::computeJointJacobians(*model_, *data_);
   pinocchio::updateFramePlacements(*model_, *data_);
-  pinocchio::computeJointJacobiansTimeVariation(*model_, *data_, q_, v_);
+  // pinocchio::computeJointJacobiansTimeVariation(*model_, *data_, q_, v_);
   CONSIM_STOP_PROFILER("pinocchio::computeAllTerms");
   detectContacts();
 
@@ -364,7 +377,6 @@ void ExponentialSimulator::computeIntegrationTerms(){
       i_active_ += 1;  
     }
   }
-  computeIntegrationTerms();
 } // ExponentialSimulator::computeContactForces
 
 
@@ -463,27 +475,27 @@ void ExponentialSimulator::computePredictedForces(){
   doesn't have to be updated at each sub_step, only at the end of the integration step 
   contact location of Inactive Contacts caonnot be predicted here, only through forward kinematics 
   */ 
-  z(6*nactive_) = 1;
-  z.head(6*nactive_) = x0_;  
-  C.setZero();
-  C.topLeftCorner(6 * nactive_, 6 * nactive_) = sub_dt*A; 
-  C.block(0, 6*nactive_, 6*nactive_,1) = sub_dt* a_;
-  utilD.compute(C,expDtC); 
-  nextZ = expDtC * z; 
-  predictedForce_ = kp0_ + D * nextZ.head(6*nactive_); 
+  // z(6*nactive_) = 1;
+  // z.head(6*nactive_) = x0_;  
+  // C.setZero();
+  // C.topLeftCorner(6 * nactive_, 6 * nactive_) = sub_dt*A; 
+  // C.block(0, 6*nactive_, 6*nactive_,1) = sub_dt* a_;
+  // utilD.compute(C,expDtC); 
+  // nextZ = expDtC * z; 
+  // predictedForce_ = kp0_ + D * nextZ.head(6*nactive_); 
   
-  // 
-  i_active_ = 0; 
-  for(unsigned int i=0; i<nc_; i++){
-    if (!contacts_[i]->active) {
-      contacts_[i]->predictedF_.fill(0);
-      contacts_[i]->predictedX_ = data_->oMf[contacts_[i]->frame_id].translation(); 
-      continue;
-    }
-    contacts_[i]->predictedF_ = predictedForce_.segment(3*i_active_,3);
-    contacts_[i]->predictedX_ = nextZ.segment(3*i_active_,3);
-    i_active_ += 1; 
-  }
+  // // 
+  // i_active_ = 0; 
+  // for(unsigned int i=0; i<nc_; i++){
+  //   if (!contacts_[i]->active) {
+  //     contacts_[i]->predictedF_.fill(0);
+  //     contacts_[i]->predictedX_ = data_->oMf[contacts_[i]->frame_id].translation(); 
+  //     continue;
+  //   }
+  //   contacts_[i]->predictedF_ = predictedForce_.segment(3*i_active_,3);
+  //   contacts_[i]->predictedX_ = nextZ.segment(3*i_active_,3);
+  //   i_active_ += 1; 
+  // }
 }
 
 
@@ -524,12 +536,12 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
     temp04_.resize(3*nactive_); temp04_.setZero();
 
     // predictedF_ resizing 
-    C.resize(1+6*nactive_,1+6*nactive_); C.setZero(); 
-    expDtC.resize(1+6*nactive_,1+6*nactive_); expDtC.setZero(); 
-    z.resize(1+6*nactive_); z.setZero(); 
-    nextZ.resize(1+6*nactive_); nextZ.setZero(); 
-    predictedForce_.resize(3*nactive_); predictedForce_.setZero();
-    utilD.resize(1+6*nactive_);
+    // C.resize(1+6*nactive_,1+6*nactive_); C.setZero(); 
+    // expDtC.resize(1+6*nactive_,1+6*nactive_); expDtC.setZero(); 
+    // z.resize(1+6*nactive_); z.setZero(); 
+    // nextZ.resize(1+6*nactive_); nextZ.setZero(); 
+    // predictedForce_.resize(3*nactive_); predictedForce_.setZero();
+    // utilD.resize(1+6*nactive_);
 
 
 
@@ -581,7 +593,7 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
     D.block(0,0, 3*nactive_, 3*nactive_).noalias() = -K;
     D.block(0,3*nactive_, 3*nactive_, 3*nactive_).noalias() = -B; 
 
-    std::cout<<"resize vectors and matrices"<<std::endl;
+    // std::cout<<"resize vectors and matrices"<<std::endl;
     
   } // nactive_ > 0
   

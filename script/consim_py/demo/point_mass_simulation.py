@@ -35,18 +35,18 @@ if __name__=="__main__":
     # simu_params += [{'name': 'exponential 100',
     #                 'type': 'exponential', 
     #                 'ndt': 100}]
-    simu_params += [{'name': 'exponential 10',
+    simu_params += [{'name': 'exponential 500',
                     'type': 'exponential', 
-                    'ndt': 10}]
+                    'ndt': 500}]
     # simu_params += [{'name': 'exponential 1',
     #                 'type': 'exponential', 
     #                 'ndt': 1}]
-    simu_params += [{'name': 'euler 100',
+    simu_params += [{'name': 'euler 500',
                     'type': 'euler', 
-                    'ndt': 100}]
-    simu_params += [{'name': 'euler 10',
-                    'type': 'euler', 
-                    'ndt': 10}]
+                    'ndt': 500}]
+    # simu_params += [{'name': 'euler 10',
+    #                 'type': 'euler', 
+    #                 'ndt': 10}]
 #    simu_params += [{'name': 'euler 1',
 #                    'type': 'euler', 
 #                    'ndt': 1}]

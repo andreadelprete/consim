@@ -30,27 +30,31 @@ if __name__=="__main__":
     # simulation parameters 
     simu_params = []
     
-    simu_params += [{'name': 'euler 500',
+    simu_params += [{'name': 'euler 1000',
                     'type': 'euler', 
+                    'ndt': 1000}]
+    # simu_params += [{'name': 'euler 200',
+    #                 'type': 'euler', 
+    #                 'ndt': 200}]
+    # simu_params += [{'name': 'euler 100',
+    #                 'type': 'euler', 
+    #                 'ndt': 100}]
+
+    simu_params += [{'name': 'exponential 500',
+                    'type': 'exponential', 
                     'ndt': 500}]
-    simu_params += [{'name': 'euler 200',
-                    'type': 'euler', 
-                    'ndt': 200}]
-    simu_params += [{'name': 'euler 100',
-                    'type': 'euler', 
-                    'ndt': 100}]
 
-    simu_params += [{'name': 'exponential 100',
-                    'type': 'exponential', 
-                    'ndt': 100}]
+    # simu_params += [{'name': 'exponential 100',
+    #                 'type': 'exponential', 
+    #                 'ndt': 100}]
         
-    simu_params += [{'name': 'euler 10',
-                    'type': 'euler', 
-                    'ndt': 10}]
+    # simu_params += [{'name': 'euler 10',
+    #                 'type': 'euler', 
+    #                 'ndt': 10}]
 
-    simu_params += [{'name': 'exponential 10',
-                    'type': 'exponential', 
-                    'ndt': 10}]
+    # simu_params += [{'name': 'exponential 10',
+    #                 'type': 'exponential', 
+    #                 'ndt': 10}]
 
     # simu_params += [{'name': 'exponential 1',
     #                 'type': 'exponential', 

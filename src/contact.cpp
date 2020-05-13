@@ -35,12 +35,12 @@ void ContactPoint::firstOrderContactKinematics(pinocchio::Data &data){
 
 
 void ContactPoint::secondOrderContactKinematics(pinocchio::Data &data, Eigen::VectorXd &v){
-  pinocchio::getFrameJacobianTimeVariation(*model_, data, frame_id, pinocchio::LOCAL, dJdt_);
-  // dJvlocal_ = pinocchio::getFrameAcceleration(*model_, data, frame_id); 
+  // pinocchio::getFrameJacobianTimeVariation(*model_, data, frame_id, pinocchio::LOCAL, dJdt_);
+  dJvlocal_ = pinocchio::getFrameAcceleration(*model_, data, frame_id); 
   // // std::cout<<"dJv acceleration component "<< dJvlocal_.linear() << std::endl;
-  // dJvlocal_.linear() += vlocal_.angular().cross(vlocal_.linear());
-  dJvlocal_.linear() = dJdt_.topRows<3>() * v; 
-  dJvlocal_.angular() = dJdt_.bottomRows<3>() * v; 
+  dJvlocal_.linear() += vlocal_.angular().cross(vlocal_.linear());
+  // dJvlocal_.linear() = dJdt_.topRows<3>() * v; 
+  // dJvlocal_.angular() = dJdt_.bottomRows<3>() * v; 
   dJv_ = frameSE3_.act(dJvlocal_).linear();
 
 }
