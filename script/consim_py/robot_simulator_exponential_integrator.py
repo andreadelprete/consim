@@ -102,7 +102,7 @@ class RobotSimulator:
         self.display_counter = self.DISPLAY_N
         self.init(conf.q0, None, True)
         #        self.init(self.robot.model.neutralConfiguration, None, True)
-
+        
         # for gepetto viewer
         if(conf.use_viewer):
             # se3.RobotWrapper.BuildFromURDF(conf.urdf, [conf.path, ], se3.JointModelFreeFlyer())
@@ -170,6 +170,12 @@ class RobotSimulator:
             self.p0[i:i+3] = c.p0
             i += 3
         self.D = np.hstack((-self.K, -self.B))
+        
+        self.debug_dp = zero(self.nk)
+        self.debug_dJv = zero(self.nk)
+        self.debug_dp_fd  = zero(self.nk)
+        self.debug_dJv_fd = zero(self.nk)
+
 
 
     def compute_forces(self, compute_data=True):
@@ -207,6 +213,7 @@ class RobotSimulator:
         self.A[self.nk:, self.nk:] = -self.Upsilon@self.B
         return K_p0, x0, dv_bar, JMinv
 
+
     def step(self, u, dt=None, use_exponential_integrator=True, use_sparse_solver=1, dt_force_pred=None, ndt_force_pred=None):
         if dt is None:
             dt = self.dt
@@ -237,16 +244,16 @@ class RobotSimulator:
         f_pred_int = None
         
         if(not use_exponential_integrator):            
-            if(dt_force_pred is not None):
+#            if(dt_force_pred is not None):
                 # predict forces using Exponential integrator
-                K_p0, x0, dv_bar, JMinv = self.compute_exponential_LDS(u)
-                
-                # predict intermediate forces using linear dynamical system (i.e. matrix exponential)
-                dt_fp = dt_force_pred/ndt_force_pred
-                f_pred[:, 0] = K_p0 + self.D @ x0
-                for j in range(1, ndt_force_pred):
-                    x_i = compute_x_T(self.A, self.a, np.copy(x0), j*dt_fp)
-                    f_pred[:, j] = K_p0 + self.D @ x_i
+#                K_p0, x0, dv_bar, JMinv = self.compute_exponential_LDS(u)
+#                
+#                # predict intermediate forces using linear dynamical system (i.e. matrix exponential)
+#                dt_fp = dt_force_pred/ndt_force_pred
+#                f_pred[:, 0] = K_p0 + self.D @ x0
+#                for j in range(1, ndt_force_pred):
+#                    x_i = compute_x_T(self.A, self.a, np.copy(x0), j*dt_fp)
+#                    f_pred[:, j] = K_p0 + self.D @ x_i
     
             self.dv = np.linalg.solve(M, self.S.T@u - h + self.Jc.T@self.f)  # use last forces
             v_mean = self.v + 0.5*dt*self.dv
@@ -257,7 +264,7 @@ class RobotSimulator:
             K_p0, x0, dv_bar, JMinv = self.compute_exponential_LDS(u)
             
             # Sanity check on contact point Jacobian and dJv
-            self.compute_dJv_finite_difference()
+#            self.compute_dJv_finite_difference()
             # USE THE VALUE COMPUTED WITH FINITE DIFFERENCING FOR NOW
 #            self.dJv = np.copy(self.debug_dJv_fd)
 #            self.a[self.nk:] = JMinv@(self.S.T@u-h) + self.dJv + self.Upsilon@K_p0
@@ -281,8 +288,8 @@ class RobotSimulator:
             if(self.assume_A_invertible):
                 int_x, int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt, compute_also_integral=True, invertible_A=True)
             else:
-                int_x = compute_integral_x_T(self.A, self.a, x0, dt, invertible_A=False)
-                int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt, invertible_A=False)
+                int_x = compute_integral_x_T(self.A, self.a, x0, dt)
+                int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt)
                 # x, int_x, int2_x = compute_x_T_and_two_integrals(self.A, self.a, x0, dt)
 
             D_int_x = self.D @ int_x
@@ -304,8 +311,8 @@ class RobotSimulator:
                     z = e_TC @ z
                     
                 # predict also what forces we would get by integrating with the force prediction
-                int_x = compute_integral_x_T(self.A, self.a, x0, dt_force_pred, invertible_A=False)
-                int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt_force_pred, invertible_A=False)
+                int_x = compute_integral_x_T(self.A, self.a, x0, dt_force_pred)
+                int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt_force_pred)
                 D_int_x = self.D @ int_x
                 D_int2_x = self.D @ int2_x
                 v_mean_pred = self.v + 0.5*dt_force_pred*dv_bar + JMinv.T@D_int2_x/dt_force_pred
@@ -401,7 +408,7 @@ class RobotSimulator:
     def reset(self):
         self.first_iter = True
 
-    def simulate(self, u, dt=0.001, ndt=1, use_exponential_integrator=True, use_sparse_solver=True):
+    def simulate(self, u, dt=0.001, ndt=1, use_exponential_integrator=True, use_sparse_solver=False):
         ''' Perform ndt steps, each lasting dt/ndt seconds '''
         #        time_start = time.time()
         
