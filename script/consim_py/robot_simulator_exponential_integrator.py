@@ -68,7 +68,6 @@ class Contact:
 class RobotSimulator:
     PRINT_N = 500                   # print every PRINT_N time steps
     # update robot configuration in viwewer every DISPLAY_N time steps
-    DISPLAY_N = 10
 
     # Class constructor
     def __init__(self, conf, robot, root_joint=None, logFileName=None):
@@ -101,7 +100,8 @@ class RobotSimulator:
         # Matrix S used as filter of vetor of inputs U
         self.S = np.hstack((np.zeros((na, nv-na)), np.eye(na, na)))
         self.contacts = []
-        self.display_counter = self.DISPLAY_N
+        self.DISPLAY_T = conf.DISPLAY_T
+        self.display_counter = conf.DISPLAY_T
         self.init(conf.q0, None, True)
         #        self.init(self.robot.model.neutralConfiguration, None, True)
         
@@ -281,8 +281,8 @@ class RobotSimulator:
             if(self.assume_A_invertible):
                 int_x, int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt, compute_also_integral=True, invertible_A=True)
             else:
-                int_x = self.expMatHelper.compute_integral_x_T(self.A, self.a, x0, dt, self.max_mat_mult)
-                int2_x = self.expMatHelper.compute_double_integral_x_T(self.A, self.a, x0, dt, self.max_mat_mult)
+                int_x = self.expMatHelper.compute_integral_x_T(self.A, self.a, x0, dt, self.max_mat_mult, True)
+                int2_x = self.expMatHelper.compute_double_integral_x_T(self.A, self.a, x0, dt, self.max_mat_mult, True)
                 # x, int_x, int2_x = compute_x_T_and_two_integrals(self.A, self.a, x0, dt)
 
             D_int_x = self.D @ int_x
@@ -304,8 +304,8 @@ class RobotSimulator:
                     z = e_TC @ z
                     
                 # predict also what forces we would get by integrating with the force prediction
-                int_x = self.expMatHelper.compute_integral_x_T(self.A, self.a, x0, dt_force_pred, self.max_mat_mult)
-                int2_x = self.expMatHelper.compute_double_integral_x_T(self.A, self.a, x0, dt_force_pred, self.max_mat_mult)
+                int_x = self.expMatHelper.compute_integral_x_T(self.A, self.a, x0, dt_force_pred, self.max_mat_mult, True)
+                int2_x = self.expMatHelper.compute_double_integral_x_T(self.A, self.a, x0, dt_force_pred, self.max_mat_mult, True)
                 D_int_x = self.D @ int_x
                 D_int2_x = self.D @ int2_x
                 v_mean_pred = self.v + 0.5*dt_force_pred*dv_bar + JMinv.T@D_int2_x/dt_force_pred
@@ -429,16 +429,16 @@ class RobotSimulator:
                 self.q, self.v, tmp1, tmp2 = self.step(u, dt/ndt, use_exponential_integrator, use_sparse_solver)
                 self.f_inner[:,i] = np.copy(self.f)
 
-        self.display(self.q)
+            self.display(self.q, dt/ndt)
 
         return self.q, self.v, self.f
         
-    def display(self, q):
+    def display(self, q, dt):
         if(self.conf.use_viewer):
-            self.display_counter -= 1
-            if self.display_counter == 0:
+            self.display_counter -= dt
+            if self.display_counter <= 0:
                 self.robot_display.display(q)
-                self.display_counter = self.DISPLAY_N
+                self.display_counter = self.DISPLAY_T
                 
     
     def compute_dJv_finite_difference(self):

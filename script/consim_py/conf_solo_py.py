@@ -32,15 +32,15 @@ kp_contact = 1.0               # proportional gain of contact constraint
 kp_com = 2.0                   # proportional gain of center of mass task
 kp_posture = 2.0               # proportional gain of joint posture task
 
-PRINT_T = 0.5                   # print every PRINT_T
-DISPLAY_T = 0.01                 # update robot configuration in viwewer every DISPLAY_T
+PRINT_T = 0.2                   # print every PRINT_T
+DISPLAY_T = 0.005                 # update robot configuration in viwewer every DISPLAY_T
 
 # Starting resting joint position
 q0 = np.array([0., 0., 0.223, 0., 0., 0., 1.,
                  -0.8,  1.6, -0.8, 1.6,
                  -0.8,  1.6, -0.8, 1.6])
 
-use_viewer = 0
+use_viewer = 1
 CAMERA_TRANSFORM = [1.0910934209823608, -1.4611519575119019, 0.9074661731719971,
                     0.5040678381919861, 0.17712827026844025, 0.24428671598434448, 0.8092374205589294]
 

@@ -18,12 +18,13 @@ class Empty:
 
 
 print("".center(conf.LINE_WIDTH, '#'))
-print("Test Exponential Integrator with Quadruped Robot ".center(conf.LINE_WIDTH, '#'))
+print("Test Quadruped Robot ".center(conf.LINE_WIDTH, '#'))
 print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be used as ground truth
-i_ground_truth = 10
-i_max = 7
+i_max = 5
+i_ground_truth = i_max+3
+
 GROUND_TRUTH_SIMU_PARAMS = {
     'name': 'euler%3d'%(2**i_max),
     'use_exp_int': 1,
@@ -41,15 +42,15 @@ for i in range(i_max):
         'max_mat_mult': 100
     }]
     
-for i in range(i_max):
-    for j in range(2,7):
-        SIMU_PARAMS += [{
-            'name': 'exp%4d mmm-%d'%(2**i,j),
-            'method_name': 'exp mmm-%d'%j,
-            'use_exp_int': 1,
-            'ndt': 2**i,
-            'max_mat_mult': j
-        }]
+#for i in range(i_max):
+#    for j in range(2,7):
+#        SIMU_PARAMS += [{
+#            'name': 'exp%4d mmm-%d'%(2**i,j),
+#            'method_name': 'exp mmm-%d'%j,
+#            'use_exp_int': 1,
+#            'ndt': 2**i,
+#            'max_mat_mult': j
+#        }]
     
 for i in range(7, i_max):
     SIMU_PARAMS += [{
@@ -62,6 +63,7 @@ for i in range(7, i_max):
 
 PLOT_UPSILON = 0
 PLOT_FORCES = 0
+PLOT_BASE_POS = 1
 PLOT_FORCE_PREDICTIONS = 0
 PLOT_INTEGRATION_ERRORS = 1
 PLOT_MAT_MULT_EXPM = 1
@@ -69,7 +71,7 @@ PLOT_MAT_MULT_EXPM = 1
 ASSUME_A_INVERTIBLE = 0
 USE_CONTROLLER = 1
 dt = 0.01                      # controller time step
-T = 0.1
+T = 1.0
 
 offset = np.array([0.0, -0.0, 0.0])
 amp = np.array([0.0, 0.0, 0.05])
@@ -77,7 +79,6 @@ two_pi_f = 2*np.pi*np.array([0.0, .0, 2.0])
 
 N_SIMULATION = int(T/dt)        # number of time steps simulated
 PRINT_N = int(conf.PRINT_T/dt)
-DISPLAY_N = int(conf.DISPLAY_T/dt)
 
 solo = loadSolo()
 nq, nv = solo.nq, solo.nv
@@ -149,8 +150,7 @@ def run_simulation(q, v, simu_params):
 
         q[:,i+1], v[:,i+1], f_i = simu.simulate(u, dt, ndt,
                                   simu_params['use_exp_int'])
-        if(i+1 < N_SIMULATION):
-            f[:, i+1] = f_i
+        f[:, i+1] = f_i
         f_pred_int[:,i+1] = simu.f_pred_int        
         f_inner[:, i*ndt:(i+1)*ndt] = simu.f_inner
         f_pred[:, i*ndt:(i+1)*ndt] = simu.f_pred        
@@ -303,7 +303,20 @@ if(PLOT_FORCE_PREDICTIONS):
        print(name, 'Force pred err max exp:', np.sum(np.abs(f_pred_err))/(f_pred_err.shape[0]*f_pred_err.shape[1]))
        print(name, 'Force pred err Euler:  ', np.sum(np.abs(f_pred_err_euler))/(f_pred_err.shape[0]*f_pred_err.shape[1]))
 
-
+# PLOT THE JOINT ANGLES OF ALL INTEGRATION METHODS ON THE SAME PLOT
+if(PLOT_BASE_POS):
+    (ff, ax) = plut.create_empty_figure(3)
+    ax = ax.reshape(3)
+    j = 0
+    for (name, d) in data.items():
+        for i in range(3):
+            ax[i].plot(tt, d.q[i, :], line_styles[j], alpha=0.7, label=name+' '+str(i))
+            ax[i].set_xlabel('Time [s]')
+            ax[i].set_ylabel('Base pos [m]')
+        j += 1
+        leg = ax[0].legend()
+        leg.get_frame().set_alpha(0.5)
+        
 #print('')
 #for (name, d) in data.items():
 #    (ff, ax) = plut.create_empty_figure(2,2)
@@ -329,51 +342,6 @@ if(PLOT_FORCE_PREDICTIONS):
 #    leg = ax[0].legend()
 #    leg.get_frame().set_alpha(0.5)
 #    print(name, "max dJv error", np.max(np.abs(d.dJv-d.dJv_fd), axis=1))
-
-#nplots = 1
-#plot_offset = 0
-#(ff, ax) = plut.create_empty_figure(nplots, 1)
-#if(nplots==1):
-#    ax = [ax]
-#else:
-#    ax = ax.reshape(nplots)
-#j = 0
-#for (name, q) in Q.items():
-#    for i in range(nplots):
-#        ax[i].plot(tt, q[plot_offset+i, :], line_styles[j], alpha=0.7, label=name+' '+str(i))
-#        ax[i].set_xlabel('Time [s]')
-#        ax[i].set_ylabel('q [rad]')
-#    j += 1
-#    leg = ax[0].legend()
-#    leg.get_frame().set_alpha(0.5)
-
-# (ff, ax) = plut.create_empty_figure(3,1)
-# for i in range(3):
-#    ax[i].plot(tt, com_pos[i,:], label='CoM '+str(i))
-#    ax[i].plot(tt, com_pos_ref[i,:], 'r:', label='CoM Ref '+str(i))
-#    ax[i].set_xlabel('Time [s]')
-#    ax[i].set_ylabel('CoM [m]')
-#    leg = ax[i].legend()
-#    leg.get_frame().set_alpha(0.5)
-#
-# (f, ax) = plut.create_empty_figure(3,1)
-# for i in range(3):
-#    ax[i].plot(tt, com_vel[i,:], label='CoM Vel '+str(i))
-#    ax[i].plot(tt, com_vel_ref[i,:], 'r:', label='CoM Vel Ref '+str(i))
-#    ax[i].set_xlabel('Time [s]')
-#    ax[i].set_ylabel('CoM Vel [m/s]')
-#    leg = ax[i].legend()
-#    leg.get_frame().set_alpha(0.5)
-#
-# (f, ax) = plut.create_empty_figure(3,1)
-# for i in range(3):
-#    ax[i].plot(tt, com_acc[i,:], label='CoM Acc '+str(i))
-#    ax[i].plot(tt, com_acc_ref[i,:], 'r:', label='CoM Acc Ref '+str(i))
-#    ax[i].plot(tt, com_acc_des[i,:], 'g--', label='CoM Acc Des '+str(i))
-#    ax[i].set_xlabel('Time [s]')
-#    ax[i].set_ylabel('CoM Acc [m/s^2]')
-#    leg = ax[i].legend()
-#    leg.get_frame().set_alpha(0.5)
 
 if(PLOT_UPSILON):
     np.set_printoptions(precision=2, linewidth=200, suppress=True)

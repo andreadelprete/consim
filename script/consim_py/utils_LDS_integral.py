@@ -11,6 +11,7 @@ from scipy.sparse.linalg.matfuncs import _ExpmPadeHelper, _ell, _solve_P_Q
 import numpy as np
 from numpy.linalg import solve
 from numpy.linalg import eigvals
+from scipy.linalg import matrix_balance
 # import matplotlib.pyplot as plt
 
 np.set_printoptions(precision=2, linewidth=200, suppress=True)
@@ -53,9 +54,44 @@ class ExponentialMatrixHelper:
             s = max(int(np.ceil(np.log2(eta_5 / theta_13))), 0)
         s = s + _ell(2**-s * h.A, 13)
         return 6+s
+      
+    def pade1(self, A):
+        ''' 
+            U = A
+            V = 2
+            P = V + U = 2 + A
+            Q = V - U = 2 - A
+        '''
+        V = 2.*np.identity(A.shape[0])
+        U = A
+        return U, V
         
+    def pade2(self, A):
+        ''' 
+            U = 12 + A2
+            V = 6*A
+            P = V + U = 12 + 6*A + A2
+            Q = V - U = 12 - 6*A + A2
+        '''
+        U = 12.*np.identity(A.shape[0]) + A@A
+        V = 6.*A
+        return U, V
         
-    def expm_times_v(self, A, v, max_mat_mult=100):
+    def pade3(self, A):
+        ''' 
+            U = A3 + 60*A
+            V = 12*A2 + 120
+            P = U + V = A3 + 12*A2 + 60*A  + 120
+            Q = V - U = -A3 + 12*A2 - 60*A  + 120
+        '''
+        b = (120., 60., 12., 1.)
+        A2 = A @ A
+        I = np.identity(A.shape[0])
+        U = A @ (b[3]*A2 + b[1]*I)
+        V = b[2]*A2 + b[0]*I
+        return U, V
+        
+    def expm_times_v(self, A, v, max_mat_mult=100, balance=True):
         ''' max_mat_mult can be used to reduce the computational complexity of the exponential 
             6: at most a Pade order 13 can be used but with no scaling
             5: at most a Pade order 9 is used
@@ -63,49 +99,75 @@ class ExponentialMatrixHelper:
             3: at most a Pade order 5 is used
             2: at most a Pade order 3 is used
         '''
+        if(np.any(np.isnan(A))):
+            print("Matrix A contains nan")
+            
         # Compute expm(A)*v
+        if balance:
+            A_bal, D = matrix_balance(A, permute=False)
+            Dinv = np.copy(D)
+            for i in range(D.shape[0]):
+                Dinv[i,i] = 1.0/D[i,i]
+#            assert(np.max(np.abs(A_bal-(Dinv@A@D)))==0.0)
+        else:
+            A_bal = A
+            
         # Hardcode a matrix order threshold for exact vs. estimated one-norms.
         use_exact_onenorm = A.shape[0] < 200
-        h = _ExpmPadeHelper(A, use_exact_onenorm=use_exact_onenorm)
+        h = _ExpmPadeHelper(A_bal, use_exact_onenorm=use_exact_onenorm)
         structure = None
         
         # Compute the number of mat-mat multiplications needed in theory
-        self.mat_mult_in_theory = self.compute_mat_mult(A)
+        self.mat_mult_in_theory = self.compute_mat_mult(A_bal)
         self.mat_mult = min(self.mat_mult_in_theory, max_mat_mult)
         
-        if self.mat_mult <= 2:
-            U, V = h.pade3()
+        if self.mat_mult <= 0:
+            U, V = self.pade1(A_bal)
             X = _solve_P_Q(U, V, structure=structure)
-            return X.dot(v)
+            
+        if self.mat_mult == 1:
+            U, V = self.pade2(A_bal)
+            X = _solve_P_Q(U, V, structure=structure)
+            
+        if self.mat_mult == 2:
+            U, V = h.pade3()
+#            U_, V_ = self.pade3(A_bal)
+#            assert(np.max(np.abs(U-U_))==0.0)
+#            assert(np.max(np.abs(V-V_))==0.0)
+            X = _solve_P_Q(U, V, structure=structure)
     
         # Try Pade order 5.
         if self.mat_mult == 3:
             U, V = h.pade5()
             X = _solve_P_Q(U, V, structure=structure)
-            return X.dot(v)
     
         # Try Pade orders 7 and 9.
         if self.mat_mult == 4:
             U, V = h.pade7()
             X = _solve_P_Q(U, V, structure=structure)
-            return X.dot(v)
             
         if self.mat_mult == 5:
             U, V = h.pade9()
             X = _solve_P_Q(U, V, structure=structure)    
-            return X.dot(v)
         
-        s = self.mat_mult-6
-        U, V = h.pade13_scaled(s)
-        X = _solve_P_Q(U, V)
-        # X = r_13(A)^(2^s) by repeated squaring.
-        for i in range(s):
-            X = X.dot(X)
+        if self.mat_mult > 5:
+            s = self.mat_mult-6
+            U, V = h.pade13_scaled(s)
+            X = _solve_P_Q(U, V)
+            # X = r_13(A)^(2^s) by repeated squaring.
+            for i in range(s):
+                X = X.dot(X)
+            
+        if(balance):
+            X = D @ X @ Dinv
+            
+#        assert(np.max(np.abs(expm(A) - X)) == 0.0)
+            
         res = X.dot(v)
         return res
     
     
-    def compute_x_T(self, A, a, x0, T, max_mat_mult=100):
+    def compute_x_T(self, A, a, x0, T, max_mat_mult=100, balance=True):
         n = A.shape[0]
         C = np.zeros((n+1, n+1))
         C[0:n,     0:n] = A
@@ -115,12 +177,12 @@ class ExponentialMatrixHelper:
         z0[-1] = 1.0
 #        e_TC = expm(T*C, verbose=True)
 #        z = e_TC@z0
-        z = self.expm_times_v(T*C, z0, max_mat_mult)
+        z = self.expm_times_v(T*C, z0, max_mat_mult, balance)
         x_T = z[:n]
         return x_T
     
     
-    def compute_integral_x_T(self, A, a, x0, T, max_mat_mult=100):
+    def compute_integral_x_T(self, A, a, x0, T, max_mat_mult=100, balance=True):
         n = A.shape[0]
         C = np.zeros((n+2, n+2))
         C[0:n,     0:n] = A
@@ -131,12 +193,12 @@ class ExponentialMatrixHelper:
         z0[-1] = 1.0
     #    e_TC = expm(T@C, verbose=True)
     #    z = e_TC@z0
-        z = self.expm_times_v(T*C, z0, max_mat_mult)
+        z = self.expm_times_v(T*C, z0, max_mat_mult, balance)
         int_x = z[:n]
         return int_x
     
     
-    def compute_double_integral_x_T(self, A, a, x0, T, max_mat_mult=100):
+    def compute_double_integral_x_T(self, A, a, x0, T, max_mat_mult=100, balance=True):
         n = A.shape[0]
         C = np.zeros((n+3, n+3))
         C[0:n,     0:n] = A
@@ -147,7 +209,7 @@ class ExponentialMatrixHelper:
         z0[-1] = 1.0
     #    e_TC = expm(T*C, verbose=True)
     #    z = e_TC@z0
-        z = self.expm_times_v(T*C, z0, max_mat_mult)
+        z = self.expm_times_v(T*C, z0, max_mat_mult, balance)
         int2_x = z[:n]
         return int2_x
     
