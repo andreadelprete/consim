@@ -22,27 +22,49 @@ print("Test Exponential Integrator with Quadruped Robot ".center(conf.LINE_WIDTH
 print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be used as ground truth
-i_max = 14
+i_ground_truth = 10
+i_max = 7
 GROUND_TRUTH_SIMU_PARAMS = {
     'name': 'euler%3d'%(2**i_max),
-    'use_exp_int': 0,
+    'use_exp_int': 1,
     'ndt': 2**i_max,
+    'max_mat_mult': 100
 }
 
 SIMU_PARAMS = []
-for i in range(i_max-2):
+for i in range(i_max):
     SIMU_PARAMS += [{
         'name': 'exp%4d'%(2**i),
+        'method_name': 'exp',
         'use_exp_int': 1,
         'ndt': 2**i,
+        'max_mat_mult': 100
     }]
     
-for i in range(7, i_max-2):
+for i in range(i_max):
+    for j in range(2,7):
+        SIMU_PARAMS += [{
+            'name': 'exp%4d mmm-%d'%(2**i,j),
+            'method_name': 'exp mmm-%d'%j,
+            'use_exp_int': 1,
+            'ndt': 2**i,
+            'max_mat_mult': j
+        }]
+    
+for i in range(7, i_max):
     SIMU_PARAMS += [{
         'name': 'euler%4d'%(2**i),
+        'method_name': 'euler',
         'use_exp_int': 0,
         'ndt': 2**i,
+        'max_mat_mult': 100
     }]
+
+PLOT_UPSILON = 0
+PLOT_FORCES = 0
+PLOT_FORCE_PREDICTIONS = 0
+PLOT_INTEGRATION_ERRORS = 1
+PLOT_MAT_MULT_EXPM = 1
 
 ASSUME_A_INVERTIBLE = 0
 USE_CONTROLLER = 1
@@ -85,6 +107,7 @@ sampleCom = invdyn.trajCom.computeNext()
 
 def run_simulation(q, v, simu_params):
     simu.init(q0, v0)
+    simu.max_mat_mult = simu_params['max_mat_mult']
     t = 0.0
     ndt = simu_params['ndt']
     time_start = time.time()
@@ -98,6 +121,7 @@ def run_simulation(q, v, simu_params):
     dp_fd = np.zeros((simu.nk, N_SIMULATION+1))
     dJv = np.zeros((simu.nk, N_SIMULATION+1))
     dJv_fd = np.zeros((simu.nk, N_SIMULATION+1))
+    mat_mult_expm = np.zeros(N_SIMULATION)
     
     q[:,0] = np.copy(simu.q)
     v[:,0] = np.copy(simu.v)
@@ -117,10 +141,7 @@ def run_simulation(q, v, simu_params):
                 print("[%d] QP problem could not be solved! Error code:" % (i), sol.status)
                 break
 
-            # TMP: update control every 2 time steps
-#            if(i%2==0):
             u = invdyn.formulation.getActuatorForces(sol)
-            #            dv_des = invdyn.formulation.getAccelerations(sol)
         else:
             invdyn.formulation.computeProblemData(t, q[:,i], v[:,i])
             #        robot.computeAllTerms(invdyn.data(), q, v)
@@ -147,6 +168,8 @@ def run_simulation(q, v, simu_params):
         dp_fd[:,i] = simu.debug_dp_fd
         dJv[:,i] = simu.debug_dJv
         dJv_fd[:,i] = simu.debug_dJv_fd
+        
+        mat_mult_expm[i] = simu.expMatHelper.mat_mult
 
         if i % PRINT_N == 0:
             print("Time %.3f" % (t))
@@ -179,6 +202,7 @@ def run_simulation(q, v, simu_params):
     results.dp_fd = dp_fd
     results.dJv = dJv
     results.dJv_fd = dJv_fd
+    results.mat_mult_expm = mat_mult_expm
     return results
 
 print("\nStart simulation ground truth")
@@ -194,92 +218,90 @@ for simu_params in SIMU_PARAMS:
 
 # COMPUTE INTEGRATION ERRORS:
 print('\n')
-ndt_exp = []
-ndt_euler = []
-final_err_exp = []
-final_err_euler = []
-total_err_exp = []
-total_err_euler = []
+ndt = {}
+total_err = {}
+mat_mult_expm = {}
 for name in sorted(data.keys()):
     d = data[name]
-    final_err = norm(d.q[:,-1] - data_ground_truth.q[:,-1]) + norm(d.v[:,-1] - data_ground_truth.v[:,-1])
-    total_err = norm(d.q - data_ground_truth.q) + norm(d.v - data_ground_truth.v)
-    print(name, 'Final error: %.2f'%np.log10(final_err))
-    print(name, 'Total error: %.2f'%np.log10(total_err))
-    if(d.use_exp_int):
-        final_err_exp += [final_err]
-        total_err_exp += [total_err]
-        ndt_exp += [d.ndt]
-    else:
-        final_err_euler += [final_err]
-        total_err_euler += [total_err]
-        ndt_euler += [d.ndt]
+    err = norm(d.q - data_ground_truth.q) + norm(d.v - data_ground_truth.v)
+    print(name, 'Total error: %.2f'%np.log10(err))
+    if(d.method_name not in total_err):
+        mat_mult_expm[d.method_name] = []
+        total_err[d.method_name] = []
+        ndt[d.method_name] = []
+    mat_mult_expm[d.method_name] += [np.mean(d.mat_mult_expm)]
+    total_err[d.method_name] += [err]
+    ndt[d.method_name] += [d.ndt]
 
 # PLOT STUFF
-line_styles = 10*['-', '--', '-.', ':']
+line_styles = 10*['-o', '--o', '-.o', ':o']
 tt = np.arange(0.0, (N_SIMULATION+1)*dt, dt)[:N_SIMULATION+1]
 
 
 # PLOT INTEGRATION ERRORS
-(ff, ax) = plut.create_empty_figure(1)
-ax.plot(ndt_exp, total_err_exp, line_styles[0], alpha=0.7, label='Exp total')
-ax.plot(ndt_euler, total_err_euler, line_styles[1], alpha=0.7, label='Euler total')
-ax.plot(ndt_exp, final_err_exp, line_styles[2], alpha=0.7, label='Exp final')
-ax.plot(ndt_euler, final_err_euler, line_styles[3], alpha=0.7, label='Euler final')
-ax.set_xlabel('Number of time steps')
-ax.set_ylabel('Error norm')
-ax.set_xscale('log')
-ax.set_yscale('log')
-leg = ax.legend()
-leg.get_frame().set_alpha(0.5)
+if(PLOT_INTEGRATION_ERRORS):
+    (ff, ax) = plut.create_empty_figure(1)
+    j = 0
+    for (name, err) in total_err.items():
+        ax.plot(ndt[name], total_err[name], line_styles[j], alpha=0.7, label=name)
+        j += 1
+    ax.set_xlabel('Number of time steps')
+    ax.set_ylabel('Error norm')
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    leg = ax.legend()
+    leg.get_frame().set_alpha(0.5)
     
-
-PLOT_UPSILON = 0
-if(PLOT_UPSILON):
-    np.set_printoptions(precision=2, linewidth=200, suppress=True)
-    plt.matshow(simu.Upsilon)
-    plt.colorbar()
-
-    U = simu.Upsilon.copy()
-    for i in range(U.shape[0]):
-        U[i, :] /= U[i, i]
-    print(U)
-    plt.show()
-
-(ff, ax) = plut.create_empty_figure(2, 2)
-ax = ax.reshape(4)
-j = 0
-for (name, d) in data.items():
-    for i in range(4):
-        ax[i].plot(tt, d.f[2+3*i, :], line_styles[j], alpha=0.7, label=name+' '+str(i))
-        ax[i].set_xlabel('Time [s]')
-        ax[i].set_ylabel('Force Z [N]')
-    j += 1
-    leg = ax[0].legend()
+if(PLOT_MAT_MULT_EXPM):
+    (ff, ax) = plut.create_empty_figure(1)
+    j = 0
+    for (name, err) in total_err.items():
+        ax.plot(ndt[name], mat_mult_expm[name], line_styles[j], alpha=0.7, label=name)
+        j += 1
+    ax.set_xlabel('Number of time steps')
+    ax.set_ylabel('Mean # mat mult in expm')
+    ax.set_xscale('log')
+    leg = ax.legend()
     leg.get_frame().set_alpha(0.5)
 
-for (name,d) in data.items():
-#   (ff, ax) = plut.create_empty_figure(2,2)
-#   ax = ax.reshape(4)
-#   tt_log = np.arange(d.f_pred.shape[1]) * T / d.f_pred.shape[1]
-#   for i in range(4):
-#       ax[i].plot(tt, d.f[2+3*i,:], ' o', markersize=8, label=name+' '+str(i))
-#       ax[i].plot(tt, d.f_pred_int[2+3*i,:], ' s', markersize=8, label=name+' pred int'+str(i))
-#       ax[i].plot(tt_log, d.f_pred[2+3*i,:], 'r v', markersize=6, label=name+' pred '+str(i))
-#       ax[i].plot(tt_log, d.f_inner[2+3*i,:], 'b x', markersize=6, label=name+' real '+str(i))
-#       ax[i].set_xlabel('Time [s]')
-#       ax[i].set_ylabel('Force Z [N]')
-#   leg = ax[0].legend()
-#   leg.get_frame().set_alpha(0.5)
-   
-   # force prediction error of Euler, i.e. assuming force remains contact during time step
-   ndt = int(d.f_inner.shape[1] / (d.f.shape[1]-1))
-   f_pred_err_euler = np.array([d.f[:,int(np.floor(i/ndt))] - d.f_inner[:,i] for i in range(d.f_inner.shape[1])]).T
-   
-   # force prediction error of matrix exponential 
-   f_pred_err = d.f_pred - d.f_inner
-   print(name, 'Force pred err max exp:', np.sum(np.abs(f_pred_err))/(f_pred_err.shape[0]*f_pred_err.shape[1]))
-   print(name, 'Force pred err Euler:  ', np.sum(np.abs(f_pred_err_euler))/(f_pred_err.shape[0]*f_pred_err.shape[1]))
+# PLOT THE CONTACT FORCES OF ALL INTEGRATION METHODS ON THE SAME PLOT
+if(PLOT_FORCES):
+    (ff, ax) = plut.create_empty_figure(2, 2)
+    ax = ax.reshape(4)
+    j = 0
+    for (name, d) in data.items():
+        for i in range(4):
+            ax[i].plot(tt, d.f[2+3*i, :], line_styles[j], alpha=0.7, label=name+' '+str(i))
+            ax[i].set_xlabel('Time [s]')
+            ax[i].set_ylabel('Force Z [N]')
+        j += 1
+        leg = ax[0].legend()
+        leg.get_frame().set_alpha(0.5)
+
+# FOR EACH INTEGRATION METHOD PLOT THE FORCE PREDICTIONS
+if(PLOT_FORCE_PREDICTIONS):
+    for (name,d) in data.items():
+       (ff, ax) = plut.create_empty_figure(2,2)
+       ax = ax.reshape(4)
+       tt_log = np.arange(d.f_pred.shape[1]) * T / d.f_pred.shape[1]
+       for i in range(4):
+           ax[i].plot(tt, d.f[2+3*i,:], ' o', markersize=8, label=name+' '+str(i))
+           ax[i].plot(tt, d.f_pred_int[2+3*i,:], ' s', markersize=8, label=name+' pred int'+str(i))
+           ax[i].plot(tt_log, d.f_pred[2+3*i,:], 'r v', markersize=6, label=name+' pred '+str(i))
+           ax[i].plot(tt_log, d.f_inner[2+3*i,:], 'b x', markersize=6, label=name+' real '+str(i))
+           ax[i].set_xlabel('Time [s]')
+           ax[i].set_ylabel('Force Z [N]')
+       leg = ax[0].legend()
+       leg.get_frame().set_alpha(0.5)
+       
+       # force prediction error of Euler, i.e. assuming force remains contact during time step
+       ndt = int(d.f_inner.shape[1] / (d.f.shape[1]-1))
+       f_pred_err_euler = np.array([d.f[:,int(np.floor(i/ndt))] - d.f_inner[:,i] for i in range(d.f_inner.shape[1])]).T
+       
+       # force prediction error of matrix exponential 
+       f_pred_err = d.f_pred - d.f_inner
+       print(name, 'Force pred err max exp:', np.sum(np.abs(f_pred_err))/(f_pred_err.shape[0]*f_pred_err.shape[1]))
+       print(name, 'Force pred err Euler:  ', np.sum(np.abs(f_pred_err_euler))/(f_pred_err.shape[0]*f_pred_err.shape[1]))
 
 
 #print('')
@@ -353,5 +375,14 @@ for (name,d) in data.items():
 #    leg = ax[i].legend()
 #    leg.get_frame().set_alpha(0.5)
 
+if(PLOT_UPSILON):
+    np.set_printoptions(precision=2, linewidth=200, suppress=True)
+    plt.matshow(simu.Upsilon)
+    plt.colorbar()
+
+    U = simu.Upsilon.copy()
+    for i in range(U.shape[0]):
+        U[i, :] /= U[i, i]
+    print(U)
 
 plt.show()

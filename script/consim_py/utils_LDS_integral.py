@@ -15,6 +15,142 @@ from numpy.linalg import eigvals
 
 np.set_printoptions(precision=2, linewidth=200, suppress=True)
 
+class ExponentialMatrixHelper:
+    
+    def __init__(self):
+        self.mat_mult = 0           # number of matrix-matrix multilpications used at last computation
+        self.mat_mult_in_theory = 0 # theoretical number of mat-mat multiplications needed
+    
+    
+    def compute_mat_mult(self, A):
+        use_exact_onenorm = A.shape[0] < 200
+        h = _ExpmPadeHelper(A, use_exact_onenorm=use_exact_onenorm)
+        
+        # Try Pade order 3.
+        eta_1 = max(h.d4_loose, h.d6_loose)
+        if (eta_1 < 1.495585217958292e-002 and _ell(h.A, 3) == 0):
+            return 2    
+        # Try Pade order 5.
+        eta_2 = max(h.d4_tight, h.d6_loose)
+        if (eta_2 < 2.539398330063230e-001 and _ell(h.A, 5) == 0):
+            return 3
+        # Try Pade orders 7 and 9.
+        eta_3 = max(h.d6_tight, h.d8_loose)
+        if (eta_3 < 9.504178996162932e-001 and _ell(h.A, 7) == 0):
+            return  4
+        if (eta_3 < 2.097847961257068e+000 and _ell(h.A, 9) == 0):
+            return 5
+        # Use Pade order 13.
+        eta_3 = max(h.d6_tight, h.d8_loose)
+        eta_4 = max(h.d8_loose, h.d10_loose)
+        eta_5 = min(eta_3, eta_4)
+        theta_13 = 4.25
+        # Choose smallest s>=0 such that 2**(-s) eta_5 <= theta_13
+        if eta_5 == 0:
+            # Nilpotent special case
+            s = 0
+        else:
+            s = max(int(np.ceil(np.log2(eta_5 / theta_13))), 0)
+        s = s + _ell(2**-s * h.A, 13)
+        return 6+s
+        
+        
+    def expm_times_v(self, A, v, max_mat_mult=100):
+        ''' max_mat_mult can be used to reduce the computational complexity of the exponential 
+            6: at most a Pade order 13 can be used but with no scaling
+            5: at most a Pade order 9 is used
+            4: at most a Pade order 7 is used
+            3: at most a Pade order 5 is used
+            2: at most a Pade order 3 is used
+        '''
+        # Compute expm(A)*v
+        # Hardcode a matrix order threshold for exact vs. estimated one-norms.
+        use_exact_onenorm = A.shape[0] < 200
+        h = _ExpmPadeHelper(A, use_exact_onenorm=use_exact_onenorm)
+        structure = None
+        
+        # Compute the number of mat-mat multiplications needed in theory
+        self.mat_mult_in_theory = self.compute_mat_mult(A)
+        self.mat_mult = min(self.mat_mult_in_theory, max_mat_mult)
+        
+        if self.mat_mult <= 2:
+            U, V = h.pade3()
+            X = _solve_P_Q(U, V, structure=structure)
+            return X.dot(v)
+    
+        # Try Pade order 5.
+        if self.mat_mult == 3:
+            U, V = h.pade5()
+            X = _solve_P_Q(U, V, structure=structure)
+            return X.dot(v)
+    
+        # Try Pade orders 7 and 9.
+        if self.mat_mult == 4:
+            U, V = h.pade7()
+            X = _solve_P_Q(U, V, structure=structure)
+            return X.dot(v)
+            
+        if self.mat_mult == 5:
+            U, V = h.pade9()
+            X = _solve_P_Q(U, V, structure=structure)    
+            return X.dot(v)
+        
+        s = self.mat_mult-6
+        U, V = h.pade13_scaled(s)
+        X = _solve_P_Q(U, V)
+        # X = r_13(A)^(2^s) by repeated squaring.
+        for i in range(s):
+            X = X.dot(X)
+        res = X.dot(v)
+        return res
+    
+    
+    def compute_x_T(self, A, a, x0, T, max_mat_mult=100):
+        n = A.shape[0]
+        C = np.zeros((n+1, n+1))
+        C[0:n,     0:n] = A
+        C[0:n,     n] = a
+        z0 = np.zeros(n+1)
+        z0[:n] = x0
+        z0[-1] = 1.0
+#        e_TC = expm(T*C, verbose=True)
+#        z = e_TC@z0
+        z = self.expm_times_v(T*C, z0, max_mat_mult)
+        x_T = z[:n]
+        return x_T
+    
+    
+    def compute_integral_x_T(self, A, a, x0, T, max_mat_mult=100):
+        n = A.shape[0]
+        C = np.zeros((n+2, n+2))
+        C[0:n,     0:n] = A
+        C[0:n,     n] = a
+        C[0:n,     n+1] = x0
+        C[n:n+1, n+1:] = 1.0
+        z0 = np.zeros(n+2)
+        z0[-1] = 1.0
+    #    e_TC = expm(T@C, verbose=True)
+    #    z = e_TC@z0
+        z = self.expm_times_v(T*C, z0, max_mat_mult)
+        int_x = z[:n]
+        return int_x
+    
+    
+    def compute_double_integral_x_T(self, A, a, x0, T, max_mat_mult=100):
+        n = A.shape[0]
+        C = np.zeros((n+3, n+3))
+        C[0:n,     0:n] = A
+        C[0:n,     n] = a
+        C[0:n,     n+1] = x0
+        C[n:n+2, n+1:] = np.eye(2)
+        z0 = np.zeros(n+3)
+        z0[-1] = 1.0
+    #    e_TC = expm(T*C, verbose=True)
+    #    z = e_TC@z0
+        z = self.expm_times_v(T*C, z0, max_mat_mult)
+        int2_x = z[:n]
+        return int2_x
+    
 
 def expm(A, use_exact_onenorm="auto", verbose=False):
     from scipy.linalg import expm as expm_scipy
@@ -44,11 +180,46 @@ def expm(A, use_exact_onenorm="auto", verbose=False):
     return X
 
 
-def expm_times_v(A, v, use_exact_onenorm="auto", verbose=False):
+def expm_times_v(A, v, scaling_reduction=0, verbose=False):
+    ''' scaling_reduction can be used to reduce the computational complexity of the exponential 
+        1: no scaling can be performed
+        2: at most a Pade order 9 is used
+        3: at most a Pade order 7 is used
+        4: at most a Pade order 5 is used
+        5: at most a Pade order 3 is used
+    '''
     # Compute expm(A)*v
     # Hardcode a matrix order threshold for exact vs. estimated one-norms.
     use_exact_onenorm = A.shape[0] < 200
     h = _ExpmPadeHelper(A, use_exact_onenorm=use_exact_onenorm)
+    structure = None
+    
+    # Try Pade order 3.
+    eta_1 = max(h.d4_loose, h.d6_loose)
+    if scaling_reduction>4 or (eta_1 < 1.495585217958292e-002 and _ell(h.A, 3) == 0):
+        U, V = h.pade3()
+        X = _solve_P_Q(U, V, structure=structure)
+        return X.dot(v)
+
+    # Try Pade order 5.
+    eta_2 = max(h.d4_tight, h.d6_loose)
+    if scaling_reduction>3 or (eta_2 < 2.539398330063230e-001 and _ell(h.A, 5) == 0):
+        U, V = h.pade5()
+        X = _solve_P_Q(U, V, structure=structure)
+        return X.dot(v)
+
+    # Try Pade orders 7 and 9.
+    eta_3 = max(h.d6_tight, h.d8_loose)
+    if scaling_reduction>2 or (eta_3 < 9.504178996162932e-001 and _ell(h.A, 7) == 0):
+        U, V = h.pade7()
+        X = _solve_P_Q(U, V, structure=structure)
+        return X.dot(v)
+        
+    if scaling_reduction>1 or (eta_3 < 2.097847961257068e+000 and _ell(h.A, 9) == 0):
+        U, V = h.pade9()
+        X = _solve_P_Q(U, V, structure=structure)    
+        return X.dot(v)
+    
     # Use Pade order 13.
     eta_3 = max(h.d6_tight, h.d8_loose)
     eta_4 = max(h.d8_loose, h.d10_loose)
@@ -61,12 +232,16 @@ def expm_times_v(A, v, use_exact_onenorm="auto", verbose=False):
     else:
         s = max(int(np.ceil(np.log2(eta_5 / theta_13))), 0)
     s = s + _ell(2**-s * h.A, 13)
+    
+    if(scaling_reduction>0):
+        s = 0
+
     U, V = h.pade13_scaled(s)
     X = _solve_P_Q(U, V)
     # X = r_13(A)^(2^s) by repeated squaring.
-    res = v
-    for i in range(2**s):
-        res = X.dot(res)
+    for i in range(s):
+        X = X.dot(X)
+    res = X.dot(v)
     return res
 
 
@@ -98,7 +273,7 @@ def compute_x_T(A, a, x0, T, dt=None, invertible_A=False):
     return x_T
 
 
-def compute_integral_x_T(A, a, x0, T, dt=None, invertible_A=False):
+def compute_integral_x_T(A, a, x0, T, dt=None, invertible_A=False, scaling_reduction=0):
     if(dt is not None):
         N = int(T/dt)
         int_x = dt*x0
@@ -124,13 +299,13 @@ def compute_integral_x_T(A, a, x0, T, dt=None, invertible_A=False):
     z0[-1] = 1.0
 #    e_TC = expm(T@C, verbose=True)
 #    z = e_TC@z0
-    z = expm_times_v(T*C, z0, verbose=True)
+    z = expm_times_v(T*C, z0, scaling_reduction, verbose=True)
     int_x = z[:n]
     return int_x
 #
 
 
-def compute_double_integral_x_T(A, a, x0, T, dt=None, compute_also_integral=False, invertible_A=False):
+def compute_double_integral_x_T(A, a, x0, T, dt=None, compute_also_integral=False, invertible_A=False, scaling_reduction=0):
     if(dt is not None):
         N = int(T/dt)
         int2_x = np.zeros_like(x0)
@@ -161,7 +336,7 @@ def compute_double_integral_x_T(A, a, x0, T, dt=None, compute_also_integral=Fals
     z0[-1] = 1.0
 #    e_TC = expm(T*C, verbose=True)
 #    z = e_TC@z0
-    z = expm_times_v(T*C, z0, verbose=True)
+    z = expm_times_v(T*C, z0, scaling_reduction, verbose=True)
     int2_x = z[:n]
 
     # print("A\n", A)

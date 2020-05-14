@@ -22,7 +22,7 @@ contact_frames = ['HL_FOOT', 'HR_FOOT', 'FL_FOOT', 'FR_FOOT']
 # direction of the normal to the contact surface
 contact_normal = np.array([0., 0., 1.])
 K = 1e5*np.asarray(np.diagflat([1., 1., 1.]))
-B = 3e2*np.asarray(np.diagflat([1., 1., 1.]))
+B = 1e2*np.asarray(np.diagflat([1., 1., 1.]))
 
 w_com = 1.0                     # weight of center of mass task
 w_posture = 1e-3                # weight of joint posture task

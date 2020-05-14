@@ -10,7 +10,7 @@ import gepetto.corbaserver
 import time
 import subprocess
 
-from consim_py.utils_LDS_integral import compute_integral_x_T, compute_double_integral_x_T
+from consim_py.utils_LDS_integral import ExponentialMatrixHelper, compute_integral_x_T, compute_double_integral_x_T
 
 
 class Contact:
@@ -82,7 +82,9 @@ class RobotSimulator:
             f.close()
 
         self.conf = conf
+        self.expMatHelper = ExponentialMatrixHelper()
         self.assume_A_invertible = False
+        self.max_mat_mult = 100
         # se3.RobotWrapper.BuildFromURDF(conf.urdf, [conf.path, ], se3.JointModelFreeFlyer())
         self.robot = robot
         self.model = self.robot.model
@@ -163,12 +165,10 @@ class RobotSimulator:
         self.a = zero(2*self.nk)
         self.A = np.zeros((2*self.nk, 2*self.nk))
         self.A[:self.nk, self.nk:] = np.eye(self.nk)
-        i = 0
-        for c in self.contacts:
-            self.K[i:i+3, i:i+3] = c.K
-            self.B[i:i+3, i:i+3] = c.B
-            self.p0[i:i+3] = c.p0
-            i += 3
+        for (i,c) in enumerate(self.contacts):
+            self.K[3*i:3*i+3, 3*i:3*i+3] = c.K
+            self.B[3*i:3*i+3, 3*i:3*i+3] = c.B
+            self.p0[3*i:3*i+3]           = c.p0
         self.D = np.hstack((-self.K, -self.B))
         
         self.debug_dp = zero(self.nk)
@@ -185,10 +185,8 @@ class RobotSimulator:
             se3.computeJointJacobians(self.model, self.data)
             se3.updateFramePlacements(self.model, self.data)
 
-        i = 0
-        for c in self.contacts:
-            self.f[i:i+3] = c.compute_force()
-            i += 3
+        for (i,c) in enumerate(self.contacts):
+            self.f[3*i:3*i+3] = c.compute_force()
 
         return self.f
 
@@ -228,13 +226,9 @@ class RobotSimulator:
         se3.crba(self.model, self.data, self.q)
         se3.nonLinearEffects(self.model, self.data, self.q, self.v)
         
-        M = self.data.M
-        h = self.data.nle
-        i = 0
-        for c in self.contacts:
-            J = c.getJacobianWorldFrame()
-            self.Jc[i:i+3, :] = J
-            i += 3
+        M, h = self.data.M, self.data.nle
+        for (i,c) in enumerate(self.contacts):
+            self.Jc[3*i:3*i+3, :] = c.getJacobianWorldFrame()
 
         # array containing the forces predicting during the time step (meaningful only for exponential integrator)
         if(dt_force_pred is not None):
@@ -272,7 +266,6 @@ class RobotSimulator:
 #            if(use_sparse_solver):
 #                D_x, D_int_x, D_int2_x = self.solve_sparse_exp(x0, b, dt)
 #                # Code about matrix expoitation was here
-#
 #            else:
 
             # I know, file is opened and closed at each iteration, but this is Python who cares
@@ -288,8 +281,8 @@ class RobotSimulator:
             if(self.assume_A_invertible):
                 int_x, int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt, compute_also_integral=True, invertible_A=True)
             else:
-                int_x = compute_integral_x_T(self.A, self.a, x0, dt)
-                int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt)
+                int_x = self.expMatHelper.compute_integral_x_T(self.A, self.a, x0, dt, self.max_mat_mult)
+                int2_x = self.expMatHelper.compute_double_integral_x_T(self.A, self.a, x0, dt, self.max_mat_mult)
                 # x, int_x, int2_x = compute_x_T_and_two_integrals(self.A, self.a, x0, dt)
 
             D_int_x = self.D @ int_x
@@ -311,8 +304,8 @@ class RobotSimulator:
                     z = e_TC @ z
                     
                 # predict also what forces we would get by integrating with the force prediction
-                int_x = compute_integral_x_T(self.A, self.a, x0, dt_force_pred)
-                int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt_force_pred)
+                int_x = self.expMatHelper.compute_integral_x_T(self.A, self.a, x0, dt_force_pred, self.max_mat_mult)
+                int2_x = self.expMatHelper.compute_double_integral_x_T(self.A, self.a, x0, dt_force_pred, self.max_mat_mult)
                 D_int_x = self.D @ int_x
                 D_int2_x = self.D @ int2_x
                 v_mean_pred = self.v + 0.5*dt_force_pred*dv_bar + JMinv.T@D_int2_x/dt_force_pred
