@@ -259,7 +259,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
         temp01_.noalias() = JcT_*fpr_; 
         temp02_ = tau_ - data_->nle + temp01_;
         dvMean_.noalias() = Minv_*temp02_; 
-        vMean_ = v_ + sub_dt* dvMean_; 
+        vMean_ = v_ + .5 * sub_dt* dvMean_; 
       } // force violates friction cone 
       else{
         temp03_.noalias() = D*intxt_; 
@@ -276,7 +276,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     else{
       pinocchio::aba(*model_, *data_, q_, v_, tau_);
       dvMean_ = data_->ddq; 
-      vMean_ = v_ + dv_ * .5 * sub_dt;
+      vMean_ = v_ + dvMean_ * .5 * sub_dt;
     } // no active contacts 
 
     CONSIM_START_PROFILER("exponential_simulator::subIntegration");      

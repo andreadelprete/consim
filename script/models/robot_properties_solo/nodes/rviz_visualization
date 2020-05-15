@@ -1,0 +1,3 @@
+#! /bin/bash
+
+roslaunch robot_properties_solo visual_rviz.launch

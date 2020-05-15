@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<package>
+  <name>robot_properties_solo</name>
+  <version>1.0.0</version>
+  <description>robot_properties_solo</description>
+  <author email="mnaveau@tuebingen.mpg.de">Maximilien Naveau</author>
+  <maintainer email="mnaveau@tuebingen.mpg.de">Maximilien Naveau</maintainer>
+  <license>TODO</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <!-- We need the xacro package to build the urdf model -->
+  <build_depend> xacro </build_depend>
+  <run_depend>   xacro </run_depend>
+
+  <!-- This provide cmake macros to help building the project. -->
+  <build_depend> mpi_cmake_modules </build_depend>
+  <run_depend>   mpi_cmake_modules </run_depend>
+
+  <export>
+  </export>
+</package>

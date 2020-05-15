@@ -2,6 +2,7 @@ import numpy as np
 import pinocchio as pin 
 import consim 
 from pinocchio.robot_wrapper import RobotWrapper
+from pinocchio.utils import fromListToVectorOfString, rotate
 import os, sys
 from os.path import dirname, join
 import matplotlib.pyplot as plt 
@@ -17,15 +18,56 @@ import numpy.matlib as matlib
 from numpy import nan
 from numpy.linalg import norm as norm
 
-pin.setNumpyType(np.matrix)
 
+def load_solo12_pinocchio(model_path):
+    """ model path is path to robot_properties_solo """
+    urdf_path = '/urdf/solo12.urdf'
+    mesh_path = fromListToVectorOfString([dirname(model_path)])
+    robot = RobotWrapper.BuildFromURDF(
+        model_path+urdf_path, mesh_path, pin.JointModelFreeFlyer())
+
+    q = [0., 0., 0.32, 0., 0., 0., 1.] + 4 * [0., 0., 0.]
+    q[8], q[9], q[11], q[12] = np.pi/4, -np.pi/2, np.pi/4,-np.pi/2
+    q[14], q[15], q[17], q[18] = -np.pi/4, np.pi/2, -np.pi/4, np.pi/2
+    q = np.array(q)
+
+    pin.framesForwardKinematics(robot.model, robot.data,
+                                q[:, None])
+    q[2] = .32 - \
+        robot.data.oMf[robot.model.getFrameId('FL_FOOT')].translation[2]
+    pin.framesForwardKinematics(robot.model, robot.data,
+                                q[:, None])
+    # q[2] += .015
+    robot.q0.flat = q
+    robot.model.referenceConfigurations["half_sitting"] = robot.q0
+    robot.model.referenceConfigurations["reference"] = robot.q0
+    robot.model.referenceConfigurations["standing"] = robot.q0
+
+    robot.defaultState = np.concatenate([robot.q0, np.zeros(robot.model.nv)])
+    # robot.model.defaultState = np.concatenate([q, np.zeros((robot.model.nv, 1))])
+    # compute contact at point feet 
+    return robot
+
+def interpolate_state(robot, x1, x2, d):
+        """ interpolate state for feedback at higher rate that plan """
+        x = np.zeros([robot.model.nq+robot.model.nv,1])
+        x[:robot.model.nq] =  pin.interpolate(robot.model, x1[:robot.model.nq], x2[:robot.model.nq], d)
+        x[robot.model.nq:] = x1[robot.model.nq:] + d*(x2[robot.model.nq:] - x1[robot.model.nq:])
+        return x
+
+def state_diff(robot, x1, x2):
+    """ returns x2 - x1 """
+    xdiff = np.zeros([2*robot.model.nv, 1])
+    xdiff[:robot.model.nv] = pin.difference(robot.model, x1[:robot.model.nv], x2[:robot.model.nv]) 
+    xdiff[robot.model.nv:] = x2[robot.model.nv:] - x1[robot.model.nv:]
+    return xdiff
+
+
+whichMotion = 'trot'
 USE_CONTROLLER = True 
-# parameters used for CoM Sinusoid 
-amp = np.matrix([0.0, 0.0, 0.05]).T
-two_pi_f = 2*np.pi*np.matrix([0.0, .0, 2.]).T # double frequency to get more slipping 
-controller_dt = 5.e-3 
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     # simulation parameters 
     simu_params = []
     
@@ -80,24 +122,23 @@ if __name__=="__main__":
     DISPLAY_N = int(conf.DISPLAY_T/dt)
 
     # PLOT STUFF
-    tt = np.arange(0.0, N_SIMULATION*dt + dt, dt)
+    tt = np.arange(0.0, N_SIMULATION*dt + dt, dt) 
 
     # load robot 
-    robot = loadSolo()
+    model_path = "../../models/robot_properties_solo"
+    robot = load_solo12_pinocchio(model_path)
     print(" Solo Loaded Successfully ".center(conf.LINE_WIDTH, '#'))
-    # lower q0 a little bit for bilateral contacts 
-    q0 = conf.q0
-    # q0[2] -= 1.e-6
-    # print(" Contact Frame Positions".center(conf.LINE_WIDTH, '-'))
-    # pin.framesForwardKinematics(robot.model, robot.data, q0)
-    # for cname in conf.contact_frames:
-    #     print robot.data.oMf[robot.model.getFrameId(cname)].translation 
-    v0 = np.zeros(robot.nv) [:,None]
-    tau = np.zeros(robot.nv) [:,None]
- 
-    # loop over simulations     
+    
+    # now load reference trajectories 
+    refX = np.load('references/'+whichMotion+'_reference_states.npy')
+    refU = np.load('references/'+whichMotion+'_reference_controls.npy') 
+    feedBack = np.load('references/'+whichMotion+'_feedback.npy') 
+
+    tau = np.zeros([robot.model.nv,1])
+
+    N_SIMULATION = refU.shape[0] 
+
     for simu_param in simu_params:
-        offset = np.matrix([0.0, -0.0, 0.0]).T
         ndt = simu_param['ndt']
         name = simu_param['name']
         print(" Running %s Simulation ".center(conf.LINE_WIDTH, '#')%name)
@@ -109,28 +150,7 @@ if __name__=="__main__":
         else:
             sim = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
                                             K, B , mu)
-
-        # trajectory log 
-        com_pos = np.empty((N_SIMULATION, 3))*nan
-        com_vel = np.empty((N_SIMULATION, 3))*nan
-        com_acc = np.empty((N_SIMULATION, 3))*nan
-        com_pos_ref = np.empty((N_SIMULATION, 3))*nan
-        com_vel_ref = np.empty((N_SIMULATION, 3))*nan
-        com_acc_ref = np.empty((N_SIMULATION, 3))*nan
-        # acc_des = acc_ref - Kp*pos_err - Kd*vel_err
-        com_acc_des = np.empty((N_SIMULATION, 3))*nan
-        # ConSim log 
-        sim_f = np.empty((N_SIMULATION+1,len(conf.contact_frames),3))*nan
-        sim_q = np.empty((N_SIMULATION+1,robot.nq))*nan
-        contact_x = np.empty((N_SIMULATION+1,len(conf.contact_frames),3))*nan
-        contact_v = np.empty((N_SIMULATION+1,len(conf.contact_frames),3))*nan
-
-        q = [q0.copy()]
-        sim_q[0,:] = np.resize(q[-1], robot.nq)
-        v = [v0.copy()]
-
-        
-        
+                
         # add the  contact points 
         cpts = [] # list of all contact points
         for cname in conf.contact_frames:
@@ -140,66 +160,44 @@ if __name__=="__main__":
         print(" %s Contact Points Added ".center(conf.LINE_WIDTH, '-')%(len(cpts)))
 
         # reset simulator 
-        sim.reset_state(q[0], v[0], True)
+        sim.reset_state(refX[0,:robot.nq], refX[0,robot.nq:], True)
         print('Reset state done '.center(conf.LINE_WIDTH, '-')) 
 
-        # inverse dynamics controller 
-        invdyn = TsidQuadruped(conf, robot, q0, viewer=False)
-        print(" TSID Initialized Successfully ".center(conf.LINE_WIDTH, '-'))
-
-    
-        offset += invdyn.robot.com(invdyn.formulation.data())
-        two_pi_f_amp = np.multiply(two_pi_f, amp)
-        two_pi_f_squared_amp = np.multiply(two_pi_f, two_pi_f_amp)
-       
-
-        sampleCom = invdyn.trajCom.computeNext()
-
         
+        sim_f = np.empty((N_SIMULATION+1,len(conf.contact_frames),3))*nan
+        sim_q = np.empty((N_SIMULATION+1,robot.nq))*nan
+        sim_v = np.empty((N_SIMULATION+1,robot.nq))*nan
+        contact_x = np.empty((N_SIMULATION+1,len(conf.contact_frames),3))*nan
+        contact_v = np.empty((N_SIMULATION+1,len(conf.contact_frames),3))*nan
+
+        q = [refX[0,:robot.nq].copy()]
+        sim_q[0,:] = np.resize(q[-1], robot.nq)
+        v = [refX[0,robot.nq:].copy()]
 
         for ci, cp in enumerate(cpts):
                 sim_f[0,ci,:] = np.resize(cp.f,3)
                 contact_x[0,ci,:] = np.resize(cp.x,3)
                 contact_v[0,ci,:] = np.resize(cp.v,3)
         
-        # for ci, cframe in enumerate(conf.contact_frames):
-        #     print('initial contact position for contact '+cframe)
-        #     print(contact_x[0,ci,:])
 
-        t = 0.0   # used for control frequency  
+        for ci, cframe in enumerate(conf.contact_frames):
+            print('initial contact position for contact '+cframe)
+            print(contact_x[0,ci,:])
+
+  
         time_start = time.time()
         # simulation loop 
         for i in range(N_SIMULATION):
+            for d in range(10):
+                if(USE_CONTROLLER):
+                    xref = interpolate_state(robot, refX[t], refX[t+1], .1*d)
+                    xact = np.concatenate([sim.get_q(), sim_get_v()])
+                    diff = state_diff(xact, xref)
+                    tau[6:] = refU[i] + solver.K[t].dot(diff) 
+                else:
+                    tau[6:] = refU[i]
+                
 
-            if(USE_CONTROLLER):
-                # sinusoid trajectory 
-                sampleCom.pos(offset + np.multiply(amp, matlib.sin(two_pi_f*t)))
-                sampleCom.vel(np.multiply(two_pi_f_amp, matlib.cos(two_pi_f*t)))
-                sampleCom.acc(np.multiply(two_pi_f_squared_amp, -matlib.sin(two_pi_f*t)))
-                invdyn.comTask.setReference(sampleCom)
-
-                HQPData = invdyn.formulation.computeProblemData(t, q[i], v[i])
-                sol = invdyn.solver.solve(HQPData)
-                if(sol.status != 0):
-                    print("[%d] QP problem could not be solved! Error code:" % (i), sol.status)
-                    break
-
-                u = invdyn.formulation.getActuatorForces(sol)
-                #            dv_des = invdyn.formulation.getAccelerations(sol)
-            else:
-                invdyn.formulation.computeProblemData(t, q[i], v[i])
-                #        robot.computeAllTerms(invdyn.data(), q, v)
-                u = -0.03*conf.kp_posture*v[6:, 0]
-
-            # log reference data 
-            # com_pos[i, :] = np.resize(invdyn.robot.com(invdyn.formulation.data()),3)
-            # com_vel[i, :] = np.resize(invdyn.robot.com_vel(invdyn.formulation.data()),3)
-            # com_acc[i, :] = np.resize(invdyn.comTask.getAcceleration(sim.get_dv()),3)
-            # com_vel_ref[i, :] = np.resize(sampleCom.vel(),3)
-            # com_pos_ref[i, :] = np.resize(sampleCom.pos(),3)
-            # com_acc_ref[i, :] = np.resize(sampleCom.acc(),3)
-            # com_acc_des[i, :] = np.resize(invdyn.comTask.getDesiredAcceleration,3)
-            tau[-8:] = np.asarray(u)
             sim.step(tau) 
             q += [sim.get_q()]
             sim_q[i+1,:] = np.resize(q[-1], robot.nq)
@@ -222,11 +220,11 @@ if __name__=="__main__":
         plt.title('Base Height vs time ')
 
         # plot contact forces 
-        # for ci, ci_name in enumerate(conf.contact_frames):
-        #     plt.figure(ci_name+" normal force")
-        #     plt.plot(tt, sim_f[:, ci, 2], line_styles[i_ls], alpha=0.7, label=name)
-        #     plt.legend()
-        #     plt.title(ci_name+" normal force vs time")
+        for ci, ci_name in enumerate(conf.contact_frames):
+            plt.figure(ci_name+" normal force")
+            plt.plot(tt, sim_f[:, ci, 2], line_styles[i_ls], alpha=0.7, label=name)
+            plt.legend()
+            plt.title(ci_name+" normal force vs time")
         
         
         i_ls += 1 
@@ -234,3 +232,5 @@ if __name__=="__main__":
 
     consim.stop_watch_report(3)
     plt.show()
+
+
