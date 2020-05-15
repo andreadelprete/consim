@@ -8,7 +8,6 @@ import utils.plot_utils as plut
 import time
 import matplotlib.pyplot as plt
 
-from tsid_quadruped import TsidQuadruped
 import conf_solo_py as conf
 from example_robot_data.robots_loader import loadSolo
 
