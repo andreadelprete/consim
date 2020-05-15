@@ -1,7 +1,7 @@
 import time
 import matplotlib.pyplot as plt
 
-from robot_simulator_exponential_integrator import RobotSimulator
+from simulator import RobotSimulator
 from tsid_quadruped import TsidQuadruped
 import conf_solo_py as conf
 from example_robot_data.robots_loader import loadSolo
@@ -84,6 +84,7 @@ PLOT_BASE_POS = 0
 PLOT_FORCE_PREDICTIONS = 0
 PLOT_INTEGRATION_ERRORS = 1
 PLOT_MAT_MULT_EXPM = 1
+PLOT_MAT_NORM_EXPM = 1
 
 ASSUME_A_INVERTIBLE = 0
 USE_CONTROLLER = 1
@@ -140,7 +141,8 @@ def run_simulation(q, v, simu_params):
     dp_fd = np.zeros((simu.nk, N_SIMULATION+1))
     dJv = np.zeros((simu.nk, N_SIMULATION+1))
     dJv_fd = np.zeros((simu.nk, N_SIMULATION+1))
-    mat_mult_expm = np.zeros(N_SIMULATION)
+    mat_mult_expm = np.zeros(N_SIMULATION) # number of matrix multiplications inside expm
+    mat_norm_expm = np.zeros(N_SIMULATION) # norm of the matrix used by exmp
     
     q[:,0] = np.copy(simu.q)
     v[:,0] = np.copy(simu.v)
@@ -188,6 +190,7 @@ def run_simulation(q, v, simu_params):
         dJv_fd[:,i] = simu.debug_dJv_fd
         
         mat_mult_expm[i] = simu.expMatHelper.mat_mult
+        mat_norm_expm[i] = simu.expMatHelper.mat_norm
 
         if i % PRINT_N == 0:
             print("Time %.3f" % (t))
@@ -221,6 +224,7 @@ def run_simulation(q, v, simu_params):
     results.dJv = dJv
     results.dJv_fd = dJv_fd
     results.mat_mult_expm = mat_mult_expm
+    results.mat_norm_expm = mat_norm_expm
     return results
 
 print("\nStart simulation ground truth")
@@ -238,15 +242,17 @@ for simu_params in SIMU_PARAMS:
 print('\n')
 ndt = {}
 total_err = {}
-mat_mult_expm = {}
+mat_mult_expm, mat_norm_expm = {}, {}
 for name in sorted(data.keys()):
     d = data[name]
     err = norm(d.q - data_ground_truth.q) + norm(d.v - data_ground_truth.v)
     print(name, 'Total error: %.2f'%np.log10(err))
     if(d.method_name not in total_err):
+        mat_norm_expm[d.method_name] = []
         mat_mult_expm[d.method_name] = []
         total_err[d.method_name] = []
         ndt[d.method_name] = []
+    mat_norm_expm[d.method_name] += [np.mean(d.mat_norm_expm)]
     mat_mult_expm[d.method_name] += [np.mean(d.mat_mult_expm)]
     total_err[d.method_name] += [err]
     ndt[d.method_name] += [d.ndt]
@@ -280,6 +286,19 @@ if(PLOT_MAT_MULT_EXPM):
     ax.set_xlabel('Number of time steps')
     ax.set_ylabel('Mean # mat mult in expm')
     ax.set_xscale('log')
+    leg = ax.legend()
+    leg.get_frame().set_alpha(0.5)
+    
+if(PLOT_MAT_NORM_EXPM):
+    (ff, ax) = plut.create_empty_figure(1)
+    j = 0
+    for (name, err) in total_err.items():
+        ax.plot(ndt[name], mat_norm_expm[name], line_styles[j], alpha=0.7, label=name)
+        j += 1
+    ax.set_xlabel('Number of time steps')
+    ax.set_ylabel('Mean mat norm in expm')
+    ax.set_xscale('log')
+    ax.set_yscale('log')
     leg = ax.legend()
     leg.get_frame().set_alpha(0.5)
 

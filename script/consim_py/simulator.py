@@ -91,9 +91,7 @@ class RobotSimulator:
         self.model = self.robot.model
         self.data = self.robot.data
         self.t = 0.0
-        self.ndt_force = 1  # number of contact force samples for each time step
         self.f = zero(0)
-        self.f_log = np.zeros((self.ndt_force, 0))
         nv = self.model.nv  # Dimension of joint velocities vector
         if root_joint is None:  # Basically if we have a floating base
             na = nv
@@ -105,7 +103,6 @@ class RobotSimulator:
         self.DISPLAY_T = conf.DISPLAY_T
         self.display_counter = conf.DISPLAY_T
         self.init(conf.q0, None, True)
-        #        self.init(self.robot.model.neutralConfiguration, None, True)
         
         # for gepetto viewer
         if(conf.use_viewer):
@@ -270,7 +267,7 @@ class RobotSimulator:
 #                # Code about matrix expoitation was here
 #            else:
 
-            # I know, file is opened and closed at each iteration, but this is Python who cares
+            # To improve: file is opened and closed at each iteration
             if (self.logFileName is not None):
                 # Writing down A
                 with open(self.logFileName + 'A', 'a+') as f:

@@ -21,6 +21,7 @@ class ExponentialMatrixHelper:
     def __init__(self):
         self.mat_mult = 0           # number of matrix-matrix multilpications used at last computation
         self.mat_mult_in_theory = 0 # theoretical number of mat-mat multiplications needed
+        self.mat_norm = 1.0
     
     
     def compute_mat_mult(self, A):
@@ -120,6 +121,7 @@ class ExponentialMatrixHelper:
         # Compute the number of mat-mat multiplications needed in theory
         self.mat_mult_in_theory = self.compute_mat_mult(A_bal)
         self.mat_mult = min(self.mat_mult_in_theory, max_mat_mult)
+        self.mat_norm = np.linalg.norm(A_bal, 1)
         
         if self.mat_mult <= 0:
             U, V = self.pade1(A_bal)
