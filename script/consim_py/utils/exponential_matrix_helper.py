@@ -22,6 +22,7 @@ class ExponentialMatrixHelper:
         self.mat_mult = 0           # number of matrix-matrix multilpications used at last computation
         self.mat_mult_in_theory = 0 # theoretical number of mat-mat multiplications needed
         self.mat_norm = 1.0
+        self.use_new_expm_alg = True
     
     
     def compute_mat_mult(self, A):
@@ -43,17 +44,21 @@ class ExponentialMatrixHelper:
         if (eta_3 < 2.097847961257068e+000 and _ell(h.A, 9) == 0):
             return 5
         # Use Pade order 13.
-        eta_3 = max(h.d6_tight, h.d8_loose)
-        eta_4 = max(h.d8_loose, h.d10_loose)
-        eta_5 = min(eta_3, eta_4)
-        theta_13 = 4.25
-        # Choose smallest s>=0 such that 2**(-s) eta_5 <= theta_13
-        if eta_5 == 0:
-            # Nilpotent special case
-            s = 0
+        if(self.use_new_expm_alg):
+            eta_3 = max(h.d6_tight, h.d8_loose)
+            eta_4 = max(h.d8_loose, h.d10_loose)
+            eta_5 = min(eta_3, eta_4)
+            theta_13 = 4.25
+            # Choose smallest s>=0 such that 2**(-s) eta_5 <= theta_13
+            if eta_5 == 0:
+                # Nilpotent special case
+                s = 0
+            else:
+                s = max(int(np.ceil(np.log2(eta_5 / theta_13))), 0)
+            s = s + _ell(2**-s * h.A, 13)
         else:
-            s = max(int(np.ceil(np.log2(eta_5 / theta_13))), 0)
-        s = s + _ell(2**-s * h.A, 13)
+            maxnorm = 5.371920351148152
+            s = max(0, int(np.ceil(np.log2(np.linalg.norm(A,1) / maxnorm))))
         return 6+s
       
     def pade1(self, A):
