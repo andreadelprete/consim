@@ -1,8 +1,6 @@
 import numpy as np 
 import pinocchio as pin 
 import consim 
-from pinocchio.robot_wrapper import RobotWrapper
-from pinocchio.utils import fromListToVectorOfString, rotate
 import os, sys
 from os.path import dirname, join
 import matplotlib.pyplot as plt 
@@ -20,33 +18,6 @@ from numpy.linalg import norm as norm
 
 pin.setNumpyType(np.matrix)
 
-def load_solo12_pinocchio(model_path):
-    """ model path is path to robot_properties_solo """
-    urdf_path = '/urdf/solo12.urdf'
-    mesh_path = fromListToVectorOfString([dirname(model_path)])
-    robot = RobotWrapper.BuildFromURDF(
-        model_path+urdf_path, mesh_path, pin.JointModelFreeFlyer())
-
-    q = [0., 0., 0.32, 0., 0., 0., 1.] + 4 * [0., 0., 0.]
-    q[8], q[9], q[11], q[12] = np.pi/4, -np.pi/2, np.pi/4,-np.pi/2
-    q[14], q[15], q[17], q[18] = -np.pi/4, np.pi/2, -np.pi/4, np.pi/2
-    q = np.array(q)
-
-    pin.framesForwardKinematics(robot.model, robot.data,
-                                q[:, None])
-    q[2] = .32 - \
-        robot.data.oMf[robot.model.getFrameId('FL_FOOT')].translation[2]
-    pin.framesForwardKinematics(robot.model, robot.data,
-                                q[:, None])
-    # q[2] += .015
-    robot.q0.flat = q
-    robot.model.referenceConfigurations["half_sitting"] = robot.q0
-    robot.model.referenceConfigurations["reference"] = robot.q0
-    robot.model.referenceConfigurations["standing"] = robot.q0
-
-    robot.defaultState = np.concatenate([robot.q0, np.zeros([robot.model.nv,1])])
-    # compute contact at point feet 
-    return robot
 
 def interpolate_state(robot, x1, x2, d):
         """ interpolate state for feedback at higher rate that plan """
@@ -63,18 +34,18 @@ def state_diff(robot, x1, x2):
     return xdiff
 
 
-whichMotion = 'trot'  # options = ['trot', 'jump"]
+whichMotion = 'jump'  # options = ['trot', 'jump"]
 USE_CONTROLLER = True 
-DISPLAY_SIMULATION = False  
+DISPLAY_SIMULATION = True  
 
 
 if __name__ == "__main__":
     # simulation parameters 
     simu_params = []
     
-    simu_params += [{'name': 'euler 1000',
+    simu_params += [{'name': 'euler 100',
                     'type': 'euler', 
-                    'ndt': 1000}]
+                    'ndt': 100}]
     # simu_params += [{'name': 'euler 200',
     #                 'type': 'euler', 
     #                 'ndt': 200}]
@@ -109,12 +80,12 @@ if __name__ == "__main__":
     line_styles = ['-', '--', '-.', '-..', ':','-o']
     i_ls = 0
     
-    mu = 0.7        # friction coefficient
+    mu = 1.        # friction coefficient
     isSparse = False 
     isInvertible = False
     unilateral_contacts = True                   
     K = 1.e+5 * np.ones([3,1])
-    B = 3.e+2 * np.ones([3,1])
+    B = 2.4e+2 * np.ones([3,1])
     T = 1 #  1 second simution  
     dt = 1.e-3 
 
@@ -125,8 +96,8 @@ if __name__ == "__main__":
     
 
     # load robot 
-    model_path = "../../models/robot_properties_solo"
-    robot = load_solo12_pinocchio(model_path)
+    # model_path = "../../models/robot_properties_solo"
+    robot = loadSolo(False) ## load_solo12_pinocchio(model_path)
     print(" Solo Loaded Successfully ".center(conf.LINE_WIDTH, '#'))
     
     # now load reference trajectories 
@@ -199,7 +170,8 @@ if __name__ == "__main__":
                 else:
                     tau[6:] = refU[i]
 
-            sim.step(tau) 
+                sim.step(tau) 
+            # log only at 10 ms 
             sim_q[i+1,:] = np.resize(sim.get_q(), robot.nq)
             sim_v[i+1,:] = np.resize(sim.get_v(), robot.nv)
 
@@ -217,24 +189,28 @@ if __name__ == "__main__":
             robot.initViewer(loadModel=True)
             cameraTF = [3., 3.68, 0.84, 0.2, 0.62, 0.72, 0.22]
             robot.viewer.gui.setCameraTransform(0, cameraTF)
-            backgroundColor = [1., 1., 1., 1.]
-            floorColor = [0.7, 0.7, 0.7, 1.]
-            #   
-            window_id = robot.viz.viewer.gui.getWindowID("python-pinocchio")
-            robot.viz.viewer.gui.setBackgroundColor1(window_id, backgroundColor)
-            robot.viz.viewer.gui.setBackgroundColor2(window_id, backgroundColor)
+            # backgroundColor = [1., 1., 1., 1.]
+            # floorColor = [0.7, 0.7, 0.7, 1.]
+            # #   
+            # window_id = robot.viz.viewer.gui.getWindowID("python-pinocchio")
+            # robot.viz.viewer.gui.setBackgroundColor1(window_id, backgroundColor)
+            # robot.viz.viewer.gui.setBackgroundColor2(window_id, backgroundColor)
 
             for i in range(N_SIMULATION):
-                robot.display(sim_q[i])
+                robot.display(sim_q[i][:,None])
                 time.sleep(1.e-2)
 
 
+        qz = []
+
+        for i in range(N_SIMULATION+1):
+            qz += [sim_q[i,2]]
 
     #     # plot base trajectory 
-    #     plt.figure('base_height')
-    #     plt.plot(tt, sim_q[:,2], line_styles[i_ls], alpha=0.7, label=name)
-    #     plt.legend()
-    #     plt.title('Base Height vs time ')
+        plt.figure('base_height')
+        plt.plot(tt, qz , line_styles[i_ls], alpha=0.7, label=name)
+        plt.legend()
+        plt.title('Base Height vs time ')
 
         # plot contact forces 
         for ci, ci_name in enumerate(conf.contact_frames):

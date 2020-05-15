@@ -186,15 +186,14 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
         tau_ -= joint_friction_.cwiseProduct(v_);
       }
       // Compute the acceloration ddq.
-      // CONSIM_START_PROFILER("pinocchio::aba");
+      // // CONSIM_START_PROFILER("pinocchio::aba");
       inverseM_ = pinocchio::computeMinverse(*model_, *data_, q_); //data_->M.inverse();
       // lltM_.compute(data_->M);
       mDv_ = tau_ - data_->nle; 
       // dv_ = lltM_.solve(mDv_);
       dv_ = inverseM_*mDv_; 
-      vMean_ = v_ + .5 * sub_dt*dv_;
-
       // pinocchio::aba(*model_, *data_, q_, v_, tau_);
+      vMean_ = v_ + .5 * sub_dt*dv_;
       // CONSIM_STOP_PROFILER("pinocchio::aba");
       // vMean_ = v_ + .5 * sub_dt * data_->ddq;
       pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
