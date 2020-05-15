@@ -25,9 +25,12 @@ class Contact:
         self.frame_id = model.getFrameId(frame_name)
         self.reset_contact_position()
 
-    def reset_contact_position(self):
+    def reset_contact_position(self, p0=None):
         # Initial (0-load) position of the spring
-        self.p0 = self.data.oMf[self.frame_id].translation.copy()
+        if(p0 is None):
+            self.p0 = self.data.oMf[self.frame_id].translation.copy()
+        else:
+            self.p0 = np.copy(p0)
         self.in_contact = True
 
     def compute_force(self):
@@ -126,7 +129,7 @@ class RobotSimulator:
             self.gui.setLightingMode('world/floor', 'OFF')
 
     # Re-initialize the simulator
-    def init(self, q0, v0=None, reset_contact_positions=False):
+    def init(self, q0, v0=None, reset_contact_positions=False, p0=None):
         self.first_iter = True
         self.q = q0.copy()
         if(v0 is None):
@@ -135,15 +138,18 @@ class RobotSimulator:
             self.v = v0.copy()
         self.dv = zero(self.robot.nv)
 
-        # reset contact position
-        if(reset_contact_positions):
+        if(reset_contact_positions and p0 is None):
+            # set the contact anchor points at the current contact positions
             se3.forwardKinematics(self.model, self.data, self.q)
             se3.updateFramePlacements(self.model, self.data)
-            i = 0
-            for c in self.contacts:
+            for (i,c) in enumerate(self.contacts):
                 c.reset_contact_position()
-                self.p0[i:i+3, 0] = c.p0
-                i += 3
+                self.p0[3*i:3*i+3, 0] = c.p0
+        elif(p0 is not None):
+            # the user is specifying explicitly the anchor points
+            for (i,c) in enumerate(self.contacts):
+                c.reset_contact_position(p0[3*i:3*i+3])
+            self.p0 = np.copy(p0)
 
         self.compute_forces(compute_data=True)
 
@@ -197,15 +203,18 @@ class RobotSimulator:
         K_p0 = self.K@self.p0
         M = self.data.M
         h = self.data.nle
-        dv_bar = np.linalg.solve(M, self.S.T@u - h + self.Jc.T@K_p0)
+        dv_bar = np.linalg.solve(M, self.S.T@u - h)
+#        dv_bar = np.linalg.solve(M, self.S.T@u - h + self.Jc.T@K_p0)
         for (i,c) in enumerate(self.contacts):
             self.p[  3*i:3*i+3] = c.p
             self.dp[ 3*i:3*i+3] = c.v
             self.dJv[3*i:3*i+3] = c.dJv
-        x0 = np.concatenate((self.p, self.dp))
+        x0 = np.concatenate((self.p-self.p0, self.dp))
+#        x0 = np.concatenate((self.p, self.dp))
         JMinv = np.linalg.solve(M, self.Jc.T).T
         self.Upsilon = self.Jc @ JMinv.T
-        self.a[self.nk:] = JMinv@(self.S.T@u-h) + self.dJv + self.Upsilon@K_p0
+        self.a[self.nk:] = JMinv@(self.S.T@u-h) + self.dJv
+#        self.a[self.nk:] = JMinv@(self.S.T@u-h) + self.dJv + self.Upsilon@K_p0
         self.A[self.nk:, :self.nk] = -self.Upsilon@self.K
         self.A[self.nk:, self.nk:] = -self.Upsilon@self.B
         return K_p0, x0, dv_bar, JMinv

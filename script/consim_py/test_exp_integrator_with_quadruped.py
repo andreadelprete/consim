@@ -22,11 +22,12 @@ print("Test Quadruped Robot ".center(conf.LINE_WIDTH, '#'))
 print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be used as ground truth
-i_max = 7
-i_ground_truth = i_max+3
+i_max = 6
+i_ground_truth = i_max+2
 
 GROUND_TRUTH_SIMU_PARAMS = {
     'name': 'ground-truth',
+    'method_name': 'ground-truth',
     'use_exp_int': 1,
     'ndt': 2**i_ground_truth,
     'max_mat_mult': 100,
@@ -34,15 +35,15 @@ GROUND_TRUTH_SIMU_PARAMS = {
 }
 
 SIMU_PARAMS = []
-for i in range(i_max):
-    SIMU_PARAMS += [{
-        'name': 'exp%4d'%(2**i),
-        'method_name': 'exp',
-        'use_exp_int': 1,
-        'ndt': 2**i,
-        'max_mat_mult': 100,
-        'use_second_integral': True
-    }]
+#for i in range(5, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'exp%4d'%(2**i),
+#        'method_name': 'exp',
+#        'use_exp_int': 1,
+#        'ndt': 2**i,
+#        'max_mat_mult': 100,
+#        'use_second_integral': True
+#    }]
     
 # USE ONLY FIRST INTEGRAL
 #for i in range(i_max):
@@ -54,9 +55,9 @@ for i in range(i_max):
 #        'max_mat_mult': 100,
 #        'use_second_integral': False
 #    }]
-    
+
 # REDUCE NUMBER OF MATRIX MULTIPLICATIONS
-for i in range(i_max):
+for i in range(2,3):
     for j in range(0,7):
         SIMU_PARAMS += [{
             'name': 'exp%4d mmm-%d'%(2**i,j),
@@ -68,28 +69,29 @@ for i in range(i_max):
         }]
 
 # EULER SIMULATOR
-for i in range(7, i_max):
-    SIMU_PARAMS += [{
-        'name': 'euler%4d'%(2**i),
-        'method_name': 'euler',
-        'use_exp_int': 0,
-        'ndt': 2**i,
-        'max_mat_mult': 100,
-        'use_second_integral': False
-    }]
+#for i in range(5, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'euler%4d'%(2**i),
+#        'method_name': 'euler',
+#        'use_exp_int': 0,
+#        'ndt': 2**i,
+#        'max_mat_mult': 100,
+#        'use_second_integral': False
+#    }]
 
 PLOT_UPSILON = 0
 PLOT_FORCES = 0
 PLOT_BASE_POS = 0
 PLOT_FORCE_PREDICTIONS = 0
 PLOT_INTEGRATION_ERRORS = 1
-PLOT_MAT_MULT_EXPM = 1
-PLOT_MAT_NORM_EXPM = 1
+PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
+PLOT_MAT_MULT_EXPM = 0
+PLOT_MAT_NORM_EXPM = 0
 
 ASSUME_A_INVERTIBLE = 0
 USE_CONTROLLER = 1
 dt = 0.01                      # controller time step
-T = 0.1
+T = 0.2
 
 offset = np.array([0.0, -0.0, 0.0])
 amp = np.array([0.0, 0.0, 0.05])
@@ -125,7 +127,10 @@ two_pi_f_squared_amp = two_pi_f * two_pi_f_amp
 sampleCom = invdyn.trajCom.computeNext()
 
 def run_simulation(q, v, simu_params):
-    simu.init(q0, v0)
+    simu = RobotSimulator(conf, solo, se3.JointModelFreeFlyer())
+    for name in conf.contact_frames:
+        simu.add_contact(name, conf.contact_normal, conf.K, conf.B)
+    simu.init(q0, v0, p0=conf.p0)
     simu.max_mat_mult = simu_params['max_mat_mult']
     simu.use_second_integral = simu_params['use_second_integral']
     t = 0.0
@@ -232,7 +237,7 @@ data_ground_truth = run_simulation(q0, v0, GROUND_TRUTH_SIMU_PARAMS)
 
 # import cProfile
 # cProfile.run('run_simulation(q0, v0)')    
-data = {}
+data = {'ground-truth': data_ground_truth}
 for simu_params in SIMU_PARAMS:
     name = simu_params['name']
     print("\nStart simulation", name)
@@ -241,11 +246,14 @@ for simu_params in SIMU_PARAMS:
 # COMPUTE INTEGRATION ERRORS:
 print('\n')
 ndt = {}
-total_err = {}
+total_err, err_traj = {}, {}
 mat_mult_expm, mat_norm_expm = {}, {}
 for name in sorted(data.keys()):
+    if(name=='ground-truth'): continue
     d = data[name]
     err = norm(d.q - data_ground_truth.q) + norm(d.v - data_ground_truth.v)
+    err_per_time = np.array(norm(d.q - data_ground_truth.q, axis=0)) + \
+                    np.array(norm(d.v - data_ground_truth.v, axis=0))
     print(name, 'Total error: %.2f'%np.log10(err))
     if(d.method_name not in total_err):
         mat_norm_expm[d.method_name] = []
@@ -255,6 +263,7 @@ for name in sorted(data.keys()):
     mat_norm_expm[d.method_name] += [np.mean(d.mat_norm_expm)]
     mat_mult_expm[d.method_name] += [np.mean(d.mat_mult_expm)]
     total_err[d.method_name] += [err]
+    err_traj[name] = err_per_time
     ndt[d.method_name] += [d.ndt]
 
 # PLOT STUFF
@@ -275,7 +284,20 @@ if(PLOT_INTEGRATION_ERRORS):
     ax.set_xscale('log')
     ax.set_yscale('log')
     leg = ax.legend()
-    leg.get_frame().set_alpha(0.5)
+    if(leg): leg.get_frame().set_alpha(0.5)
+    
+if(PLOT_INTEGRATION_ERROR_TRAJECTORIES):
+    (ff, ax) = plut.create_empty_figure(1)
+    j = 0
+    for name in sorted(err_traj.keys()):
+        err = err_traj[name]
+        ax.plot(tt, err_traj[name], line_styles[j], alpha=0.7, label=name)
+        j += 1
+    ax.set_xlabel('Time [s]')
+    ax.set_ylabel('Error norm')
+    ax.set_yscale('log')
+    leg = ax.legend()
+    if(leg): leg.get_frame().set_alpha(0.5)
     
 if(PLOT_MAT_MULT_EXPM):
     (ff, ax) = plut.create_empty_figure(1)
@@ -287,7 +309,7 @@ if(PLOT_MAT_MULT_EXPM):
     ax.set_ylabel('Mean # mat mult in expm')
     ax.set_xscale('log')
     leg = ax.legend()
-    leg.get_frame().set_alpha(0.5)
+    if(leg): leg.get_frame().set_alpha(0.5)
     
 if(PLOT_MAT_NORM_EXPM):
     (ff, ax) = plut.create_empty_figure(1)
@@ -300,7 +322,7 @@ if(PLOT_MAT_NORM_EXPM):
     ax.set_xscale('log')
     ax.set_yscale('log')
     leg = ax.legend()
-    leg.get_frame().set_alpha(0.5)
+    if(leg): leg.get_frame().set_alpha(0.5)
 
 # PLOT THE CONTACT FORCES OF ALL INTEGRATION METHODS ON THE SAME PLOT
 if(PLOT_FORCES):
@@ -314,7 +336,7 @@ if(PLOT_FORCES):
             ax[i].set_ylabel('Force Z [N]')
         j += 1
         leg = ax[0].legend()
-        leg.get_frame().set_alpha(0.5)
+        if(leg): leg.get_frame().set_alpha(0.5)
 
 # FOR EACH INTEGRATION METHOD PLOT THE FORCE PREDICTIONS
 if(PLOT_FORCE_PREDICTIONS):
@@ -330,7 +352,7 @@ if(PLOT_FORCE_PREDICTIONS):
            ax[i].set_xlabel('Time [s]')
            ax[i].set_ylabel('Force Z [N]')
        leg = ax[-1].legend()
-       leg.get_frame().set_alpha(0.5)
+       if(leg): leg.get_frame().set_alpha(0.5)
        
        # force prediction error of Euler, i.e. assuming force remains contact during time step
        ndt = int(d.f_inner.shape[1] / (d.f.shape[1]-1))
@@ -353,7 +375,7 @@ if(PLOT_BASE_POS):
             ax[i].set_ylabel('Base pos [m]')
         j += 1
         leg = ax[0].legend()
-        leg.get_frame().set_alpha(0.5)
+        if(leg): leg.get_frame().set_alpha(0.5)
         
 #print('')
 #for (name, d) in data.items():

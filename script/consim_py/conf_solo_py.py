@@ -35,10 +35,18 @@ kp_posture = 2.0               # proportional gain of joint posture task
 PRINT_T = 0.2                   # print every PRINT_T
 DISPLAY_T = 0.005                 # update robot configuration in viwewer every DISPLAY_T
 
-# Starting resting joint position
+# Starting position with zero contact forces
 q0 = np.array([0., 0., 0.223, 0., 0., 0., 1.,
                  -0.8,  1.6, -0.8, 1.6,
                  -0.8,  1.6, -0.8, 1.6])
+# Starting position with stable contact forces
+q0 = 1e-6*np.array([0.605, -0.083, 223001.532, 0.187, 5.332, -0.000, 1000000.000, 
+                    -799754.095, 1599492.290, -799755.961, 1599496.022, 
+                    -799781.180, 1599546.460, -799783.045, 1599550.191])
+# anchor for contact points
+#p0 = 1e-6*np.array([-190000.000, 150050.000, 53.853, -190000.000, -150050.000, 53.853, 
+#                     190000.000, 150050.000, 53.853, 190000.000, -150050.000, 53.853, ])
+p0 = None
 
 use_viewer = 1
 CAMERA_TRANSFORM = [1.0910934209823608, -1.4611519575119019, 0.9074661731719971,
