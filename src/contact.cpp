@@ -61,24 +61,26 @@ void LinearPenaltyContactModel::computeForce(ContactPoint& cp)
   normalF_ = stiffness_.cwiseProduct(cp.normal) - damping_.cwiseProduct(cp.normvel); 
 
   /*!< unilateral force, no pulling into contact object */ 
-  if (cp.unilateral && normalF_.dot(cp.normal)<0){
-    normalF_.fill(0);
-  }
-  normalNorm_ = sqrt(normalF_.transpose()*normalF_);
-  tangentF_ = stiffness_.cwiseProduct(cp.tangent) - damping_.cwiseProduct(cp.tanvel);
-  tangentNorm_ = sqrt(tangentF_.transpose()*tangentF_);
-  cp.f = normalF_; 
-  //
-  if (cp.unilateral && (tangentNorm_ > friction_coeff_*normalNorm_)){
-    tangentDir_ = tangentF_/tangentNorm_; 
-    cp.f += friction_coeff_*normalNorm_*tangentDir_; 
-    // TODO: different friction coefficient along x,y will have to do 
-    //       the update below in vector form  
-    delAnchor_ = (tangentNorm_ - friction_coeff_*normalNorm_)/stiffness_(0);  
-    cp.x_start -= delAnchor_ * tangentDir_;  
-  } // friction cone violation
+  if (cp.unilateral && normalF_.dot(cp.contactNormal_)<0){
+    cp.f.fill(0);
+  } 
   else{
-    cp.f += tangentF_;
+    normalNorm_ = sqrt(normalF_.transpose()*normalF_);
+    tangentF_ = stiffness_.cwiseProduct(cp.tangent) - damping_.cwiseProduct(cp.tanvel);
+    tangentNorm_ = sqrt(tangentF_.transpose()*tangentF_);
+    cp.f = normalF_; 
+    //
+    if (cp.unilateral && (tangentNorm_ > friction_coeff_*normalNorm_)){
+      tangentDir_ = tangentF_/tangentNorm_; 
+      cp.f += friction_coeff_*normalNorm_*tangentDir_; 
+      // TODO: different friction coefficient along x,y will have to do 
+      //       the update below in vector form  
+      delAnchor_ = (tangentNorm_ - friction_coeff_*normalNorm_)/stiffness_(0);  
+      cp.x_start -= delAnchor_ * tangentDir_;  
+    } // friction cone violation
+    else{
+      cp.f += tangentF_;
+    }
   }
 }
 
