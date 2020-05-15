@@ -1,4 +1,4 @@
-from consim_py.utils_LDS_integral import compute_x_T
+#from consim_py.utils_LDS_integral import compute_x_T
 import pinocchio as se3
 from pinocchio.utils import zero
 import numpy as np
@@ -10,7 +10,8 @@ import gepetto.corbaserver
 import time
 import subprocess
 
-from consim_py.utils_LDS_integral import ExponentialMatrixHelper, compute_integral_x_T, compute_double_integral_x_T
+#from consim_py.utils.utils_LDS_integral import compute_integral_x_T, compute_double_integral_x_T
+from consim_py.utils.exponential_matrix_helper import ExponentialMatrixHelper
 
 
 class Contact:
@@ -84,6 +85,7 @@ class RobotSimulator:
         self.expMatHelper = ExponentialMatrixHelper()
         self.assume_A_invertible = False
         self.max_mat_mult = 100
+        self.use_second_integral = True
         # se3.RobotWrapper.BuildFromURDF(conf.urdf, [conf.path, ], se3.JointModelFreeFlyer())
         self.robot = robot
         self.model = self.robot.model
@@ -278,18 +280,17 @@ class RobotSimulator:
                 with open(self.logFileName + 'xInit', 'a+') as f:
                     np.savetxt(f, [np.asarray(x0)[:, 0]], '%.18f', '\t')
 
-            if(self.assume_A_invertible):
-                int_x, int2_x = compute_double_integral_x_T(self.A, self.a, x0, dt, compute_also_integral=True, invertible_A=True)
-            else:
-                int_x = self.expMatHelper.compute_integral_x_T(self.A, self.a, x0, dt, self.max_mat_mult, True)
-                int2_x = self.expMatHelper.compute_double_integral_x_T(self.A, self.a, x0, dt, self.max_mat_mult, True)
-                # x, int_x, int2_x = compute_x_T_and_two_integrals(self.A, self.a, x0, dt)
-
+            int_x = self.expMatHelper.compute_integral_x_T(self.A, self.a, x0, dt, self.max_mat_mult)
             D_int_x = self.D @ int_x
-            D_int2_x = self.D @ int2_x
+            dv_mean = dv_bar + JMinv.T @ D_int_x/dt
             
-            v_mean = self.v + 0.5*dt*dv_bar + JMinv.T@D_int2_x/dt
-            dv_mean = dv_bar + JMinv.T@D_int_x/dt
+            if(self.use_second_integral):
+                int2_x = self.expMatHelper.compute_double_integral_x_T(self.A, self.a, x0, dt, self.max_mat_mult)
+                D_int2_x = self.D @ int2_x
+                v_mean = self.v + 0.5*dt*dv_bar + JMinv.T@D_int2_x/dt
+            else:
+#                f_avg = K_p0 + D_int_x/dt # average force during time step
+                v_mean  = self.v + 0.5*dt*dv_mean
 
             if(dt_force_pred is not None):
                 # predict intermediate forces using linear dynamical system (i.e. matrix exponential)
@@ -304,8 +305,8 @@ class RobotSimulator:
                     z = e_TC @ z
                     
                 # predict also what forces we would get by integrating with the force prediction
-                int_x = self.expMatHelper.compute_integral_x_T(self.A, self.a, x0, dt_force_pred, self.max_mat_mult, True)
-                int2_x = self.expMatHelper.compute_double_integral_x_T(self.A, self.a, x0, dt_force_pred, self.max_mat_mult, True)
+                int_x = self.expMatHelper.compute_integral_x_T(self.A, self.a, x0, dt_force_pred, self.max_mat_mult)
+                int2_x = self.expMatHelper.compute_double_integral_x_T(self.A, self.a, x0, dt_force_pred, self.max_mat_mult)
                 D_int_x = self.D @ int_x
                 D_int2_x = self.D @ int2_x
                 v_mean_pred = self.v + 0.5*dt_force_pred*dv_bar + JMinv.T@D_int2_x/dt_force_pred

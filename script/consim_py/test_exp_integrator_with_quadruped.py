@@ -22,14 +22,15 @@ print("Test Quadruped Robot ".center(conf.LINE_WIDTH, '#'))
 print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be used as ground truth
-i_max = 5
+i_max = 7
 i_ground_truth = i_max+3
 
 GROUND_TRUTH_SIMU_PARAMS = {
-    'name': 'euler%3d'%(2**i_max),
+    'name': 'ground-truth',
     'use_exp_int': 1,
-    'ndt': 2**i_max,
-    'max_mat_mult': 100
+    'ndt': 2**i_ground_truth,
+    'max_mat_mult': 100,
+    'use_second_integral': True
 }
 
 SIMU_PARAMS = []
@@ -39,31 +40,47 @@ for i in range(i_max):
         'method_name': 'exp',
         'use_exp_int': 1,
         'ndt': 2**i,
-        'max_mat_mult': 100
+        'max_mat_mult': 100,
+        'use_second_integral': True
     }]
     
+# USE ONLY FIRST INTEGRAL
 #for i in range(i_max):
-#    for j in range(2,7):
-#        SIMU_PARAMS += [{
-#            'name': 'exp%4d mmm-%d'%(2**i,j),
-#            'method_name': 'exp mmm-%d'%j,
-#            'use_exp_int': 1,
-#            'ndt': 2**i,
-#            'max_mat_mult': j
-#        }]
+#    SIMU_PARAMS += [{
+#        'name': 'exp%4d n2i'%(2**i),
+#        'method_name': 'exp-no-2nd-int',
+#        'use_exp_int': 1,
+#        'ndt': 2**i,
+#        'max_mat_mult': 100,
+#        'use_second_integral': False
+#    }]
     
+# REDUCE NUMBER OF MATRIX MULTIPLICATIONS
+for i in range(i_max):
+    for j in range(0,7):
+        SIMU_PARAMS += [{
+            'name': 'exp%4d mmm-%d'%(2**i,j),
+            'method_name': 'exp mmm-%d'%j,
+            'use_exp_int': 1,
+            'ndt': 2**i,
+            'max_mat_mult': j,
+            'use_second_integral': True
+        }]
+
+# EULER SIMULATOR
 for i in range(7, i_max):
     SIMU_PARAMS += [{
         'name': 'euler%4d'%(2**i),
         'method_name': 'euler',
         'use_exp_int': 0,
         'ndt': 2**i,
-        'max_mat_mult': 100
+        'max_mat_mult': 100,
+        'use_second_integral': False
     }]
 
 PLOT_UPSILON = 0
 PLOT_FORCES = 0
-PLOT_BASE_POS = 1
+PLOT_BASE_POS = 0
 PLOT_FORCE_PREDICTIONS = 0
 PLOT_INTEGRATION_ERRORS = 1
 PLOT_MAT_MULT_EXPM = 1
@@ -71,7 +88,7 @@ PLOT_MAT_MULT_EXPM = 1
 ASSUME_A_INVERTIBLE = 0
 USE_CONTROLLER = 1
 dt = 0.01                      # controller time step
-T = 1.0
+T = 0.1
 
 offset = np.array([0.0, -0.0, 0.0])
 amp = np.array([0.0, 0.0, 0.05])
@@ -109,6 +126,7 @@ sampleCom = invdyn.trajCom.computeNext()
 def run_simulation(q, v, simu_params):
     simu.init(q0, v0)
     simu.max_mat_mult = simu_params['max_mat_mult']
+    simu.use_second_integral = simu_params['use_second_integral']
     t = 0.0
     ndt = simu_params['ndt']
     time_start = time.time()
@@ -242,7 +260,8 @@ tt = np.arange(0.0, (N_SIMULATION+1)*dt, dt)[:N_SIMULATION+1]
 if(PLOT_INTEGRATION_ERRORS):
     (ff, ax) = plut.create_empty_figure(1)
     j = 0
-    for (name, err) in total_err.items():
+    for name in sorted(total_err.keys()):
+        err = total_err[name]
         ax.plot(ndt[name], total_err[name], line_styles[j], alpha=0.7, label=name)
         j += 1
     ax.set_xlabel('Number of time steps')
@@ -291,7 +310,7 @@ if(PLOT_FORCE_PREDICTIONS):
            ax[i].plot(tt_log, d.f_inner[2+3*i,:], 'b x', markersize=6, label=name+' real '+str(i))
            ax[i].set_xlabel('Time [s]')
            ax[i].set_ylabel('Force Z [N]')
-       leg = ax[0].legend()
+       leg = ax[-1].legend()
        leg.get_frame().set_alpha(0.5)
        
        # force prediction error of Euler, i.e. assuming force remains contact during time step
