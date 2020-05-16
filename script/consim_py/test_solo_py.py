@@ -1,3 +1,5 @@
+''' Test python simulator with Solo robot 
+'''
 import time
 import matplotlib.pyplot as plt
 
@@ -18,7 +20,7 @@ class Empty:
 
 
 print("".center(conf.LINE_WIDTH, '#'))
-print("Test Quadruped Robot ".center(conf.LINE_WIDTH, '#'))
+print(" Test Solo ".center(conf.LINE_WIDTH, '#'))
 print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be used as ground truth

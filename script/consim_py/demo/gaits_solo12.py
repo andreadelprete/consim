@@ -4,11 +4,11 @@ import consim
 import os, sys
 from os.path import dirname, join
 import matplotlib.pyplot as plt 
-import utils.plot_utils as plut
+import consim_py.utils.plot_utils as plut
 import time
 import matplotlib.pyplot as plt
 
-import conf_solo_py as conf
+import consim_py.conf_solo_py as conf
 from example_robot_data.robots_loader import loadSolo
 
 import numpy.matlib as matlib
@@ -187,7 +187,7 @@ if __name__ == "__main__":
         if DISPLAY_SIMULATION:
             robot.initViewer(loadModel=True)
             cameraTF = [3., 3.68, 0.84, 0.2, 0.62, 0.72, 0.22]
-            robot.viewer.gui.setCameraTransform(0, cameraTF)
+            robot.viewer.gui.setCameraTransform('python-pinocchio', cameraTF)
             # backgroundColor = [1., 1., 1., 1.]
             # floorColor = [0.7, 0.7, 0.7, 1.]
             # #   
