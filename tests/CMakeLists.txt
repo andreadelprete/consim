@@ -33,7 +33,7 @@ INCLUDE_DIRECTORIES(.)
 
 # --- TESTS ------------------------------------------------------------------
 
-ADD_CONSIM_UNIT_TEST(test_contact)
+#ADD_CONSIM_UNIT_TEST(test_contact)
 #ADD_CONSIM_UNIT_TEST(test_object)
 #ADD_CONSIM_UNIT_TEST(test_euler)
 #ADD_CONSIM_UNIT_TEST(test_exponential)

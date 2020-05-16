@@ -253,7 +253,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       checkFrictionCone();
       CONSIM_STOP_PROFILER("exponential_simulator::checkFrictionCone");
       if(cone_flag_){
-        std::cout<<"friction cone activecated "<<std::endl;
+        //std::cout<<"friction cone activecated "<<std::endl;
         // computeSlipping();
         temp01_.noalias() = JcT_*fpr_; 
         temp02_ = tau_ - data_->nle + temp01_;
