@@ -33,7 +33,7 @@ def state_diff(robot, x1, x2):
     return xdiff
 
 
-whichMotion = 'jump'  # options = ['trot', 'jump"]
+whichMotion = 'trot'  # options = ['trot', 'jump"]
 USE_CONTROLLER = True 
 DISPLAY_SIMULATION = True  
 
@@ -42,9 +42,9 @@ if __name__ == "__main__":
     # simulation parameters 
     simu_params = []
     
-    simu_params += [{'name': 'euler 100',
-                    'type': 'euler', 
-                    'ndt': 100}]
+#    simu_params += [{'name': 'euler 100',
+#                    'type': 'euler', 
+#                    'ndt': 100}]
     # simu_params += [{'name': 'euler 200',
     #                 'type': 'euler', 
     #                 'ndt': 200}]
@@ -56,21 +56,21 @@ if __name__ == "__main__":
     #                 'type': 'exponential', 
     #                 'ndt': 500}]
 
-    # simu_params += [{'name': 'exponential 100',
-    #                 'type': 'exponential', 
-    #                 'ndt': 100}]
+#    simu_params += [{'name': 'exponential 100',
+#                     'type': 'exponential', 
+#                     'ndt': 100}]
         
     # simu_params += [{'name': 'euler 10',
     #                 'type': 'euler', 
     #                 'ndt': 10}]
 
-    # simu_params += [{'name': 'exponential 10',
-    #                 'type': 'exponential', 
-    #                 'ndt': 10}]
+    simu_params += [{'name': 'exponential 10',
+                     'type': 'exponential', 
+                     'ndt': 10}]
 
-    # simu_params += [{'name': 'exponential 1',
-    #                 'type': 'exponential', 
-    #                 'ndt': 1}]
+    simu_params += [{'name': 'exponential 1',
+                     'type': 'exponential', 
+                     'ndt': 1}]
     
     # simu_params += [{'name': 'euler 1',
     #                 'type': 'euler', 
@@ -86,13 +86,11 @@ if __name__ == "__main__":
     K = 1.e+5 * np.ones([3,1])
     B = 2.4e+2 * np.ones([3,1])
     T = 1 #  1 second simution  
-    dt = 1.e-3 
+    dt = 2.e-3 
+    dt_ref = 1e-2 # time step of reference motion
 
-    N_SIMULATION = int(T/dt)        # number of time steps simulated
     PRINT_N = int(conf.PRINT_T/dt)
     DISPLAY_N = int(conf.DISPLAY_T/dt)
-
-    
 
     # load robot 
     # model_path = "../../models/robot_properties_solo"
@@ -107,7 +105,6 @@ if __name__ == "__main__":
     tau = np.zeros([robot.model.nv,1])
 
     N_SIMULATION = refU.shape[0] 
-    # PLOT STUFF
     tt = np.arange(0.0, N_SIMULATION*dt + dt, dt) 
 
     for simu_param in simu_params:
@@ -133,8 +130,6 @@ if __name__ == "__main__":
 
         # reset simulator 
         sim.reset_state(refX[0,:robot.nq], refX[0,robot.nq:], True)
-        print('Reset state done '.center(conf.LINE_WIDTH, '-')) 
-
         
         sim_f = np.empty((N_SIMULATION+1,len(conf.contact_frames),3))*nan
         sim_q = np.empty((N_SIMULATION+1,robot.nq))*nan
@@ -147,22 +142,17 @@ if __name__ == "__main__":
         v = [refX[0,robot.nq:].copy()]
 
         for ci, cp in enumerate(cpts):
-                sim_f[0,ci,:] = np.resize(cp.f,3)
-                contact_x[0,ci,:] = np.resize(cp.x,3)
-                contact_v[0,ci,:] = np.resize(cp.v,3)
-        
-
-        for ci, cframe in enumerate(conf.contact_frames):
-            print('initial contact position for contact '+cframe)
-            print(contact_x[0,ci,:])
+            sim_f[0,ci,:] = np.resize(cp.f,3)
+            contact_x[0,ci,:] = np.resize(cp.x,3)
+            contact_v[0,ci,:] = np.resize(cp.v,3)
 
         t = 0. 
         time_start = time.time()
         # simulation loop 
         for i in range(N_SIMULATION):
-            for d in range(10):
+            for d in range(int(dt_ref/dt)):
                 if(USE_CONTROLLER):
-                    xref = interpolate_state(robot, refX[i], refX[i+1], .1*d)
+                    xref = interpolate_state(robot, refX[i], refX[i+1], dt*d/dt_ref)
                     xact = np.concatenate([sim.get_q(), sim.get_v()])
                     diff = state_diff(robot, xact, xref)
                     tau[6:] = refU[i] + feedBack[i].dot(diff) 
@@ -179,15 +169,17 @@ if __name__ == "__main__":
                 contact_x[i+1,ci,:] = np.resize(cp.x,3)
                 contact_v[i+1,ci,:] = np.resize(cp.v,3)
     
-            t += 1.e-3  
+            t += dt
         # end simulation loop
         time_spent = time.time() - time_start
         print("Real-time factor:", t/time_spent)    
 
         if DISPLAY_SIMULATION:
             robot.initViewer(loadModel=True)
+            robot.viewer.gui.createSceneWithFloor('world')
+            robot.viewer.gui.setLightingMode('world/floor', 'OFF')
             cameraTF = [3., 3.68, 0.84, 0.2, 0.62, 0.72, 0.22]
-            robot.viewer.gui.setCameraTransform('python-pinocchio', cameraTF)
+#            robot.viewer.gui.setCameraTransform('python-pinocchio', cameraTF)
             # backgroundColor = [1., 1., 1., 1.]
             # floorColor = [0.7, 0.7, 0.7, 1.]
             # #   
@@ -197,7 +189,7 @@ if __name__ == "__main__":
 
             for i in range(N_SIMULATION):
                 robot.display(sim_q[i][:,None])
-                time.sleep(1.e-2)
+                time.sleep(dt_ref)
 
 
         qz = []
@@ -218,11 +210,7 @@ if __name__ == "__main__":
             plt.legend()
             plt.title(ci_name+" normal force vs time")
         
-        
         i_ls += 1 
         
-
     consim.stop_watch_report(3)
     plt.show()
-
-
