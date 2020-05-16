@@ -22,7 +22,8 @@ print("Test Quadruped Robot ".center(conf.LINE_WIDTH, '#'))
 print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be used as ground truth
-i_max = 6
+i_min = 4
+i_max = 5
 i_ground_truth = i_max+2
 
 GROUND_TRUTH_SIMU_PARAMS = {
@@ -30,20 +31,27 @@ GROUND_TRUTH_SIMU_PARAMS = {
     'method_name': 'ground-truth',
     'use_exp_int': 1,
     'ndt': 2**i_ground_truth,
-    'max_mat_mult': 100,
-    'use_second_integral': True
 }
 
 SIMU_PARAMS = []
-#for i in range(5, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'exp%4d'%(2**i),
-#        'method_name': 'exp',
-#        'use_exp_int': 1,
-#        'ndt': 2**i,
-#        'max_mat_mult': 100,
-#        'use_second_integral': True
-#    }]
+for i in range(i_min, i_max):
+    SIMU_PARAMS += [{
+        'name': 'exp%4d'%(2**i),
+        'method_name': 'exp',
+        'use_exp_int': 1,
+        'ndt': 2**i,
+    }]
+    
+# UPDATE MATRIX EXPONENTIAL EVERY FEW ITERATIONS
+for i in range(i_min, i_max):
+    for j in range(1,2):
+        SIMU_PARAMS += [{
+            'name': 'exp%4d update%3d'%(2**i, 2**j),
+            'method_name': 'exp update',
+            'use_exp_int': 1,
+            'ndt': 2**i,
+            'update_expm_N': 2**j
+        }]
     
 # USE ONLY FIRST INTEGRAL
 #for i in range(i_max):
@@ -52,21 +60,19 @@ SIMU_PARAMS = []
 #        'method_name': 'exp-no-2nd-int',
 #        'use_exp_int': 1,
 #        'ndt': 2**i,
-#        'max_mat_mult': 100,
 #        'use_second_integral': False
 #    }]
 
 # REDUCE NUMBER OF MATRIX MULTIPLICATIONS
-for i in range(2,3):
-    for j in range(0,7):
-        SIMU_PARAMS += [{
-            'name': 'exp%4d mmm-%d'%(2**i,j),
-            'method_name': 'exp mmm-%d'%j,
-            'use_exp_int': 1,
-            'ndt': 2**i,
-            'max_mat_mult': j,
-            'use_second_integral': True
-        }]
+#for i in range(2,3):
+#    for j in range(0,7):
+#        SIMU_PARAMS += [{
+#            'name': 'exp%4d mmm-%d'%(2**i,j),
+#            'method_name': 'exp mmm-%d'%j,
+#            'use_exp_int': 1,
+#            'ndt': 2**i,
+#            'max_mat_mult': j,
+#        }]
 
 # EULER SIMULATOR
 #for i in range(5, i_max):
@@ -75,14 +81,12 @@ for i in range(2,3):
 #        'method_name': 'euler',
 #        'use_exp_int': 0,
 #        'ndt': 2**i,
-#        'max_mat_mult': 100,
-#        'use_second_integral': False
 #    }]
 
 PLOT_UPSILON = 0
 PLOT_FORCES = 0
 PLOT_BASE_POS = 0
-PLOT_FORCE_PREDICTIONS = 0
+PLOT_FORCE_PREDICTIONS = 1
 PLOT_INTEGRATION_ERRORS = 1
 PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
 PLOT_MAT_MULT_EXPM = 0
@@ -91,7 +95,7 @@ PLOT_MAT_NORM_EXPM = 0
 ASSUME_A_INVERTIBLE = 0
 USE_CONTROLLER = 1
 dt = 0.01                      # controller time step
-T = 0.2
+T = 0.1
 
 offset = np.array([0.0, -0.0, 0.0])
 amp = np.array([0.0, 0.0, 0.05])
@@ -131,8 +135,18 @@ def run_simulation(q, v, simu_params):
     for name in conf.contact_frames:
         simu.add_contact(name, conf.contact_normal, conf.K, conf.B)
     simu.init(q0, v0, p0=conf.p0)
-    simu.max_mat_mult = simu_params['max_mat_mult']
-    simu.use_second_integral = simu_params['use_second_integral']
+    try:
+        simu.max_mat_mult = simu_params['max_mat_mult']
+    except:
+        simu.max_mat_mult = 100
+    try:
+        simu.use_second_integral = simu_params['use_second_integral']
+    except:
+        simu.use_second_integral = True
+    try:
+        simu.update_expm_N = simu_params['update_expm_N']
+    except:
+        simu.update_expm_N = 1
     t = 0.0
     ndt = simu_params['ndt']
     time_start = time.time()
@@ -153,65 +167,68 @@ def run_simulation(q, v, simu_params):
     v[:,0] = np.copy(simu.v)
 #    f[:,0] = np.copy(simu.f)
     
-    for i in range(0, N_SIMULATION):
-
-        if(USE_CONTROLLER):
-            sampleCom.pos(offset + amp * np.sin(two_pi_f*t))
-            sampleCom.vel(two_pi_f_amp * np.cos(two_pi_f*t))
-            sampleCom.acc(-two_pi_f_squared_amp * np.sin(two_pi_f*t))
-            invdyn.comTask.setReference(sampleCom)
-
-            HQPData = invdyn.formulation.computeProblemData(t, q[:,i], v[:,i])
-            sol = invdyn.solver.solve(HQPData)
-            if(sol.status != 0):
-                print("[%d] QP problem could not be solved! Error code:" % (i), sol.status)
-                break
-
-            u = invdyn.formulation.getActuatorForces(sol)
-        else:
-            invdyn.formulation.computeProblemData(t, q[:,i], v[:,i])
-            #        robot.computeAllTerms(invdyn.data(), q, v)
-            u = -0.03*conf.kp_posture*v[6:, i]
-
-        q[:,i+1], v[:,i+1], f_i = simu.simulate(u, dt, ndt,
-                                  simu_params['use_exp_int'])
-        f[:, i+1] = f_i
-        f_pred_int[:,i+1] = simu.f_pred_int        
-        f_inner[:, i*ndt:(i+1)*ndt] = simu.f_inner
-        f_pred[:, i*ndt:(i+1)*ndt] = simu.f_pred        
-        dv = simu.dv
-
-        com_pos[:, i] = invdyn.robot.com(invdyn.formulation.data())
-        com_vel[:, i] = invdyn.robot.com_vel(invdyn.formulation.data())
-        com_acc[:, i] = invdyn.comTask.getAcceleration(dv)
-        com_pos_ref[:, i] = sampleCom.pos()
-        com_vel_ref[:, i] = sampleCom.vel()
-        com_acc_ref[:, i] = sampleCom.acc()
-        com_acc_des[:, i] = invdyn.comTask.getDesiredAcceleration
-        
-        dp[:,i] = simu.debug_dp
-        dp_fd[:,i] = simu.debug_dp_fd
-        dJv[:,i] = simu.debug_dJv
-        dJv_fd[:,i] = simu.debug_dJv_fd
-        
-        mat_mult_expm[i] = simu.expMatHelper.mat_mult
-        mat_norm_expm[i] = simu.expMatHelper.mat_norm
-
-        if i % PRINT_N == 0:
-            print("Time %.3f" % (t))
-#            print("\tNormal forces:         ", f_i[2::3].T)
-#            if(USE_CONTROLLER):
-#                print("\tDesired normal forces: ")
-#                for contact in invdyn.contacts:
-#                    if invdyn.formulation.checkContact(contact.name, sol):
-#                        f_des = invdyn.formulation.getContactForce(contact.name, sol)
-#                        print("%4.1f" % (contact.getNormalForce(f_des)))
-#
-#                print("\n\ttracking err %s: %.3f" % (invdyn.comTask.name.ljust(20, '.'),
-#                                                     norm(invdyn.comTask.position_error, 2)))
-#                print("\t||v||: %.3f\t ||dv||: %.3f" % (norm(v, 2), norm(dv)))
-
-        t += dt
+    try:
+        for i in range(0, N_SIMULATION):
+    
+            if(USE_CONTROLLER):
+                sampleCom.pos(offset + amp * np.sin(two_pi_f*t))
+                sampleCom.vel(two_pi_f_amp * np.cos(two_pi_f*t))
+                sampleCom.acc(-two_pi_f_squared_amp * np.sin(two_pi_f*t))
+                invdyn.comTask.setReference(sampleCom)
+    
+                HQPData = invdyn.formulation.computeProblemData(t, q[:,i], v[:,i])
+                sol = invdyn.solver.solve(HQPData)
+                if(sol.status != 0):
+                    print("[%d] QP problem could not be solved! Error code:" % (i), sol.status)
+                    break
+    
+                u = invdyn.formulation.getActuatorForces(sol)
+            else:
+                invdyn.formulation.computeProblemData(t, q[:,i], v[:,i])
+                #        robot.computeAllTerms(invdyn.data(), q, v)
+                u = -0.03*conf.kp_posture*v[6:, i]
+    
+            q[:,i+1], v[:,i+1], f_i = simu.simulate(u, dt, ndt,
+                                      simu_params['use_exp_int'])
+            f[:, i+1] = f_i
+            f_pred_int[:,i+1] = simu.f_pred_int        
+            f_inner[:, i*ndt:(i+1)*ndt] = simu.f_inner
+            f_pred[:, i*ndt:(i+1)*ndt] = simu.f_pred        
+            dv = simu.dv
+    
+            com_pos[:, i] = invdyn.robot.com(invdyn.formulation.data())
+            com_vel[:, i] = invdyn.robot.com_vel(invdyn.formulation.data())
+            com_acc[:, i] = invdyn.comTask.getAcceleration(dv)
+            com_pos_ref[:, i] = sampleCom.pos()
+            com_vel_ref[:, i] = sampleCom.vel()
+            com_acc_ref[:, i] = sampleCom.acc()
+            com_acc_des[:, i] = invdyn.comTask.getDesiredAcceleration
+            
+            dp[:,i] = simu.debug_dp
+            dp_fd[:,i] = simu.debug_dp_fd
+            dJv[:,i] = simu.debug_dJv
+            dJv_fd[:,i] = simu.debug_dJv_fd
+            
+            mat_mult_expm[i] = simu.expMatHelper.mat_mult
+            mat_norm_expm[i] = simu.expMatHelper.mat_norm
+    
+            if i % PRINT_N == 0:
+                print("Time %.3f" % (t))
+    #            print("\tNormal forces:         ", f_i[2::3].T)
+    #            if(USE_CONTROLLER):
+    #                print("\tDesired normal forces: ")
+    #                for contact in invdyn.contacts:
+    #                    if invdyn.formulation.checkContact(contact.name, sol):
+    #                        f_des = invdyn.formulation.getContactForce(contact.name, sol)
+    #                        print("%4.1f" % (contact.getNormalForce(f_des)))
+    #
+    #                print("\n\ttracking err %s: %.3f" % (invdyn.comTask.name.ljust(20, '.'),
+    #                                                     norm(invdyn.comTask.position_error, 2)))
+    #                print("\t||v||: %.3f\t ||dv||: %.3f" % (norm(v, 2), norm(dv)))
+    
+            t += dt
+    except:
+        print("ERROR WHILE RUNNING SIMULATION")
 
     time_spent = time.time() - time_start
     print("Real-time factor:", t/time_spent)
@@ -232,16 +249,17 @@ def run_simulation(q, v, simu_params):
     results.mat_norm_expm = mat_norm_expm
     return results
 
-print("\nStart simulation ground truth")
-data_ground_truth = run_simulation(q0, v0, GROUND_TRUTH_SIMU_PARAMS)
-
 # import cProfile
 # cProfile.run('run_simulation(q0, v0)')    
-data = {'ground-truth': data_ground_truth}
+data = {}
 for simu_params in SIMU_PARAMS:
     name = simu_params['name']
     print("\nStart simulation", name)
     data[name] = run_simulation(q0, v0, simu_params)
+
+print("\nStart simulation ground truth")
+data_ground_truth = run_simulation(q0, v0, GROUND_TRUTH_SIMU_PARAMS)
+data['ground-truth'] = data_ground_truth
 
 # COMPUTE INTEGRATION ERRORS:
 print('\n')
@@ -331,7 +349,7 @@ if(PLOT_FORCES):
     j = 0
     for (name, d) in data.items():
         for i in range(4):
-            ax[i].plot(tt, d.f[2+3*i, :], line_styles[j], alpha=0.7, label=name+' '+str(i))
+            ax[i].plot(tt, d.f[2+3*i, :], line_styles[j], alpha=0.7, label=name)
             ax[i].set_xlabel('Time [s]')
             ax[i].set_ylabel('Force Z [N]')
         j += 1
@@ -345,10 +363,10 @@ if(PLOT_FORCE_PREDICTIONS):
        ax = ax.reshape(4)
        tt_log = np.arange(d.f_pred.shape[1]) * T / d.f_pred.shape[1]
        for i in range(4):
-           ax[i].plot(tt, d.f[2+3*i,:], ' o', markersize=8, label=name+' '+str(i))
-           ax[i].plot(tt, d.f_pred_int[2+3*i,:], ' s', markersize=8, label=name+' pred int'+str(i))
-           ax[i].plot(tt_log, d.f_pred[2+3*i,:], 'r v', markersize=6, label=name+' pred '+str(i))
-           ax[i].plot(tt_log, d.f_inner[2+3*i,:], 'b x', markersize=6, label=name+' real '+str(i))
+           ax[i].plot(tt, d.f[2+3*i,:], ' o', markersize=8, label=name)
+           ax[i].plot(tt, d.f_pred_int[2+3*i,:], ' s', markersize=8, label=name+' pred int')
+           ax[i].plot(tt_log, d.f_pred[2+3*i,:], 'r v', markersize=6, label=name+' pred ')
+           ax[i].plot(tt_log, d.f_inner[2+3*i,:], 'b x', markersize=6, label=name+' real ')
            ax[i].set_xlabel('Time [s]')
            ax[i].set_ylabel('Force Z [N]')
        leg = ax[-1].legend()
@@ -370,7 +388,7 @@ if(PLOT_BASE_POS):
     j = 0
     for (name, d) in data.items():
         for i in range(3):
-            ax[i].plot(tt, d.q[i, :], line_styles[j], alpha=0.7, label=name+' '+str(i))
+            ax[i].plot(tt, d.q[i, :], line_styles[j], alpha=0.7, label=name)
             ax[i].set_xlabel('Time [s]')
             ax[i].set_ylabel('Base pos [m]')
         j += 1

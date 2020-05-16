@@ -89,6 +89,8 @@ class RobotSimulator:
         self.assume_A_invertible = False
         self.max_mat_mult = 100
         self.use_second_integral = True
+        self.update_expm_N = 1 # update the expm every self.update_expm_N inner simulation steps
+        
         # se3.RobotWrapper.BuildFromURDF(conf.urdf, [conf.path, ], se3.JointModelFreeFlyer())
         self.robot = robot
         self.model = self.robot.model
@@ -196,31 +198,28 @@ class RobotSimulator:
         return self.f
 
 
-    def compute_exponential_LDS(self, u):
+    def compute_exponential_LDS(self, u, update_expm):
         ''' Compute matrix A and vector a that define the Linear Dynamical System to
             integrate with the matrix exponential.
         '''
-        K_p0 = self.K@self.p0
-        M = self.data.M
-        h = self.data.nle
+        M, h = self.data.M, self.data.nle
         dv_bar = np.linalg.solve(M, self.S.T@u - h)
-#        dv_bar = np.linalg.solve(M, self.S.T@u - h + self.Jc.T@K_p0)
         for (i,c) in enumerate(self.contacts):
             self.p[  3*i:3*i+3] = c.p
             self.dp[ 3*i:3*i+3] = c.v
             self.dJv[3*i:3*i+3] = c.dJv
         x0 = np.concatenate((self.p-self.p0, self.dp))
-#        x0 = np.concatenate((self.p, self.dp))
         JMinv = np.linalg.solve(M, self.Jc.T).T
-        self.Upsilon = self.Jc @ JMinv.T
-        self.a[self.nk:] = JMinv@(self.S.T@u-h) + self.dJv
-#        self.a[self.nk:] = JMinv@(self.S.T@u-h) + self.dJv + self.Upsilon@K_p0
-        self.A[self.nk:, :self.nk] = -self.Upsilon@self.K
-        self.A[self.nk:, self.nk:] = -self.Upsilon@self.B
-        return K_p0, x0, dv_bar, JMinv
+        if(update_expm):
+            self.Upsilon = self.Jc @ JMinv.T
+            self.a[self.nk:] = JMinv@(self.S.T@u-h) + self.dJv
+            self.A[self.nk:, :self.nk] = -self.Upsilon@self.K
+            self.A[self.nk:, self.nk:] = -self.Upsilon@self.B
+        return x0, dv_bar, JMinv
 
 
-    def step(self, u, dt=None, use_exponential_integrator=True, use_sparse_solver=1, dt_force_pred=None, ndt_force_pred=None):
+    def step(self, u, dt=None, use_exponential_integrator=True, dt_force_pred=None, ndt_force_pred=None,
+             update_expm=True):
         if dt is None:
             dt = self.dt
 
@@ -248,14 +247,14 @@ class RobotSimulator:
         if(not use_exponential_integrator):            
 #            if(dt_force_pred is not None):
                 # predict forces using Exponential integrator
-#                K_p0, x0, dv_bar, JMinv = self.compute_exponential_LDS(u)
+#                x0, dv_bar, JMinv = self.compute_exponential_LDS(u)
 #                
 #                # predict intermediate forces using linear dynamical system (i.e. matrix exponential)
 #                dt_fp = dt_force_pred/ndt_force_pred
-#                f_pred[:, 0] = K_p0 + self.D @ x0
+#                f_pred[:, 0] = self.D @ x0
 #                for j in range(1, ndt_force_pred):
 #                    x_i = compute_x_T(self.A, self.a, np.copy(x0), j*dt_fp)
-#                    f_pred[:, j] = K_p0 + self.D @ x_i
+#                    f_pred[:, j] = self.D @ x_i
     
             self.dv = np.linalg.solve(M, self.S.T@u - h + self.Jc.T@self.f)  # use last forces
             v_mean = self.v + 0.5*dt*self.dv
@@ -263,40 +262,46 @@ class RobotSimulator:
             self.q = se3.integrate(self.model, self.q, v_mean*dt)
             
         else:
-            K_p0, x0, dv_bar, JMinv = self.compute_exponential_LDS(u)
+            x0, dv_bar, JMinv = self.compute_exponential_LDS(u, update_expm)
+                
             
             # Sanity check on contact point Jacobian and dJv
 #            self.compute_dJv_finite_difference()
             # USE THE VALUE COMPUTED WITH FINITE DIFFERENCING FOR NOW
 #            self.dJv = np.copy(self.debug_dJv_fd)
-#            self.a[self.nk:] = JMinv@(self.S.T@u-h) + self.dJv + self.Upsilon@K_p0
-
-#            if(use_sparse_solver):
-#                D_x, D_int_x, D_int2_x = self.solve_sparse_exp(x0, b, dt)
-#                # Code about matrix expoitation was here
-#            else:
-
-            # To improve: file is opened and closed at each iteration
-            if (self.logFileName is not None):
-                # Writing down A
-                with open(self.logFileName + 'A', 'a+') as f:
-                    np.savetxt(f, self.A.flatten(), '%.18f', '\t')
-                with open(self.logFileName + 'b', 'a+') as f:
-                    np.savetxt(f, [np.asarray(self.a)[:, 0]], '%.18f', '\t')  # All this mess to print it as a row, and no transposing does not help
-                with open(self.logFileName + 'xInit', 'a+') as f:
-                    np.savetxt(f, [np.asarray(x0)[:, 0]], '%.18f', '\t')
-
-            int_x = self.expMatHelper.compute_integral_x_T(self.A, self.a, x0, dt, self.max_mat_mult)
+#            self.a[self.nk:] = JMinv@(self.S.T@u-h) + self.dJv
+            self.logToFile(x0)
+            
+            if(update_expm):
+                int_x = self.expMatHelper.compute_integral_x_T(self.A, self.a, x0, dt, self.max_mat_mult)
+                self.x_pred = self.expMatHelper.compute_x_T(self.A, self.a, x0, dt, self.max_mat_mult)
+#                print("Update x_pred")
+            else:
+                int_x = self.expMatHelper.compute_next_integral()
+#                int_x_from_x_pred = self.expMatHelper.compute_integral_x_T(self.A, self.a, self.x_pred, dt, self.max_mat_mult, store=False)
+                int_x_from_x_real = self.expMatHelper.compute_integral_x_T(self.A, self.a, x0, dt, self.max_mat_mult, store=False)
+#                print("int_x - int_x_from_x_pred", np.max(np.abs(int_x - int_x_from_x_pred)))
+#                print("int_x - int_x_from_x_real", np.max(np.abs(int_x - int_x_from_x_real)))
+                int_x = int_x_from_x_real #+ 1e-9*np.random.rand(int_x.shape[0])
             D_int_x = self.D @ int_x
             dv_mean = dv_bar + JMinv.T @ D_int_x/dt
             
             if(self.use_second_integral):
-                int2_x = self.expMatHelper.compute_double_integral_x_T(self.A, self.a, x0, dt, self.max_mat_mult)
+                if(update_expm):
+                    int2_x = self.expMatHelper.compute_double_integral_x_T(self.A, self.a, x0, dt, self.max_mat_mult)
+                else:
+                    int2_x = self.expMatHelper.compute_next_double_integral()
+                    int2_x_from_x_pred = self.expMatHelper.compute_double_integral_x_T(self.A, self.a, self.x_pred, dt, self.max_mat_mult, store=False)
+                    int2_x_from_x_real = self.expMatHelper.compute_double_integral_x_T(self.A, self.a, x0, dt, self.max_mat_mult, store=False)
+                    print("int2_x - int2_x_from_x_pred", np.max(np.abs(int2_x - int2_x_from_x_pred))) #this should be zero but it's not!
+                    print("int2_x - int2_x_from_x_real", np.max(np.abs(int2_x - int2_x_from_x_real)))
+#                    int2_x = int2_x_from_x_real
                 D_int2_x = self.D @ int2_x
                 v_mean = self.v + 0.5*dt*dv_bar + JMinv.T@D_int2_x/dt
             else:
-#                f_avg = K_p0 + D_int_x/dt # average force during time step
+#                f_avg = D_int_x/dt # average force during time step
                 v_mean  = self.v + 0.5*dt*dv_mean
+
 
             if(dt_force_pred is not None):
                 # predict intermediate forces using linear dynamical system (i.e. matrix exponential)
@@ -307,16 +312,16 @@ class RobotSimulator:
                 z = np.concatenate((x0, [1.0]))
                 e_TC = expm(dt_force_pred/ndt_force_pred*C)
                 for i in range(ndt_force_pred):
-                    f_pred[:, i] = K_p0 + self.D @ z[:n]
+                    f_pred[:, i] = self.D @ z[:n]
                     z = e_TC @ z
                     
                 # predict also what forces we would get by integrating with the force prediction
-                int_x = self.expMatHelper.compute_integral_x_T(self.A, self.a, x0, dt_force_pred, self.max_mat_mult)
-                int2_x = self.expMatHelper.compute_double_integral_x_T(self.A, self.a, x0, dt_force_pred, self.max_mat_mult)
+                int_x = self.expMatHelper.compute_integral_x_T(self.A, self.a, x0, dt_force_pred, self.max_mat_mult, store=False)
+                int2_x = self.expMatHelper.compute_double_integral_x_T(self.A, self.a, x0, dt_force_pred, self.max_mat_mult, store=False)
                 D_int_x = self.D @ int_x
                 D_int2_x = self.D @ int2_x
                 v_mean_pred = self.v + 0.5*dt_force_pred*dv_bar + JMinv.T@D_int2_x/dt_force_pred
-                dv_mean_pred = dv_bar + JMinv.T@D_int_x/dt_force_pred
+                dv_mean_pred = dv_bar + JMinv.T @ D_int_x/dt_force_pred
                 v_pred = self.v + dt_force_pred*dv_mean_pred
                 q_pred = se3.integrate(self.model, self.q, v_mean_pred*dt_force_pred)
                 
@@ -408,7 +413,7 @@ class RobotSimulator:
     def reset(self):
         self.first_iter = True
 
-    def simulate(self, u, dt=0.001, ndt=1, use_exponential_integrator=True, use_sparse_solver=False):
+    def simulate(self, u, dt=0.001, ndt=1, use_exponential_integrator=True):
         ''' Perform ndt steps, each lasting dt/ndt seconds '''
         #        time_start = time.time()
         
@@ -426,14 +431,21 @@ class RobotSimulator:
         self.f_inner = np.zeros((self.nk, ndt))
         # forces predicted at the first of the inner simulation steps
 #        self.f_pred = np.zeros((self.nk, self.ndt_force))
-        
+        update_expm_counter = 1
         for i in range(ndt):
+            update_expm_counter -= 1
+            if(update_expm_counter==0):
+                update_expm_counter = self.update_expm_N
+                update_expm = True
+            else:
+                update_expm = False
+                
             if(i==0):
                 self.q, self.v, self.f_pred, self.f_pred_int = self.step(u, dt/ndt, 
-                                                    use_exponential_integrator, use_sparse_solver, dt, ndt)
+                                                    use_exponential_integrator, dt, ndt, update_expm=True)
                 self.f_inner[:,0] = self.f_pred[:,0]
             else:
-                self.q, self.v, tmp1, tmp2 = self.step(u, dt/ndt, use_exponential_integrator, use_sparse_solver)
+                self.q, self.v, tmp1, tmp2 = self.step(u, dt/ndt, use_exponential_integrator, update_expm=update_expm)
                 self.f_inner[:,i] = np.copy(self.f)
 
             self.display(self.q, dt/ndt)
@@ -466,6 +478,17 @@ class RobotSimulator:
             dp_next[3*i:3*i+3] = c.v
         self.debug_dp_fd  = (p_next-self.p)/eps
         self.debug_dJv_fd = (dp_next-self.dp)/eps
+        
+    def logToFile(self, x0):
+        # To improve: file is opened and closed at each iteration
+        if (self.logFileName is not None):
+            # Writing down A
+            with open(self.logFileName + 'A', 'a+') as f:
+                np.savetxt(f, self.A.flatten(), '%.18f', '\t')
+            with open(self.logFileName + 'b', 'a+') as f:
+                np.savetxt(f, [np.asarray(self.a)[:, 0]], '%.18f', '\t')  # All this mess to print it as a row, and no transposing does not help
+            with open(self.logFileName + 'xInit', 'a+') as f:
+                np.savetxt(f, [np.asarray(x0)[:, 0]], '%.18f', '\t')
 
 '''
 def solve_dense_expo_system(self, U, K, B, a, x0, dt):

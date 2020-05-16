@@ -97,7 +97,7 @@ class ExponentialMatrixHelper:
         V = b[2]*A2 + b[0]*I
         return U, V
         
-    def expm_times_v(self, A, v, max_mat_mult=100, balance=True):
+    def expm(self, A, max_mat_mult=100, balance=True):
         ''' max_mat_mult can be used to reduce the computational complexity of the exponential 
             6: at most a Pade order 13 can be used but with no scaling
             5: at most a Pade order 9 is used
@@ -168,10 +168,13 @@ class ExponentialMatrixHelper:
         if(balance):
             X = D @ X @ Dinv
 #        assert(np.max(np.abs(expm(A) - X)) == 0.0)
-            
-        res = X.dot(v)
-        return res
+        return X
     
+    def expm_times_v(self, A, v, max_mat_mult=100, balance=True):
+        X = self.expm(A, max_mat_mult, balance)
+        return X.dot(v)
+    
+#    def compute_both_integrals(self, A, a, x0, T, max_mat_mult=100, balance=True):
     
     def compute_x_T(self, A, a, x0, T, max_mat_mult=100, balance=True):
         n = A.shape[0]
@@ -188,7 +191,7 @@ class ExponentialMatrixHelper:
         return x_T
     
     
-    def compute_integral_x_T(self, A, a, x0, T, max_mat_mult=100, balance=True):
+    def compute_integral_x_T(self, A, a, x0, T, max_mat_mult=100, balance=False, store=True):
         n = A.shape[0]
         C = np.zeros((n+2, n+2))
         C[0:n,     0:n] = A
@@ -197,14 +200,25 @@ class ExponentialMatrixHelper:
         C[n:n+1, n+1:] = 1.0
         z0 = np.zeros(n+2)
         z0[-1] = 1.0
-    #    e_TC = expm(T@C, verbose=True)
-    #    z = e_TC@z0
-        z = self.expm_times_v(T*C, z0, max_mat_mult, balance)
-        int_x = z[:n]
-        return int_x
+        e_TC = self.expm(T*C, max_mat_mult, balance)
+        z = e_TC @ z0
+#        z = self.expm_times_v(T*C, z0, max_mat_mult, balance)
+        if(store): 
+            self.e_TA1 = e_TC
+            self.e_TA1_to_the_n = e_TC
+        return z[:n]
+        
+    def compute_next_integral(self):
+        n = self.e_TA1.shape[0]-2
+        z0 = np.zeros(self.e_TA1.shape[0])
+        z0[-1] = 1.0
+        e_TA1_to_the_n_plus_1 = self.e_TA1_to_the_n @ self.e_TA1
+        z = (e_TA1_to_the_n_plus_1 - self.e_TA1_to_the_n) @ z0
+        self.e_TA1_to_the_n = e_TA1_to_the_n_plus_1
+        return z[:n]
     
     
-    def compute_double_integral_x_T(self, A, a, x0, T, max_mat_mult=100, balance=True):
+    def compute_double_integral_x_T(self, A, a, x0, T, max_mat_mult=100, balance=False, store=True):
         n = A.shape[0]
         C = np.zeros((n+3, n+3))
         C[0:n,     0:n] = A
@@ -213,11 +227,22 @@ class ExponentialMatrixHelper:
         C[n:n+2, n+1:] = np.eye(2)
         z0 = np.zeros(n+3)
         z0[-1] = 1.0
-    #    e_TC = expm(T*C, verbose=True)
-    #    z = e_TC@z0
-        z = self.expm_times_v(T*C, z0, max_mat_mult, balance)
-        int2_x = z[:n]
-        return int2_x
+        e_TC = self.expm(T*C, max_mat_mult, balance)
+        z = e_TC@z0
+#        z = self.expm_times_v(T*C, z0, max_mat_mult, balance)
+        if(store):
+            self.e_TA2 = e_TC
+            self.e_TA2_to_the_n = e_TC
+        return z[:n]
+        
+    def compute_next_double_integral(self):
+        n = self.e_TA2.shape[0]-3
+        z0 = np.zeros(self.e_TA2.shape[0])
+        z0[-1] = 1.0
+        e_TA2_to_the_n_plus_1 = self.e_TA2_to_the_n @ self.e_TA2
+        z = (e_TA2_to_the_n_plus_1 - self.e_TA2_to_the_n) @ z0
+        self.e_TA2_to_the_n = e_TA2_to_the_n_plus_1
+        return z[:n]
 
     
     
@@ -241,9 +266,9 @@ if __name__ == '__main__':
     Upsilon = U@U.T
     K = np.eye(n2)*stiffness
     B = np.eye(n2)*damping
-    A = np.block([[np.zeros((n2, n2)), np.eye(n2)],
-                      [-Upsilon@K,      -Upsilon@B]])
-#    A  = rand((n, n))
+#    A = np.block([[np.zeros((n2, n2)), np.eye(n2)],
+#                      [-Upsilon@K,      -Upsilon@B]])
+    A  = rand((n, n))
     
     helper = ExponentialMatrixHelper()
 
@@ -253,36 +278,57 @@ if __name__ == '__main__':
     print("Eigenvalues of A:", np.sort_complex(eigvals(A)).T)
     print("")
     
-    MAX_MAT_MULT = 0
-
-    start_time = time.time()
-    x_T = helper.compute_x_T(A, a, x0, T)
-    time_exact = time.time()-start_time
+    T = 1
+    int_x_T     = helper.compute_integral_x_T(A, a, x0, T)
+    int_x_T_2T  = helper.compute_next_integral()
+    int_x_2T_3T = helper.compute_next_integral()
+    int_x_2T    = helper.compute_integral_x_T(A, a, x0, 2*T)
+    int_x_3T    = helper.compute_integral_x_T(A, a, x0, 3*T)
+    print("int_x_T + int_x_T_2T", int_x_T+int_x_T_2T)
+    print("int_x_2T            ", int_x_2T)
+    print("int_x_2T + int_x_2T_3T", int_x_2T+int_x_2T_3T)
+    print("int_x_3T              ", int_x_3T)
     
-    start_time = time.time()
-    x_T_approx = helper.compute_x_T(A, a, x0, T, MAX_MAT_MULT)
-    time_approx = time.time()-start_time
+    int2_x_T     = helper.compute_double_integral_x_T(A, a, x0, T)
+    int2_x_T_2T  = helper.compute_next_double_integral()
+    int2_x_2T_3T = helper.compute_next_double_integral()
+    int2_x_2T    = helper.compute_double_integral_x_T(A, a, x0, 2*T)
+    int2_x_3T    = helper.compute_double_integral_x_T(A, a, x0, 3*T)
+    print("int2_x_T + int_x_T_2T", int2_x_T+int2_x_T_2T)
+    print("int2_x_2T            ", int2_x_2T)
+    print("int2_x_2T + int_x_2T_3T", int2_x_2T+int2_x_2T_3T)
+    print("int2_x_3T              ", int2_x_3T)
     
-    print("Mat-mult needed in theory:", helper.mat_mult_in_theory)
-    print("Mat-mult actually used:   ", helper.mat_mult)
-    print("Approximated x(T) computed in             ", 1e3*time_approx)
-    print("Exact x(T) computed in                    ", 1e3*time_exact)
-    print("Approximated x(T)", x_T_approx.T)
-    print("Exact x(T)       ", x_T.T)
-    print_error(x_T, x_T_approx)
-    print("")
-
-    start_time = time.time()
-    int_x_T = helper.compute_integral_x_T(A, a, x0, T)
-    time_exact = time.time()-start_time
-    
-    start_time = time.time()
-    int_x_T_approx = helper.compute_integral_x_T(A, a, x0, T, MAX_MAT_MULT)
-    time_approx = time.time()-start_time
-
-    print("Mat-mult needed in theory:", helper.mat_mult_in_theory)
-    print("Mat-mult actually used:   ", helper.mat_mult)
-    print("Approximated int x(T) computed in               ", 1e3*time_approx)
-    print("Exact int x(T) computed in                      ", 1e3*time_exact)
-    print_error(int_x_T, int_x_T_approx)
-    print("")
+#    MAX_MAT_MULT = 0
+#
+#    start_time = time.time()
+#    x_T = helper.compute_x_T(A, a, x0, T)
+#    time_exact = time.time()-start_time
+#    
+#    start_time = time.time()
+#    x_T_approx = helper.compute_x_T(A, a, x0, T, MAX_MAT_MULT)
+#    time_approx = time.time()-start_time
+#    
+#    print("Mat-mult needed in theory:", helper.mat_mult_in_theory)
+#    print("Mat-mult actually used:   ", helper.mat_mult)
+#    print("Approximated x(T) computed in             ", 1e3*time_approx)
+#    print("Exact x(T) computed in                    ", 1e3*time_exact)
+#    print("Approximated x(T)", x_T_approx.T)
+#    print("Exact x(T)       ", x_T.T)
+#    print_error(x_T, x_T_approx)
+#    print("")
+#
+#    start_time = time.time()
+#    int_x_T = helper.compute_integral_x_T(A, a, x0, T)
+#    time_exact = time.time()-start_time
+#    
+#    start_time = time.time()
+#    int_x_T_approx = helper.compute_integral_x_T(A, a, x0, T, MAX_MAT_MULT)
+#    time_approx = time.time()-start_time
+#
+#    print("Mat-mult needed in theory:", helper.mat_mult_in_theory)
+#    print("Mat-mult actually used:   ", helper.mat_mult)
+#    print("Approximated int x(T) computed in               ", 1e3*time_approx)
+#    print("Exact int x(T) computed in                      ", 1e3*time_exact)
+#    print_error(int_x_T, int_x_T_approx)
+#    print("")
