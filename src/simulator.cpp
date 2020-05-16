@@ -400,7 +400,8 @@ void ExponentialSimulator::checkFrictionCone(){
       continue;
     }
     
-    fnor_ = contacts_[i]->contactNormal_.dot(f_avg);
+    Vector3d f_avg_i = f_avg.segment<3>(3*i_active_);
+    fnor_ = contacts_[i]->contactNormal_.dot(f_avg_i);
     if (fnor_<0.){
       /*!< check for pulling force at contact i */  
       fpr_.segment<3>(3*i_active_).fill(0); 
@@ -409,18 +410,18 @@ void ExponentialSimulator::checkFrictionCone(){
     } else{
       /*!< check for friction bounds  */  
       normalFi_ = fnor_* contacts_[i]->contactNormal_; 
-      tangentFi_ = f_avg.segment<3>(3*i_active_) - normalFi_; 
+      tangentFi_ = f_avg_i - normalFi_; 
       ftan_ = sqrt(tangentFi_.dot(tangentFi_));
       double mu = contacts_[i]->optr->contact_model_->friction_coeff_;
       if(ftan_ > mu * fnor_){
         /*!< cone violated */  
-        fpr_.segment<3>(3*i_active_) = (mu*fnor_/ftan_)*tangentFi_; 
+        fpr_.segment<3>(3*i_active_) = normalFi_ + (mu*fnor_/ftan_)*tangentFi_; 
         cone_flag_ = true;
         // break; 
       } 
       else {
         /*!< if not violated still fill out in case another contact violates the cone  */  
-        fpr_.segment<3>(3*i_active_) = f_avg.segment<3>(3*i_active_); 
+        fpr_.segment<3>(3*i_active_) = f_avg_i;
       }
     }
     contacts_[i]->predictedF_ = fpr_.segment<3>(3*i_active_);

@@ -22,10 +22,10 @@ if __name__=="__main__":
     mu = 0.3        # friction coefficient
     isSparse = False 
     isInvertible = False
-    unilateral_contacts = False  
+    unilateral_contacts = True  
     K = 1e5 * np.ones([3,1])
-    B = 3e2 * np.ones([3,1])
-    N = 1000 
+    B = 2e2 * np.ones([3,1])
+    N = 100
     
     q0 = np.array([0., 0., 0., 0., 0., 0., 1.]) [:,None]
     dq0 = np.array([0., 0., 0., 0., 0., 0.]) [:,None]
@@ -44,7 +44,7 @@ if __name__=="__main__":
     tau0 = np.zeros(robot.nv) [:,None]
     tau0[2] = -0.19 # complete it to 10 Nm  
     tau = np.zeros(robot.nv) [:,None]
-    tau[0] = 10. 
+    tau[0] = 4. 
     tau[2] = -0.19 # complete it to 10 Nm  
 
     contact_names = ['root_joint']
@@ -53,15 +53,15 @@ if __name__=="__main__":
     # simu_params += [{'name': 'exponential 100',
     #                 'type': 'exponential', 
     #                 'ndt': 100}]
-    # simu_params += [{'name': 'exponential 10',
-    #                 'type': 'exponential', 
-    #                 'ndt': 10}]
+    simu_params += [{'name': 'exponential 10',
+                     'type': 'exponential', 
+                     'ndt': 10}]
     # simu_params += [{'name': 'exponential 1',
     #                 'type': 'exponential', 
     #                 'ndt': 1}]
-    simu_params += [{'name': 'euler 100',
-                    'type': 'euler', 
-                    'ndt': 100}]
+#    simu_params += [{'name': 'euler 100',
+#                    'type': 'euler', 
+#                    'ndt': 100}]
     simu_params += [{'name': 'euler 10',
                     'type': 'euler', 
                     'ndt': 10}]
@@ -74,7 +74,7 @@ if __name__=="__main__":
         simu_type = simu_param['type']
         if(simu_type=='exponential'):
             sim = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
-                                        K, B ,K, B, mu, mu, isSparse, isInvertible)
+                                        K, B , mu, isSparse, isInvertible)
         else:
             sim = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
                                             K, B, mu)
@@ -109,6 +109,7 @@ if __name__=="__main__":
             dq += [sim.get_v()]
             for i, cp in enumerate(cpts):
                 fcnt[t+1,i,:] = np.resize(cp.f,3)
+#                fcnt[t+1,i,:] = np.resize(cp.predicted_f,3)
                 xstart[t+1,i,:] = np.resize(cp.x_start,3)
         print('Simulation done ')
 
@@ -148,6 +149,14 @@ if __name__=="__main__":
         plt.legend()
         plt.grid()
         plt.title('tangent contact forces')
+        
+        plt.figure('ratio tangent-normal contact forces')
+        for i,cp in enumerate(cpts):
+            tangent = np.sqrt(fcnt[:,i,0]*fcnt[:,i,0]+fcnt[:,i,1]*fcnt[:,i,1])
+            plt.plot(dt*np.arange(N+1), tangent / (1e-3+fcnt[:,i,2]), line_styles[i_ls], alpha=0.7, label=name+' pnt %s'%i)
+        plt.legend()
+        plt.grid()
+        plt.title('ratio tangent-normal contact forces')
 
         plt.figure('Anchor Point')
         for i,cp in enumerate(cpts):
