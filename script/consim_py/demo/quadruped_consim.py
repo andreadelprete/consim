@@ -1,4 +1,3 @@
-# constructs and simulates the drop of a point mass using both Euler and Exponential Simulators 
 import numpy as np 
 import pinocchio as pin 
 import consim 
@@ -11,7 +10,7 @@ import time
 import matplotlib.pyplot as plt
 
 from consim_py.tsid_quadruped import TsidQuadruped
-from consim_py.robot_simulator_exponential_integrator import RobotSimulator
+from consim_py.simulator import RobotSimulator
 import consim_py.conf_solo_py as conf
 from example_robot_data.robots_loader import loadSolo
 
@@ -23,33 +22,44 @@ from numpy.linalg import norm as norm
 
 USE_CONTROLLER = True 
 # parameters used for CoM Sinusoid 
-amp = np.array([0.0, 0.0, 0.05])
-two_pi_f = 2*np.pi*np.array([0.0, .0, 2.0])
+amp = np.array([0.0, 0.0, 0.05]).T
+two_pi_f = 2*np.pi*np.array([0.0, .0, 2.]).T # double frequency to get more slipping 
+
 controller_dt = 5.e-3 
 
 if __name__=="__main__":
     # simulation parameters 
     simu_params = []
-  
-    simu_params += [{'name': 'euler 100',
-                    'type': 'euler', 
-                    'ndt': 100}]
-
-    simu_params += [{'name': 'exponential 100',
-                    'type': 'exponential', 
-                    'ndt': 100}]
-        
+    
+#    simu_params += [{'name': 'euler 1000',
+#                    'type': 'euler', 
+#                    'ndt': 1000}]
+    # simu_params += [{'name': 'euler 200',
+    #                 'type': 'euler', 
+    #                 'ndt': 200}]
     simu_params += [{'name': 'euler 10',
-                    'type': 'euler', 
-                    'ndt': 10}]
+                     'type': 'euler', 
+                     'ndt': 10}]
+
+#    simu_params += [{'name': 'exponential 500',
+#                    'type': 'exponential', 
+#                    'ndt': 500}]
+
+#    simu_params += [{'name': 'exponential 100',
+#                     'type': 'exponential', 
+#                     'ndt': 100}]
+        
+    # simu_params += [{'name': 'euler 10',
+    #                 'type': 'euler', 
+    #                 'ndt': 10}]
+
+#    simu_params += [{'name': 'exponential 10',
+#                     'type': 'exponential', 
+#                     'ndt': 10}]
 
     simu_params += [{'name': 'exponential 10',
-                    'type': 'exponential', 
-                    'ndt': 10}]
-
-    simu_params += [{'name': 'exponential 1',
-                    'type': 'exponential', 
-                    'ndt': 1}]
+                     'type': 'exponential', 
+                     'ndt': 10}]
     
     # simu_params += [{'name': 'euler 1',
     #                 'type': 'euler', 
@@ -59,12 +69,12 @@ if __name__=="__main__":
 
     i_ls = 0
     
-    mu = 0.3        # friction coefficient
+    mu = 0.5        # friction coefficient
     isSparse = False 
     isInvertible = False
-    unilateral_contacts = True              
-    K = 1e5
-    B = 3e2
+    unilateral_contacts = True                   
+    K = 1e5 * np.ones([3,1])
+    B = 3e2 * np.ones([3,1])
     T = 1 #  1 second simution  
     dt = 1.e-3 
 
@@ -83,14 +93,15 @@ if __name__=="__main__":
     
     # lower q0 a little bit for bilateral contacts 
     q0 = conf.q0
-    # q0[2] -= 1.e-5
-    print((" Contact Frame Positions".center(conf.LINE_WIDTH, '-')))
-    pin.framesForwardKinematics(robot.model, robot.data, q0)
-    for cname in conf.contact_frames:
-        print(robot.data.oMf[robot.model.getFrameId(cname)].translation.T) 
 
-    v0 = np.zeros(robot.nv) [:,None]
-    tau = np.zeros(robot.nv) [:,None]
+    # q0[2] -= 1.e-6
+    # print(" Contact Frame Positions".center(conf.LINE_WIDTH, '-'))
+    # pin.framesForwardKinematics(robot.model, robot.data, q0)
+    # for cname in conf.contact_frames:
+    #     print robot.data.oMf[robot.model.getFrameId(cname)].translation 
+
+    v0 = np.zeros(robot.nv)
+    tau = np.zeros(robot.nv)
  
     # loop over simulations     
     for simu_param in simu_params:
@@ -102,23 +113,10 @@ if __name__=="__main__":
         # build the simulator 
         if(simu_type=='exponential'):
             sim = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
-                                        K, B ,K, B, mu, mu, isSparse, isInvertible)
+                                        K, B , mu, isSparse, isInvertible)
         else:
             sim = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
-                                            K, B ,K, B, mu, mu)
-        
-        # add the  contact points 
-        cpts = [] # list of all contact points
-        for cname in conf.contact_frames:
-            if not robot.model.existFrame(cname):
-                print(("ERROR: Frame", cname, "does not exist"))
-            cpts += [sim.add_contact_point(robot.model.getFrameId(cname), unilateral_contacts)]
-        print((" %s Contact Points Added ".center(conf.LINE_WIDTH, '-')%(len(cpts))))
-
-        # inverse dynamics controller 
-        invdyn = TsidQuadruped(conf, robot, q0, viewer=False)
-        print((" TSID Initialized Successfully ".center(conf.LINE_WIDTH, '-')))
-
+                                            K, B , mu)
 
         # trajectory log 
         com_pos = np.empty((N_SIMULATION, 3))*nan
@@ -146,7 +144,7 @@ if __name__=="__main__":
         for cname in conf.contact_frames:
             if not robot.model.existFrame(cname):
                 print(("ERROR: Frame", cname, "does not exist"))
-            cpts += [sim.add_contact_point(robot.model.getFrameId(cname), unilateral_contacts)]
+            cpts += [sim.add_contact_point(cname, robot.model.getFrameId(cname), unilateral_contacts)]
         print(" %s Contact Points Added ".center(conf.LINE_WIDTH, '-')%(len(cpts)))
 
         # reset simulator 
@@ -161,22 +159,17 @@ if __name__=="__main__":
         offset = invdyn.robot.com(invdyn.formulation.data())
         two_pi_f_amp = two_pi_f * amp
         two_pi_f_squared_amp = two_pi_f * two_pi_f_amp
-       
 
         sampleCom = invdyn.trajCom.computeNext()
-
-        # reset simulator 
-        sim.reset_state(q[0], v[0], True)
-        print(('Reset state done '.center(conf.LINE_WIDTH, '-')))
 
         for ci, cp in enumerate(cpts):
             sim_f[0,ci,:] = np.resize(cp.f,3)
             contact_x[0,ci,:] = np.resize(cp.x,3)
             contact_v[0,ci,:] = np.resize(cp.v,3)
         
-        for ci, cframe in enumerate(conf.contact_frames):
-            print(('initial contact position for contact '+cframe))
-            print((contact_x[0,ci,:]))
+#        for ci, cframe in enumerate(conf.contact_frames):
+#            print(('initial contact position for contact '+cframe))
+#            print((contact_x[0,ci,:]))
 
         t = 0.0   # used for control frequency  
         time_start = time.time()
@@ -221,7 +214,7 @@ if __name__=="__main__":
                 contact_x[i+1,ci,:] = np.resize(cp.x,3)
                 contact_v[i+1,ci,:] = np.resize(cp.v,3)
     
-            simu.display(q[-1])
+            simu.display(q[-1], dt)
             t += dt 
         # end simulation loop
         time_spent = time.time() - time_start
@@ -234,13 +227,17 @@ if __name__=="__main__":
         plt.legend()
         plt.title('Base Height vs time ')
 
-        # plot contact forces 
-        # for ci, ci_name in enumerate(conf.contact_frames):
-        #     plt.figure(ci_name+" normal force")
-        #     plt.plot(tt, sim_f[:, ci, 2], line_styles[i_ls], alpha=0.7, label=name)
-        #     plt.legend()
-        #     plt.title(ci_name+" normal force vs time")
-        
+        # plot contact forces             
+        for ci, ci_name in enumerate(conf.contact_frames):
+            (ff, ax) = plut.create_empty_figure(3, 1, name=ci_name+" normal force")
+            ax = ax.reshape(3)            
+            for i in range(3):
+                ax[i].plot(tt, sim_f[:, ci, i], line_styles[i_ls], alpha=0.7, label=name)
+                ax[i].set_xlabel('Time [s]')
+                ax[i].set_ylabel('Force [N]')
+            leg = ax[-1].legend()
+            if(leg): leg.get_frame().set_alpha(0.5)
+            ax[0].set_title(ci_name+" normal force vs time") 
         
         i_ls += 1 
         

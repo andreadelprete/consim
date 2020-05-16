@@ -22,6 +22,7 @@ INCLUDE(cmake/eigen.cmake)
 INCLUDE(cmake/python.cmake)
 INCLUDE(cmake/ide.cmake)
 INCLUDE(cmake/apple.cmake)
+INCLUDE(cmake/test.cmake)
 
 SET(PROJECT_NAME consim)
 SET(PROJECT_DESCRIPTION "Efficient Contact Dynamics Simulation based on Pinocchio")
@@ -97,6 +98,7 @@ SET(BOOST_COMPONENTS ${BOOST_REQUIERED_COMPONENTS} ${BOOST_OPTIONAL_COMPONENTS} 
 SEARCH_FOR_BOOST()
 
 ADD_REQUIRED_DEPENDENCY("expokit")
+ADD_REQUIRED_DEPENDENCY("eiquadprog")
 
 
 # Path to boost headers
@@ -169,7 +171,7 @@ IF(BUILD_PYTHON_INTERFACE)
   ADD_SUBDIRECTORY(bindings)
 ENDIF(BUILD_PYTHON_INTERFACE)
 # --- UNIT TESTS ---------------------------------------------------------------
-#ADD_SUBDIRECTORY(unittest)
+ADD_SUBDIRECTORY(tests)
 
 # --- PACKAGING ----------------------------------------------------------------
 PKG_CONFIG_APPEND_LIBS(${PROJECT_NAME})

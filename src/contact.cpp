@@ -1,97 +1,92 @@
 #include "consim/contact.hpp"
+#include <pinocchio/algorithm/kinematics.hpp>
+#include <pinocchio/algorithm/frames.hpp>
 #include <math.h>
 
 namespace consim {
 
-LinearPenaltyContactModel::LinearPenaltyContactModel(
-    double normal_spring_const, double normal_damping_coeff,
-    double static_friction_spring_coeff, double static_friction_damping_spring_coeff,
-    double static_friction_coeff, double dynamic_friction_coeff)
-{
-  normal_spring_const_ = normal_spring_const;
-  normal_damping_coeff_ = normal_damping_coeff;
-  static_friction_spring_coeff_ = static_friction_spring_coeff;
-  static_friction_damping_spring_coeff_ = static_friction_damping_spring_coeff;
-  static_friction_coeff_ = static_friction_coeff;
-  dynamic_friction_coeff_ = dynamic_friction_coeff;
-}
-
 #define macro_sign(x) ((x > 0) - (x < 0))
 #define sqr(x) (x * x)
 
-/**
- * Based on the DAMPED_SPRING_STATIC_FRICTION contact model in SL.
- *
- * note: the contact_parms arrays has the following elements:
- *       contact_parms[1] = normal spring coefficient
- *       contact_parms[2] = normal damping coefficient
- *       contact_parms[3] = static friction spring coefficient
- *       contact_parms[4] = static friction damping spring coefficient
- *       contact_parms[5] = static friction coefficient (friction cone)
- *       contact_parms[6] = dynamic friction coefficient (proportional to normal force)
- *
- * https://git-amd.tuebingen.mpg.de/amd-clmc/locomotion-sl/blob/master/src/SL_objects.c#L1372-1430
- */
-void LinearPenaltyContactModel::computeForce(ContactPoint& cptr)
+
+ContactPoint::ContactPoint(const pinocchio::Model &model, std::string name, unsigned int frameId, unsigned int nv, bool isUnilateral): 
+        model_(&model), name_(name), frame_id(frameId), unilateral(isUnilateral) {
+          active = false; 
+          f.fill(0);
+          predictedF_.fill(0);
+          predictedX_.fill(0);
+          world_J_.resize(3, nv); world_J_.setZero();
+          full_J_.resize(6, nv); full_J_.setZero();
+          dJdt_.resize(6, nv); dJdt_.setZero();
+           
+        }
+
+void ContactPoint::updatePosition(pinocchio::Data &data){
+  x = data.oMf[frame_id].translation(); 
+}
+
+void ContactPoint::firstOrderContactKinematics(pinocchio::Data &data){
+  vlocal_ = pinocchio::getFrameVelocity(*model_, data, frame_id); 
+  frameSE3_.rotation() = data.oMf[frame_id].rotation();
+  v.noalias() = frameSE3_.rotation()*vlocal_.linear();
+  pinocchio::getFrameJacobian(*model_, data, frame_id, pinocchio::LOCAL_WORLD_ALIGNED, full_J_);
+  world_J_ = full_J_.topRows<3>(); 
+}
+
+
+void ContactPoint::secondOrderContactKinematics(pinocchio::Data &data, Eigen::VectorXd &v){
+  // pinocchio::getFrameJacobianTimeVariation(*model_, data, frame_id, pinocchio::LOCAL, dJdt_);
+  dJvlocal_ = pinocchio::getFrameAcceleration(*model_, data, frame_id); 
+  // // std::cout<<"dJv acceleration component "<< dJvlocal_.linear() << std::endl;
+  dJvlocal_.linear() += vlocal_.angular().cross(vlocal_.linear());
+  // dJvlocal_.linear() = dJdt_.topRows<3>() * v; 
+  // dJvlocal_.angular() = dJdt_.bottomRows<3>() * v; 
+  dJv_ = frameSE3_.act(dJvlocal_).linear();
+
+}
+
+
+// --------------------------------------------------------------------------------------------------------// 
+
+LinearPenaltyContactModel::LinearPenaltyContactModel(Eigen::Vector3d &stiffness, Eigen::Vector3d &damping, double frictionCoeff){
+  stiffness_=stiffness;
+  damping_=damping; 
+  friction_coeff_=frictionCoeff;
+ }
+
+
+void LinearPenaltyContactModel::computeForce(ContactPoint& cp)
 {
-  unsigned int i;
-  double viscvel;
-  Eigen::Vector3d temp;
+  /*!< force along normal to contact object */ 
+  normalF_ = stiffness_.cwiseProduct(cp.normal) - damping_.cwiseProduct(cp.normvel); 
 
-  double tangent_force = 0.;
-  double normal_force = 0.;
-  for (i = 0; i < 3; ++i) {
-    cptr.f(i) = normal_spring_const_ * cptr.normal(i) + normal_damping_coeff_ * cptr.normvel(i);
-
-    // make sure the damping part does not attract a contact force with wrong sign
-    if (cptr.unilateral && (cptr.f(i)) * macro_sign(cptr.normal(i)) < 0) {
-      cptr.f(i) = 0.0;
-    }
-
-    normal_force += sqr(cptr.f(i));
-  }
-  normal_force = sqrt(normal_force);
-
-  // project the spring force according to the information in the contact and object structures
-  // TODO: Need to support force projection from SL. Doing no projection is the
-  //       same as having "F_FULL" contact point.
-  //
-  // projectForce(cptr,optr);
-
-  // the force due to static friction, modeled as horizontal damper, again
-  // in object centered coordinates
-  tangent_force = 0;
-  viscvel = 1.e-10;
-  for (i = 0; i < 3; ++i) {
-    temp(i) = -static_friction_spring_coeff_ * cptr.tangent(i) -
-        static_friction_damping_spring_coeff_ * cptr.tanvel(i);
-    tangent_force += sqr(temp(i));
-    viscvel += sqr(cptr.viscvel(i));
-  }
-  tangent_force = sqrt(tangent_force);
-  viscvel = sqrt(viscvel);
-
-  if(cptr.unilateral && (tangent_force > static_friction_coeff_ * normal_force || cptr.friction_flag)) 
-  {
-    /* If static friction too large -> spring breaks -> dynamic friction in
-      the direction of the viscvel vector; we also reset the x_start
-      vector such that static friction would be triggered appropriately,
-      i.e., when the viscvel becomes zero */
-    cptr.friction_flag = true;
-    for (i = 0; i < 3; ++i) {
-      cptr.f(i) += -dynamic_friction_coeff_ * normal_force * cptr.viscvel(i)/viscvel;
-      if (viscvel < 0.01) {
-        cptr.friction_flag = false;
-        cptr.x_start = cptr.x;
-      }
-    }
+  /*!< unilateral force, no pulling into contact object */ 
+  if (cp.unilateral && normalF_.dot(cp.contactNormal_)<0){
+    cp.f.fill(0);
   } 
-  else {
-      for (i = 0; i < 3; ++i) {
-        cptr.f(i) += temp(i);
-      }
+  else{
+    normalNorm_ = sqrt(normalF_.transpose()*normalF_);
+    tangentF_ = stiffness_.cwiseProduct(cp.tangent) - damping_.cwiseProduct(cp.tanvel);
+    tangentNorm_ = sqrt(tangentF_.transpose()*tangentF_);
+    cp.f = normalF_; 
+    //
+    if (cp.unilateral && (tangentNorm_ > friction_coeff_*normalNorm_)){
+      tangentDir_ = tangentF_/tangentNorm_; 
+      cp.f += friction_coeff_*normalNorm_*tangentDir_; 
+      // TODO: different friction coefficient along x,y will have to do 
+      //       the update below in vector form  
+      delAnchor_ = (tangentNorm_ - friction_coeff_*normalNorm_)/stiffness_(0);  
+      cp.x_start -= delAnchor_ * tangentDir_;  
+    } // friction cone violation
+    else{
+      cp.f += tangentF_;
+    }
   }
 }
+
+// --------------------------------------------------------------------------------------------------------// 
+
+
 
 
 } // namespace consim

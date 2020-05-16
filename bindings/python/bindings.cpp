@@ -11,6 +11,8 @@
 // IMPORTANT!!!!! DO NOT CHANGE THE ORDER OF THE INCLUDES HERE (COPIED FROM TSID) 
 #include <pinocchio/fwd.hpp>
 #include <boost/python.hpp>
+#include <iostream>
+// #include <Eigen/Dense>
 #include <string>
 #include <eigenpy/eigenpy.hpp>
 #include <boost/python/suite/indexing/vector_indexing_suite.hpp>
@@ -36,23 +38,20 @@ class AbstractSimulatorWrapper : public AbstractSimulator, public boost::python:
       this->get_override("step")(tau);
     }
 
-  void computeContactForces(const Eigen::VectorXd &dq){
-    this->get_override("computeContactForces")(dq);
+  void computeContactForces(){
+    this->get_override("computeContactForces")();
   }
 
 };
 
 EulerSimulator* build_euler_simulator(
     float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data,
-    double normal_spring_const, double normal_damping_coeff,
-    double static_friction_spring_coeff, double static_friction_damping_spring_coeff,
-    double static_friction_coeff, double dynamic_friction_coeff)
+    Eigen::Vector3d stifness, Eigen::Vector3d damping, double frictionCoefficient)
 {
   LinearPenaltyContactModel *contact_model = new LinearPenaltyContactModel(
-      normal_spring_const, normal_damping_coeff, static_friction_spring_coeff,
-      static_friction_damping_spring_coeff, static_friction_coeff, dynamic_friction_coeff);
+      stifness, damping, frictionCoefficient);
 
-  Object* obj = new FloorObject("Floor", *contact_model);
+  ContactObject* obj = new FloorObject("Floor", *contact_model);
 
   if(!model.check(data))
   {
@@ -67,15 +66,12 @@ EulerSimulator* build_euler_simulator(
 
 ExponentialSimulator* build_exponential_simulator(
     float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data,
-    double normal_spring_const, double normal_damping_coeff,
-    double static_friction_spring_coeff, double static_friction_damping_spring_coeff,
-    double static_friction_coeff, double dynamic_friction_coeff,bool sparse, bool invertibleA)
+    Eigen::Vector3d stifness, Eigen::Vector3d damping, double frictionCoefficient,bool sparse, bool invertibleA)
 {
   LinearPenaltyContactModel *contact_model = new LinearPenaltyContactModel(
-      normal_spring_const, normal_damping_coeff, static_friction_spring_coeff,
-      static_friction_damping_spring_coeff, static_friction_coeff, dynamic_friction_coeff);
+      stifness, damping, frictionCoefficient);
 
-  Object* obj = new FloorObject("Floor", *contact_model);
+  ContactObject* obj = new FloorObject("Floor", *contact_model);
 
   if(!model.check(data))
   {
@@ -122,20 +118,23 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
             bp::return_value_policy<bp::manage_new_object>());
 
     bp::class_<ContactPoint>("Contact",
-                             "Contact struct")
-        .def_readwrite("active", &ContactPoint::active)
-        .def_readwrite("frame_id", &ContactPoint::frame_id)
-        .def_readwrite("friction_flag", &ContactPoint::friction_flag)
+                             "Contact Point",
+                          bp::init<pinocchio::Model &, std::string, unsigned int, unsigned int, bool >())
+        .def("updatePosition", &ContactPoint::updatePosition, return_internal_reference<>())
+        .def("firstOrderContactKinematics", &ContactPoint::firstOrderContactKinematics, return_internal_reference<>())
+        .def("secondOrderContactKinematics", &ContactPoint::secondOrderContactKinematics, return_internal_reference<>())
+        // .def("computeContactForce", &ContactPoint::computeContactForce, return_internal_reference<>())
+        .ADD_PROPERTY_RETURN_BY_VALUE("frame_id", &ContactPoint::frame_id)
         .ADD_PROPERTY_RETURN_BY_VALUE("x", &ContactPoint::x)
         .ADD_PROPERTY_RETURN_BY_VALUE("v", &ContactPoint::v)
         .ADD_PROPERTY_RETURN_BY_VALUE("x_start", &ContactPoint::x_start)
-        .ADD_PROPERTY_RETURN_BY_VALUE("contact_surface_normal", &ContactPoint::contact_surface_normal)
         .ADD_PROPERTY_RETURN_BY_VALUE("normal", &ContactPoint::normal)
         .ADD_PROPERTY_RETURN_BY_VALUE("normvel", &ContactPoint::normvel)
         .ADD_PROPERTY_RETURN_BY_VALUE("tangent", &ContactPoint::tangent)
         .ADD_PROPERTY_RETURN_BY_VALUE("tanvel", &ContactPoint::tanvel)
-        .ADD_PROPERTY_RETURN_BY_VALUE("viscvel", &ContactPoint::viscvel)
-        .ADD_PROPERTY_RETURN_BY_VALUE("f", &ContactPoint::f);
+        .ADD_PROPERTY_RETURN_BY_VALUE("f", &ContactPoint::f)
+        .ADD_PROPERTY_RETURN_BY_VALUE("predicted_f", &ContactPoint::predictedF_)
+        .ADD_PROPERTY_RETURN_BY_VALUE("predicted_x", &ContactPoint::predictedX_);
 
 
     bp::class_<AbstractSimulatorWrapper, boost::noncopyable>("AbstractSimulator", "Abstract Simulator Class", 
@@ -180,52 +179,5 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
         .def("get_dv", &ExponentialSimulator::get_dv,bp::return_value_policy<bp::copy_const_reference>(), "time derivative of tangent vector to configuration");
 
 }
-//
-//#include <pinocchio/fwd.hpp>
-//#include <eigenpy/eigenpy.hpp>
-//#include <eigenpy/geometry.hpp>
 
-//#include "tsid/bindings/python/robots/expose-robots.hpp"
-//#include "tsid/bindings/python/constraint/expose-constraints.hpp"
-//#include "tsid/bindings/python/contacts/expose-contact.hpp"
-//#include "tsid/bindings/python/trajectories/expose-trajectories.hpp"
-//#include "tsid/bindings/python/tasks/expose-tasks.hpp"
-//#include "tsid/bindings/python/solvers/expose-solvers.hpp"
-//#include "tsid/bindings/python/formulations/expose-formulations.hpp"
-
-//#include <boost/python/module.hpp>
-//#include <boost/python/def.hpp>
-//#include <boost/python/tuple.hpp>
-//#include <boost/python/to_python_converter.hpp>
-
-//namespace bp = boost::python;
-//using namespace tsid::python;
-
-//BOOST_PYTHON_MODULE(libtsid_pywrap)
-//{
-//  eigenpy::enableEigenPy();
-//  eigenpy::exposeAngleAxis();
-//  eigenpy::exposeQuaternion();
-
-//  typedef Eigen::Matrix<double,6,6> Matrix6d;
-//  typedef Eigen::Matrix<double,6,1> Vector6d;
-//  typedef Eigen::Matrix<double,6,Eigen::Dynamic> Matrix6x;
-//  typedef Eigen::Matrix<double,3,Eigen::Dynamic> Matrix3x;
-
-//  eigenpy::enableEigenPySpecific<Matrix6d>();
-//  eigenpy::enableEigenPySpecific<Vector6d>();
-//  eigenpy::enableEigenPySpecific<Matrix6x>();
-//  eigenpy::enableEigenPySpecific<Matrix3x>();
-//  eigenpy::enableEigenPySpecific<Eigen::MatrixXd>();
-//  eigenpy::enableEigenPySpecific<Eigen::Vector3d>();
-
-//  exposeRobots();
-//  exposeConstraints();
-//  exposeContact();
-//  exposeTrajectories();
-//  exposeTasks();
-//  exposeSolvers();
-//  exposeFormulations();
-
-//}
 }

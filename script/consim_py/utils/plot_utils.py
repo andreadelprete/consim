@@ -57,8 +57,18 @@ mpl.rcParams['figure.facecolor'] = DEFAULT_FIGURE_FACE_COLOR
 mpl.rcParams['figure.figsize'] = 23, 18  # 12, 9 #
 
 
-def create_empty_figure(nRows=1, nCols=1, spinesPos=None, sharex=True):
-    f, ax = plt.subplots(nRows, nCols, sharex=sharex)
+def create_empty_figure(nRows=1, nCols=1, spinesPos=None, sharex=True, name=None):
+    if(name):
+        f = plt.figure(name)
+        ax = np.empty((nRows,nCols), dtype=object)
+        k = 0
+        for i in range(nRows):
+            for j in range(nCols):
+                ax[i,j] = f.add_subplot(nRows,nCols,k+1)
+                k+=1
+    else:
+        f, ax = plt.subplots(nRows, nCols, sharex=sharex)
+        
     mngr = plt.get_current_fig_manager()
 #    mngr.window.setGeometry(50, 50, 1080, 720)
 

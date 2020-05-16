@@ -3,15 +3,13 @@
 
 namespace consim {
 
-Object::Object(std::string name, ContactModel& contact_model):
+ContactObject::ContactObject(std::string name, ContactModel& contact_model):
     name_(name), contact_model_(&contact_model) { }
 
-bool FloorObject::checkContact(ContactPoint &cp)
-{
-  // if(!cp.unilateral){
-  //   return true;
-  // }
+// -------------------------------------------------------------------------------
 
+bool FloorObject::checkCollision(ContactPoint &cp)
+{
   // checks for penetration into the floor 
   if (cp.x(2) > 0.) {
     return false;
@@ -19,32 +17,27 @@ bool FloorObject::checkContact(ContactPoint &cp)
 
   if (!cp.active) {
     cp.x_start = cp.x;
+    cp.contactNormal_ << 0.,0.,1.; 
+    cp.contactTangentA_ << 1.,0.,0.;
+    cp.contactTangentB_ << 0.,1.,0.;
   }
-
-  cp.contact_surface_normal << 0., 0., 1.;
-
-  // Ensure the starting position is at the top of the floor.
-  cp.x_start(2) = 0;
+  //
   return true;
 }
 
-void FloorObject::contactModel(ContactPoint &cp)
-{
-  // Compute the normal displacement and velocities.
-  // TODO: Move this into a separate method (of the contact object)?
-  cp.normal = (cp.x_start - cp.x).dot(cp.contact_surface_normal) * cp.contact_surface_normal;
-  cp.normvel = (-cp.v).dot(cp.contact_surface_normal) * cp.contact_surface_normal;
-
-  // Compute the tangential offset and velocity by removing the normal component.
-  // NOTE: The normal component has a different signs than the tangential one.
-  cp.tangent = (cp.x - cp.x_start) + cp.normal;
-  cp.tanvel = cp.v + cp.normvel;
-
-  // TODO: Figure out if the viscvel is always the same as the tanvel for each
-  //       shape.
-  cp.viscvel = cp.tanvel;
-
-  contact_model_->computeForce(cp);
+void FloorObject::computePenetration(ContactPoint &cp){
+  /** compute displacement relative to contact object
+   * delta_x: relative penetration 
+   * normal: penetration along normal to contact object
+   * tangent: penetration along tangent to contact object
+   * normalvel: velocity along normal to contact object
+   * tanvel: velocity along tangent to contact object
+   * */ 
+  cp.delta_x = cp.x_start - cp.x; 
+  cp.normal = cp.delta_x.dot(cp.contactNormal_) * cp.contactNormal_; 
+  cp.tangent = cp.delta_x - cp.normal; 
+  cp.normvel = (cp.v).dot(cp.contactNormal_) * cp.contactNormal_; 
+  cp.tanvel = cp.v - cp.normvel; 
 }
 
 }

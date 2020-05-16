@@ -1,35 +1,47 @@
 #pragma once
 
+// #include "consim/object.fwd.hpp"
+// #include "consim/contact.fwd.hpp"
 #include "consim/contact.hpp"
 
 namespace consim {
 
-class Object {
-public:
-  Object(std::string name, ContactModel& contact_model);
+/**
+ * base class for ContactObject is defined here 
+ * object can modify contact point and vice-versa
+ * one had to be included before the other 
+ * **/  
 
-  virtual bool checkContact(ContactPoint &cp) = 0;
-  virtual void contactModel(ContactPoint &cp) = 0;
-
-  double getNormalStiffness() const { return contact_model_->getNormalStiffness(); };
-  double getNormalDamping() const { return contact_model_->getNormalDamping(); };
-  double getTangentialStiffness() const { return contact_model_->getTangentialStiffness(); };
-  double getTangentialDamping() const { return contact_model_->getTangentialDamping(); };
-  double getFrictionCoefficient() const { return contact_model_->getFrictionCoefficient(); };
-  const std::string & getName() const { return name_; }
-
-protected:
-  std::string name_;
-  ContactModel* contact_model_;
+class ContactObject {
+  public:
+  // initialize with a specific contact model, could be viscoElastic, rigid .. etc 
+  // all model specific parameters will be stored in the model itself 
+    ContactObject(std::string name, ContactModel& contact_model);
+    ~ContactObject(){};
+    
+    /** CheckCollision()
+     * Checks if a given contact point is in collision with the object
+     * A contact point can be in contact with one object only
+     **/  
+    virtual bool checkCollision(ContactPoint &cp) = 0;
+    virtual void computePenetration(ContactPoint &cp) = 0;
+    const std::string & getName() const { return name_; }
+    ContactModel* contact_model_;
+     
+    std::string name_;
+    
 };
 
-class FloorObject: public Object
-{
-public:
-  FloorObject(std::string name, ContactModel& contact_model): Object(name, contact_model) { };
+// -----------------------------------------------------------------------------
 
-  bool checkContact(ContactPoint &cp);
-  void contactModel(ContactPoint &cp);
+class FloorObject: public ContactObject
+{
+  public:
+  FloorObject(std::string name, ContactModel& contact_model): ContactObject(name, contact_model) { };
+  ~FloorObject(){};
+
+  bool checkCollision(ContactPoint &cp) override; 
+  void computePenetration(ContactPoint &cp) override;
 };
 
 }

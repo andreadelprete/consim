@@ -1,3 +1,5 @@
+#pragma once
+
 #include <Eigen/Eigen>
 #include<Eigen/Cholesky>
 #include <pinocchio/spatial/se3.hpp>
@@ -10,7 +12,8 @@
 
 #include "consim/object.hpp"
 #include "consim/contact.hpp"
-//#include "consim/dynamic_algebra.hpp"
+#include "eiquadprog/eiquadprog-fast.hpp"
+#include <Eigen/Cholesky>
 
 #define CONSIM_PROFILER
 #ifndef CONSIM_PROFILER
@@ -20,6 +23,8 @@
 #define CONSIM_START_PROFILER(name) getProfiler().start(name)
 #define CONSIM_STOP_PROFILER(name) getProfiler().stop(name)
 #endif
+
+
 
 
 
@@ -34,18 +39,18 @@ namespace consim {
         * Defines a pinocchio frame as a contact point for contact interaction checking.
         * A contact is a struct containing all the contact information 
       */
-      const ContactPoint &addContactPoint(int frame_id, bool unilateral);
+      const ContactPoint &addContactPoint(std::string name, int frame_id, bool unilateral);
 
       /**
         * Returns the contact points reference 
       */
 
-      const ContactPoint &getContact(int index);
+      const ContactPoint &getContact(std::string name);
 
       /**
         * Adds an object to the simulator for contact interaction checking.
       */
-      void addObject(Object &obj);
+      void addObject(ContactObject &obj);
 
       /**
        * Convenience method to perform a single dt timestep of the simulation. The
@@ -61,9 +66,6 @@ namespace consim {
 
       void setJointFriction(const Eigen::VectorXd &joint_friction);
 
-      
-
-      
       /**
        * Convenience method to perform a single dt timestep of the simulation. 
        * Computes q, dq, ddq, and contact forces for a single time step 
@@ -75,34 +77,23 @@ namespace consim {
       const Eigen::VectorXd& get_q() const {return q_;};
       const Eigen::VectorXd& get_v() const {return v_;};
       const Eigen::VectorXd& get_dv() const {return dv_;};
-      // Eigen::VectorXd get_f() const {return f_};
 
-    
     protected:
-
+      const double sub_dt;
       Eigen::VectorXd q_;  
       Eigen::VectorXd qnext_;
       Eigen::VectorXd v_;
       Eigen::VectorXd dv_;
-      // Eigen::VectorXd f_;
       Eigen::VectorXd vMean_;
       Eigen::VectorXd tau_;
       unsigned int nc_=0;
-      int nactive_; // number of active contacts
+      int nactive_; 
       bool resetflag_ = false;
       /**
         * loops over contact points, checks active contacts and sets reference contact positions 
       */
-      void checkContact();
-      /**
-      * computes all relative dynamic and kinematic terms, then checks for the contacts  
-      */
-      void computeContactState();
-
-
-      virtual void computeContactForces(const Eigen::VectorXd &dq)=0;
-
-      inline void contactLinearJacobian(unsigned int frame_id);
+      void detectContacts();
+      virtual void computeContactForces()=0;
 
       const pinocchio::Model *model_;
       pinocchio::Data *data_;
@@ -111,15 +102,15 @@ namespace consim {
       int n_integration_steps_;
   
       std::vector<ContactPoint *> contacts_;
-      std::vector<Object *> objects_;
-
-      Eigen::MatrixXd frame_Jc_;
-      pinocchio::Data::Matrix6x J_;
+      std::vector<ContactObject *> objects_;
 
       Eigen::VectorXd joint_friction_;
       bool joint_friction_flag_ = 0;
-
+  
   }; // class AbstractSimulator
+
+/*_______________________________________________________________________________*/
+
 
   class EulerSimulator : public AbstractSimulator
   {
@@ -134,13 +125,14 @@ namespace consim {
       void step(const Eigen::VectorXd &tau) override;
 
     protected:
-      const double sub_dt;
-      void computeContactForces(const Eigen::VectorXd &dq) override;
-      
-      
-
+      void computeContactForces() override;
+      Eigen::LLT<MatrixXd> lltM_;
+      Eigen::MatrixXd inverseM_; 
+      Eigen::VectorXd mDv_; 
 
   }; // class EulerSimulator
+
+/*_______________________________________________________________________________*/
 
   class ExponentialSimulator : public AbstractSimulator
   {
@@ -150,14 +142,12 @@ namespace consim {
       ~ExponentialSimulator(){};
       void step(const Eigen::VectorXd &tau) override;
 
-
-
     protected:
       /**
        * AbstractSimulator::computeContactState() must be called before  
        * calling ExponentialSimulator::computeContactForces()
        */
-      void computeContactForces(const Eigen::VectorXd &dq) override; 
+      void computeContactForces() override; 
       /**
        * computes average contact force during one integration step 
        * loops over the average force to compute tangential and normal force per contact 
@@ -166,9 +156,12 @@ namespace consim {
        */
       void checkFrictionCone(); 
 
+      void resizeVectorsAndMatrices();
+      // convenience method to compute terms needed in integration  
+      void computeIntegrationTerms();
+
       bool sparse_; 
       bool invertibleA_;
-      const double sub_dt;
       
       Eigen::VectorXd f_;  // total force 
       Eigen::MatrixXd Jc_; // contact jacobian for all contacts 
@@ -183,21 +176,8 @@ namespace consim {
       Eigen::VectorXd int2xt_;
       Eigen::VectorXd kp0_; 
       Eigen::VectorXd dv_bar; 
-
-      
-      void resizeVectorsAndMatrices();
-      void computeFrameKinematics(unsigned int contact_id); 
-      // convenience method to compute terms needed in integration  
-      void computeIntegrationTerms();
-
       // contact acceleration components 
       Eigen::VectorXd dJv_;  
-      // contnact frame components
-      pinocchio::Motion vilocal_ = pinocchio::Motion::Zero();
-      pinocchio::Motion dJvilocal_ = pinocchio::Motion::Zero(); 
-      Eigen::VectorXd dJvi_; 
-      pinocchio::SE3 frameSE3_ = pinocchio::SE3::Identity();
-      //
       Eigen::MatrixXd K;
       Eigen::MatrixXd B;
       Eigen::MatrixXd D;
@@ -221,11 +201,44 @@ namespace consim {
       Eigen::VectorXd fpr_;   // projected force on cone boundaries 
       bool cone_flag_ = false; // cone violation status 
       double cone_direction_; // angle of tangential(to contact surface) force 
-      double ftan_; 
+
+      Eigen::Vector3d normalFi_; // normal component of contact force Fi at contact Ci  
+      Eigen::Vector3d tangentFi_; // normal component of contact force Fi at contact Ci  
+      double fnor_;   // norm of normalFi_  
+      double ftan_;   // norm of tangentFi_ 
       unsigned int i_active_; // index of the active contact      
 
+      /**
+       * solves a QP to update anchor points of sliding contacts
+       * min || dp0_avg || ^ 2 
+       * st. Fc \in Firction Cone
+       **/  
+      void computeSlipping(); 
+      eiquadprog::solvers::EiquadprogFast qp;
+      Eigen::MatrixXd Q_cone; 
+      Eigen::VectorXd q_cone; 
+      Eigen::MatrixXd Cineq_cone; 
+      Eigen::VectorXd cineq_cone; 
+      Eigen::MatrixXd Ceq_cone; 
+      Eigen::VectorXd ceq_cone; 
+      Eigen::VectorXd optdP_cone; 
+      //
+      Eigen::Vector3d xstart_new; // invK*cone_force_offset_03
+
+      Eigen::MatrixXd normal_constraints_;
+      Eigen::MatrixXd tangentA_constraints_;
+      Eigen::MatrixXd tangentB_constraints_;
+      Eigen::MatrixXd contact_position_integrator_; 
+      Eigen::MatrixXd D_intExpA_integrator; 
+
+      void computePredictedForces();
+      // Eigen::MatrixXd C; 
+      // Eigen::VectorXd z; 
+      // Eigen::VectorXd nextZ; 
+      // Eigen::MatrixXd expDtC;
+      // Eigen::VectorXd predictedForce_;  
+      // expokit::MatrixExponential<double, Dynamic> utilD; // Dynamic
+      Eigen::VectorXd fkDv_; // filled with zeros for second order kinematics  
   }; // class ExponentialSimulator
-
-
 
 } // namespace consim 
