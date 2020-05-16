@@ -1,7 +1,6 @@
 import pinocchio as se3
 import tsid
 import numpy as np
-import numpy.matlib as matlib
 import os
 import gepetto.corbaserver
 import time
@@ -26,7 +25,7 @@ class TsidQuadruped:
             q = np.copy(q0)
 #        q = se3.getNeutralConfiguration(robot.model(), conf.srdf, False)
 #        q = robot.model().referenceConfigurations["half_sitting"]
-        v = np.matrix(np.zeros(robot.nv)).T
+        v = np.zeros(robot.nv)
 
         # for gepetto viewer
         if(viewer):
@@ -42,7 +41,7 @@ class TsidQuadruped:
             self.robot_display.displayVisuals(True)
             self.robot_display.display(q)
             self.gui = self.robot_display.viewer.gui
-            self.gui.setCameraTransform(0, conf.CAMERA_TRANSFORM)
+            self.gui.setCameraTransform('gepetto', conf.CAMERA_TRANSFORM)
 
         robot = self.robot
         self.model = robot.model()
@@ -58,8 +57,8 @@ class TsidQuadruped:
         self.contact_ids = {}
         for i, name in enumerate(conf.contact_frames):
             contacts[i] = tsid.ContactPoint(name, robot, name, conf.contact_normal, conf.mu, conf.fMin, conf.fMax)
-            contacts[i].setKp(conf.kp_contact * matlib.ones(3).T)
-            contacts[i].setKd(2.0 * np.sqrt(conf.kp_contact) * matlib.ones(3).T)
+            contacts[i].setKp(conf.kp_contact * np.ones(3))
+            contacts[i].setKd(2.0 * np.sqrt(conf.kp_contact) * np.ones(3))
             self.contact_ids[name] = robot.model().getFrameId(name)
             H_ref = robot.framePosition(data, robot.model().getFrameId(name))
             contacts[i].setReference(H_ref)
@@ -75,23 +74,23 @@ class TsidQuadruped:
 #        formulation.addRigidContact(contactRF, conf.w_forceRef)
 
         comTask = tsid.TaskComEquality("task-com", robot)
-        comTask.setKp(conf.kp_com * matlib.ones(3).T)
-        comTask.setKd(2.0 * np.sqrt(conf.kp_com) * matlib.ones(3).T)
+        comTask.setKp(conf.kp_com * np.ones(3))
+        comTask.setKd(2.0 * np.sqrt(conf.kp_com) * np.ones(3))
         formulation.addMotionTask(comTask, conf.w_com, 1, 0.0)
 
         postureTask = tsid.TaskJointPosture("task-posture", robot)
-        postureTask.setKp(conf.kp_posture * matlib.ones(robot.nv-6).T)
-        postureTask.setKd(2.0 * np.sqrt(conf.kp_posture) * matlib.ones(robot.nv-6).T)
+        postureTask.setKp(conf.kp_posture * np.ones(robot.nv-6))
+        postureTask.setKd(2.0 * np.sqrt(conf.kp_posture) * np.ones(robot.nv-6))
         formulation.addMotionTask(postureTask, conf.w_posture, 1, 0.0)
 
 #        self.leftFootTask = tsid.TaskSE3Equality("task-left-foot", self.robot, self.conf.lf_frame_name)
-#        self.leftFootTask.setKp(self.conf.kp_foot * np.matrix(np.ones(6)).T)
-#        self.leftFootTask.setKd(2.0 * np.sqrt(self.conf.kp_foot) * np.matrix(np.ones(6)).T)
+#        self.leftFootTask.setKp(self.conf.kp_foot * np.array(np.ones(6)).T)
+#        self.leftFootTask.setKd(2.0 * np.sqrt(self.conf.kp_foot) * np.array(np.ones(6)).T)
 #        self.trajLF = tsid.TrajectorySE3Constant("traj-left-foot", H_lf_ref)
 #
 #        self.rightFootTask = tsid.TaskSE3Equality("task-right-foot", self.robot, self.conf.rf_frame_name)
-#        self.rightFootTask.setKp(self.conf.kp_foot * np.matrix(np.ones(6)).T)
-#        self.rightFootTask.setKd(2.0 * np.sqrt(self.conf.kp_foot) * np.matrix(np.ones(6)).T)
+#        self.rightFootTask.setKp(self.conf.kp_foot * np.array(np.ones(6)).T)
+#        self.rightFootTask.setKd(2.0 * np.sqrt(self.conf.kp_foot) * np.array(np.ones(6)).T)
 #        self.trajRF = tsid.TrajectorySE3Constant("traj-right-foot", H_rf_ref)
 #
         com_ref = robot.com(data)

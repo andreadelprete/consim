@@ -1,14 +1,27 @@
-#include <pinocchio/bindings/python/multibody/data.hpp>
-#include <pinocchio/bindings/python/multibody/model.hpp>
+// #include <pinocchio/bindings/python/multibody/data.hpp>
+// #include <pinocchio/bindings/python/multibody/model.hpp>
+// #include <pinocchio/fwd.hpp>
+// #include <boost/python.hpp>
+// #include <iostream>
+// #include <eigenpy/eigenpy.hpp>
+
+// #include "consim/simulator.hpp"
+
+
+// IMPORTANT!!!!! DO NOT CHANGE THE ORDER OF THE INCLUDES HERE (COPIED FROM TSID) 
 #include <pinocchio/fwd.hpp>
 #include <boost/python.hpp>
 #include <iostream>
 // #include <Eigen/Dense>
+#include <string>
 #include <eigenpy/eigenpy.hpp>
+#include <boost/python/suite/indexing/vector_indexing_suite.hpp>
+#include <boost/python/make_constructor.hpp>
+
+#include <pinocchio/bindings/python/multibody/data.hpp>
+#include <pinocchio/bindings/python/multibody/model.hpp>
 
 #include "consim/simulator.hpp"
-// #include "consim/utils/stop-watch.hpp"
-
 
 //eigenpy::switchToNumpyMatrix();
 

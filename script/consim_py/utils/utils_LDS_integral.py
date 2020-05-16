@@ -9,16 +9,17 @@ Given x(0) and T I want to compute:
 from __future__ import print_function
 from scipy.sparse.linalg.matfuncs import _ExpmPadeHelper, _ell, _solve_P_Q
 import numpy as np
-from numpy import matlib
 from numpy.linalg import solve
-# rom scipy.linalg import expm
 from numpy.linalg import eigvals
+from scipy.linalg import matrix_balance
 # import matplotlib.pyplot as plt
 
 np.set_printoptions(precision=2, linewidth=200, suppress=True)
-
+    
 
 def expm(A, use_exact_onenorm="auto", verbose=False):
+    from scipy.linalg import expm as expm_scipy
+    return expm_scipy(A)
     # Core of expm, separated to allow testing exact and approximate
     # algorithms.
     # Hardcode a matrix order threshold for exact vs. estimated one-norms.
@@ -44,11 +45,46 @@ def expm(A, use_exact_onenorm="auto", verbose=False):
     return X
 
 
-def expm_times_v(A, v, use_exact_onenorm="auto", verbose=False):
+def expm_times_v(A, v, scaling_reduction=0, verbose=False):
+    ''' scaling_reduction can be used to reduce the computational complexity of the exponential 
+        1: no scaling can be performed
+        2: at most a Pade order 9 is used
+        3: at most a Pade order 7 is used
+        4: at most a Pade order 5 is used
+        5: at most a Pade order 3 is used
+    '''
     # Compute expm(A)*v
     # Hardcode a matrix order threshold for exact vs. estimated one-norms.
     use_exact_onenorm = A.shape[0] < 200
     h = _ExpmPadeHelper(A, use_exact_onenorm=use_exact_onenorm)
+    structure = None
+    
+    # Try Pade order 3.
+    eta_1 = max(h.d4_loose, h.d6_loose)
+    if scaling_reduction>4 or (eta_1 < 1.495585217958292e-002 and _ell(h.A, 3) == 0):
+        U, V = h.pade3()
+        X = _solve_P_Q(U, V, structure=structure)
+        return X.dot(v)
+
+    # Try Pade order 5.
+    eta_2 = max(h.d4_tight, h.d6_loose)
+    if scaling_reduction>3 or (eta_2 < 2.539398330063230e-001 and _ell(h.A, 5) == 0):
+        U, V = h.pade5()
+        X = _solve_P_Q(U, V, structure=structure)
+        return X.dot(v)
+
+    # Try Pade orders 7 and 9.
+    eta_3 = max(h.d6_tight, h.d8_loose)
+    if scaling_reduction>2 or (eta_3 < 9.504178996162932e-001 and _ell(h.A, 7) == 0):
+        U, V = h.pade7()
+        X = _solve_P_Q(U, V, structure=structure)
+        return X.dot(v)
+        
+    if scaling_reduction>1 or (eta_3 < 2.097847961257068e+000 and _ell(h.A, 9) == 0):
+        U, V = h.pade9()
+        X = _solve_P_Q(U, V, structure=structure)    
+        return X.dot(v)
+    
     # Use Pade order 13.
     eta_3 = max(h.d6_tight, h.d8_loose)
     eta_4 = max(h.d8_loose, h.d10_loose)
@@ -61,19 +97,23 @@ def expm_times_v(A, v, use_exact_onenorm="auto", verbose=False):
     else:
         s = max(int(np.ceil(np.log2(eta_5 / theta_13))), 0)
     s = s + _ell(2**-s * h.A, 13)
+    
+    if(scaling_reduction>0):
+        s = 0
+
     U, V = h.pade13_scaled(s)
     X = _solve_P_Q(U, V)
     # X = r_13(A)^(2^s) by repeated squaring.
-    res = v
-    for i in range(2**s):
-        res = X.dot(res)
+    for i in range(s):
+        X = X.dot(X)
+    res = X.dot(v)
     return res
 
 
 def compute_x_T(A, a, x0, T, dt=None, invertible_A=False):
     if(dt is not None):
         N = int(T/dt)
-        x = matlib.copy(x0)
+        x = np.copy(x0)
         for i in range(N):
             dx = A.dot(x) + a
             x += dt*dx
@@ -82,23 +122,23 @@ def compute_x_T(A, a, x0, T, dt=None, invertible_A=False):
     if(invertible_A):
         e_TA = expm(T*A)
         A_inv_a = solve(A, a)
-        return e_TA*(x0+A_inv_a) - A_inv_a
+        return e_TA@(x0+A_inv_a) - A_inv_a
 
     n = A.shape[0]
-    C = matlib.zeros((n+1, n+1))
+    C = np.zeros((n+1, n+1))
     C[0:n,     0:n] = A
     C[0:n,     n] = a
-    z0 = matlib.zeros((n+1, 1))
-    z0[:n, 0] = x0
-    z0[-1, 0] = 1.0
+    z0 = np.zeros(n+1)
+    z0[:n] = x0
+    z0[-1] = 1.0
     e_TC = expm(T*C, verbose=True)
-    z = e_TC*z0
+    z = e_TC@z0
 #    z = expm_times_v(T*C, z0, verbose=True)
-    x_T = z[:n, 0]
+    x_T = z[:n]
     return x_T
 
 
-def compute_integral_x_T(A, a, x0, T, dt=None, invertible_A=False):
+def compute_integral_x_T(A, a, x0, T, dt=None, invertible_A=False, scaling_reduction=0):
     if(dt is not None):
         N = int(T/dt)
         int_x = dt*x0
@@ -111,29 +151,29 @@ def compute_integral_x_T(A, a, x0, T, dt=None, invertible_A=False):
         e_TA = expm(T*A)
         Ainv_a = solve(A, a)
         Ainv_x0_plus_Ainv_a = solve(A, x0+Ainv_a)
-        Id = matlib.eye(A.shape[0])
-        return (e_TA - Id)*Ainv_x0_plus_Ainv_a - T*Ainv_a
+        Id = np.eye(A.shape[0])
+        return (e_TA - Id)@Ainv_x0_plus_Ainv_a - T*Ainv_a
 
     n = A.shape[0]
-    C = matlib.zeros((n+2, n+2))
+    C = np.zeros((n+2, n+2))
     C[0:n,     0:n] = A
     C[0:n,     n] = a
     C[0:n,     n+1] = x0
     C[n:n+1, n+1:] = 1.0
-    z0 = matlib.zeros((n+2, 1))
-    z0[-1, 0] = 1.0
-#    e_TC = expm(T*C, verbose=True)
-#    z = e_TC*z0
-    z = expm_times_v(T*C, z0, verbose=True)
-    int_x = z[:n, 0]
+    z0 = np.zeros(n+2)
+    z0[-1] = 1.0
+#    e_TC = expm(T@C, verbose=True)
+#    z = e_TC@z0
+    z = expm_times_v(T*C, z0, scaling_reduction, verbose=True)
+    int_x = z[:n]
     return int_x
 #
 
 
-def compute_double_integral_x_T(A, a, x0, T, dt=None, compute_also_integral=False, invertible_A=False):
+def compute_double_integral_x_T(A, a, x0, T, dt=None, compute_also_integral=False, invertible_A=False, scaling_reduction=0):
     if(dt is not None):
         N = int(T/dt)
-        int2_x = matlib.zeros_like(x0)
+        int2_x = np.zeros_like(x0)
         for i in range(1, N):
             int_x = compute_integral_x_T(A, a, x0, i*dt)
             int2_x += dt*int_x
@@ -144,25 +184,25 @@ def compute_double_integral_x_T(A, a, x0, T, dt=None, compute_also_integral=Fals
         Ainv_a = solve(A, a)
         Ainv_x0_plus_Ainv_a = solve(A, x0+Ainv_a)
         Ainv2_x0_plus_Ainv_a = solve(A, Ainv_x0_plus_Ainv_a)
-        Id = matlib.eye(A.shape[0])
-        int2_x = (e_TA - Id)*Ainv2_x0_plus_Ainv_a - T*Ainv_x0_plus_Ainv_a - 0.5*T*T*Ainv_a
+        Id = np.eye(A.shape[0])
+        int2_x = (e_TA - Id)@Ainv2_x0_plus_Ainv_a - T*Ainv_x0_plus_Ainv_a - 0.5*T*T*Ainv_a
         if compute_also_integral:
-            int_x = (e_TA - Id)*Ainv_x0_plus_Ainv_a - T*Ainv_a
+            int_x = (e_TA - Id)@Ainv_x0_plus_Ainv_a - T*Ainv_a
             return int_x, int2_x
         return int2_x
 
     n = A.shape[0]
-    C = matlib.zeros((n+3, n+3))
+    C = np.zeros((n+3, n+3))
     C[0:n,     0:n] = A
     C[0:n,     n] = a
     C[0:n,     n+1] = x0
-    C[n:n+2, n+1:] = matlib.eye(2)
-    z0 = matlib.zeros((n+3, 1))
-    z0[-1, 0] = 1.0
+    C[n:n+2, n+1:] = np.eye(2)
+    z0 = np.zeros(n+3)
+    z0[-1] = 1.0
 #    e_TC = expm(T*C, verbose=True)
-#    z = e_TC*z0
-    z = expm_times_v(T*C, z0, verbose=True)
-    int2_x = z[:n, 0]
+#    z = e_TC@z0
+    z = expm_times_v(T*C, z0, scaling_reduction, verbose=True)
+    int2_x = z[:n]
 
     # print("A\n", A)
     # print("a\n", a.T)
@@ -197,17 +237,17 @@ def compute_x_T_and_two_integrals(A, a, x0, T):
     with z(0) = (1, x(0), 0, 0)
     '''
     n = A.shape[0]
-    C = matlib.zeros((3*n+1, 3*n+1))
+    C = np.zeros((3*n+1, 3*n+1))
     C[1:1+n,   0] = a
     C[1:1+n,   1:1+n] = A
-    C[1+n:1+2*n, 1:1+n] = matlib.eye(n)
-    C[1+2*n:,      1+n:1+2*n] = matlib.eye(n)
-    z0 = np.vstack((1, x0, matlib.zeros((2*n, 1))))
+    C[1+n:1+2*n, 1:1+n] = np.eye(n)
+    C[1+2*n:,      1+n:1+2*n] = np.eye(n)
+    z0 = np.concatenate((np.ones(1), x0, np.zeros(2*n)))
     e_TC = expm(T*C)
-    z = e_TC*z0
-    x = z[1:1+n, 0]
-    int_x = z[1+n:2*n+1, 0]
-    int2_x = z[1+2*n:, 0]
+    z = e_TC@z0
+    x = z[1:1+n]
+    int_x = z[1+n:2*n+1]
+    int2_x = z[1+2*n:]
     return x, int_x, int2_x
 
 
@@ -216,47 +256,48 @@ def compute_integral_expm(A, T, dt=None):
     
     if(dt is not None):
         N = int(T/dt)
-        int_expm = matlib.zeros((n,n))
+        int_expm = np.zeros((n,n))
         for i in range(1, N):
             ex = expm(i*dt*A)
             int_expm += dt*ex
         return int_expm
     
-    C = matlib.zeros((n+n, n+n))
+    C = np.zeros((n+n, n+n))
     C[0:n,     0:n] = A
-    C[0:n,     n:] = matlib.identity(n)
-    z0 = matlib.zeros((n+n, n))
+    C[0:n,     n:] = np.identity(n)
+    z0 = np.zeros((n+n, n))
 #    z0[:n, 0] = x0
-    z0[-n:, :] = matlib.identity(n)
+    z0[-n:, :] = np.identity(n)
     e_TC = expm(T*C, verbose=True)
-    z = e_TC*z0
+    z = e_TC@z0
 #    z = expm_times_v(T*C, z0, verbose=True)
     res = z[:n, :]
     return res
     
     
 def print_error(x_exact, x_approx):
-    print("Approximation error: ", np.max(np.abs(x_exact-x_approx).A1 / np.abs(x_exact).A1))
+    print("Approximation error: ", np.max(np.abs(x_exact-x_approx) / np.abs(x_exact)))
 
 
 if __name__ == '__main__':
     import time
-    N_TESTS = 1000
+    from numpy.random import random as rand
+    N_TESTS = 100
     T = 0.001
     dt = 1e-7
-    n = 4*3*2
+    n = 1*3*2
     n2 = int(n/2)
     stiffness = 1e5
     damping = 1e2
-    x0 = matlib.rand((n, 1))
-    a = matlib.rand((n, 1))
-    U = matlib.rand((n2, n2))
-    Upsilon = U*U.T
-    K = matlib.eye(n2)*stiffness
-    B = matlib.eye(n2)*damping
-#    A = matlib.block([[matlib.zeros((n2, n2)), matlib.eye(n2)],
-#                      [-Upsilon*K,      -Upsilon*B]])
-    A  = matlib.rand((n, n))
+    x0 = rand(n)
+    a = rand(n)
+    U = rand((n2, n2))
+    Upsilon = U@U.T
+    K = np.eye(n2)*stiffness
+    B = np.eye(n2)*damping
+#    A = np.block([[np.zeros((n2, n2)), np.eye(n2)],
+#                      [-Upsilon@K,      -Upsilon@B]])
+    A  = rand((n, n))
     
 
     # print("x(0) is:", x0.T)

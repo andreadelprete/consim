@@ -5,68 +5,71 @@ from pinocchio.robot_wrapper import RobotWrapper
 import os, sys
 from os.path import dirname, join
 import matplotlib.pyplot as plt 
-import utils.plot_utils as plut
+import consim_py.utils.plot_utils as plut
 import time
 import matplotlib.pyplot as plt
 
-from tsid_quadruped import TsidQuadruped
-import conf_solo_py as conf
+from consim_py.tsid_quadruped import TsidQuadruped
+from consim_py.simulator import RobotSimulator
+import consim_py.conf_solo_py as conf
 from example_robot_data.robots_loader import loadSolo
 
-import numpy.matlib as matlib
+#import numpy.matlib as matlib
 from numpy import nan
 from numpy.linalg import norm as norm
 
-pin.setNumpyType(np.matrix)
+#pin.setNumpyType(np.array)
 
 USE_CONTROLLER = True 
 # parameters used for CoM Sinusoid 
-amp = np.matrix([0.0, 0.0, 0.05]).T
-two_pi_f = 2*np.pi*np.matrix([0.0, .0, 2.]).T # double frequency to get more slipping 
+amp = np.array([0.0, 0.0, 0.05]).T
+two_pi_f = 2*np.pi*np.array([0.0, .0, 2.]).T # double frequency to get more slipping 
+
 controller_dt = 5.e-3 
 
 if __name__=="__main__":
     # simulation parameters 
     simu_params = []
     
-    simu_params += [{'name': 'euler 1000',
-                    'type': 'euler', 
-                    'ndt': 1000}]
+#    simu_params += [{'name': 'euler 1000',
+#                    'type': 'euler', 
+#                    'ndt': 1000}]
     # simu_params += [{'name': 'euler 200',
     #                 'type': 'euler', 
     #                 'ndt': 200}]
-    # simu_params += [{'name': 'euler 100',
-    #                 'type': 'euler', 
-    #                 'ndt': 100}]
+    simu_params += [{'name': 'euler 100',
+                     'type': 'euler', 
+                     'ndt': 100}]
 
-    simu_params += [{'name': 'exponential 500',
-                    'type': 'exponential', 
-                    'ndt': 500}]
+#    simu_params += [{'name': 'exponential 500',
+#                    'type': 'exponential', 
+#                    'ndt': 500}]
 
-    # simu_params += [{'name': 'exponential 100',
-    #                 'type': 'exponential', 
-    #                 'ndt': 100}]
+#    simu_params += [{'name': 'exponential 100',
+#                     'type': 'exponential', 
+#                     'ndt': 100}]
         
     # simu_params += [{'name': 'euler 10',
     #                 'type': 'euler', 
     #                 'ndt': 10}]
 
-    # simu_params += [{'name': 'exponential 10',
-    #                 'type': 'exponential', 
-    #                 'ndt': 10}]
+#    simu_params += [{'name': 'exponential 10',
+#                     'type': 'exponential', 
+#                     'ndt': 10}]
 
-    # simu_params += [{'name': 'exponential 1',
-    #                 'type': 'exponential', 
-    #                 'ndt': 1}]
+    simu_params += [{'name': 'exponential 1',
+                     'type': 'exponential', 
+                     'ndt': 1}]
     
     # simu_params += [{'name': 'euler 1',
     #                 'type': 'euler', 
     #                 'ndt': 1}]
 
     line_styles = ['-', '--', '-.', '-..', ':','-o']
+
     i_ls = 0
     
-    mu = 0.3        # friction coefficient
+    mu = 0.9        # friction coefficient
     isSparse = False 
     isInvertible = False
     unilateral_contacts = True                   
@@ -84,23 +87,28 @@ if __name__=="__main__":
 
     # load robot 
     robot = loadSolo()
-    print(" Solo Loaded Successfully ".center(conf.LINE_WIDTH, '#'))
+    print((" Solo Loaded Successfully ".center(conf.LINE_WIDTH, '#')))    
+    # create python simulator just for viewer
+    simu = RobotSimulator(conf, robot, pin.JointModelFreeFlyer())
+    
     # lower q0 a little bit for bilateral contacts 
     q0 = conf.q0
+
     # q0[2] -= 1.e-6
     # print(" Contact Frame Positions".center(conf.LINE_WIDTH, '-'))
     # pin.framesForwardKinematics(robot.model, robot.data, q0)
     # for cname in conf.contact_frames:
     #     print robot.data.oMf[robot.model.getFrameId(cname)].translation 
-    v0 = np.zeros(robot.nv) [:,None]
-    tau = np.zeros(robot.nv) [:,None]
+
+    v0 = np.zeros(robot.nv)
+    tau = np.zeros(robot.nv)
  
     # loop over simulations     
     for simu_param in simu_params:
-        offset = np.matrix([0.0, -0.0, 0.0]).T
+        offset = np.array([0.0, -0.0, 0.0])
         ndt = simu_param['ndt']
         name = simu_param['name']
-        print(" Running %s Simulation ".center(conf.LINE_WIDTH, '#')%name)
+        print((" Running %s Simulation ".center(conf.LINE_WIDTH, '#')%name))
         simu_type = simu_param['type']
         # build the simulator 
         if(simu_type=='exponential'):
@@ -148,23 +156,20 @@ if __name__=="__main__":
         print(" TSID Initialized Successfully ".center(conf.LINE_WIDTH, '-'))
 
     
-        offset += invdyn.robot.com(invdyn.formulation.data())
-        two_pi_f_amp = np.multiply(two_pi_f, amp)
-        two_pi_f_squared_amp = np.multiply(two_pi_f, two_pi_f_amp)
-       
+        offset = invdyn.robot.com(invdyn.formulation.data())
+        two_pi_f_amp = two_pi_f * amp
+        two_pi_f_squared_amp = two_pi_f * two_pi_f_amp
 
         sampleCom = invdyn.trajCom.computeNext()
 
-        
-
         for ci, cp in enumerate(cpts):
-                sim_f[0,ci,:] = np.resize(cp.f,3)
-                contact_x[0,ci,:] = np.resize(cp.x,3)
-                contact_v[0,ci,:] = np.resize(cp.v,3)
+            sim_f[0,ci,:] = np.resize(cp.f,3)
+            contact_x[0,ci,:] = np.resize(cp.x,3)
+            contact_v[0,ci,:] = np.resize(cp.v,3)
         
-        # for ci, cframe in enumerate(conf.contact_frames):
-        #     print('initial contact position for contact '+cframe)
-        #     print(contact_x[0,ci,:])
+        for ci, cframe in enumerate(conf.contact_frames):
+            print(('initial contact position for contact '+cframe))
+            print((contact_x[0,ci,:]))
 
         t = 0.0   # used for control frequency  
         time_start = time.time()
@@ -173,15 +178,15 @@ if __name__=="__main__":
 
             if(USE_CONTROLLER):
                 # sinusoid trajectory 
-                sampleCom.pos(offset + np.multiply(amp, matlib.sin(two_pi_f*t)))
-                sampleCom.vel(np.multiply(two_pi_f_amp, matlib.cos(two_pi_f*t)))
-                sampleCom.acc(np.multiply(two_pi_f_squared_amp, -matlib.sin(two_pi_f*t)))
+                sampleCom.pos(offset + np.multiply(amp, np.sin(two_pi_f*t)))
+                sampleCom.vel(np.multiply(two_pi_f_amp, np.cos(two_pi_f*t)))
+                sampleCom.acc(np.multiply(two_pi_f_squared_amp, -np.sin(two_pi_f*t)))
                 invdyn.comTask.setReference(sampleCom)
 
                 HQPData = invdyn.formulation.computeProblemData(t, q[i], v[i])
                 sol = invdyn.solver.solve(HQPData)
                 if(sol.status != 0):
-                    print("[%d] QP problem could not be solved! Error code:" % (i), sol.status)
+                    print(("[%d] QP problem could not be solved! Error code:" % (i), sol.status))
                     break
 
                 u = invdyn.formulation.getActuatorForces(sol)
@@ -199,7 +204,7 @@ if __name__=="__main__":
             # com_pos_ref[i, :] = np.resize(sampleCom.pos(),3)
             # com_acc_ref[i, :] = np.resize(sampleCom.acc(),3)
             # com_acc_des[i, :] = np.resize(invdyn.comTask.getDesiredAcceleration,3)
-            tau[-8:] = np.asarray(u)
+            tau[6:] = np.asarray(u)
             sim.step(tau) 
             q += [sim.get_q()]
             sim_q[i+1,:] = np.resize(q[-1], robot.nq)
@@ -209,6 +214,7 @@ if __name__=="__main__":
                 contact_x[i+1,ci,:] = np.resize(cp.x,3)
                 contact_v[i+1,ci,:] = np.resize(cp.v,3)
     
+            simu.display(q[-1], dt)
             t += dt 
         # end simulation loop
         time_spent = time.time() - time_start
