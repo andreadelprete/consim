@@ -23,13 +23,13 @@ print("".center(conf.LINE_WIDTH, '#'))
 print(" Test Solo ".center(conf.LINE_WIDTH, '#'))
 print("".center(conf.LINE_WIDTH, '#'))
 
-# parameters of the simulation to be used as ground truth
-i_min = 4
-i_max = 5
+# parameters of the simulation to be tested
+i_min = 3
+i_max = 6
 i_ground_truth = i_max+2
 
 GROUND_TRUTH_SIMU_PARAMS = {
-    'name': 'ground-truth',
+    'name': 'ground-truth %d'%(2**i_ground_truth),
     'method_name': 'ground-truth',
     'use_exp_int': 1,
     'ndt': 2**i_ground_truth,

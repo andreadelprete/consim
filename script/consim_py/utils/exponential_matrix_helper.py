@@ -278,26 +278,54 @@ if __name__ == '__main__':
     print("Eigenvalues of A:", np.sort_complex(eigvals(A)).T)
     print("")
     
+    # update_expm
+#    dt = 1.0
+#    int_x = helper.compute_integral_x_T(A, a, x0, dt)
+#    print("compute x")
+#    x_pred = helper.compute_x_T(A, a, x0, dt)
+#    print("compute double int")
+#    int2_x = helper.compute_double_integral_x_T(A, a, x0, dt)
+#
+#    # predict
+#    print("compute next integral")
+#    int_x = helper.compute_next_integral()
+#    print("compute integral")
+#    int_x_from_x_pred = helper.compute_integral_x_T(A, a, x_pred, dt, store=False)
+#    print("int_x - int_x_from_x_pred", np.max(np.abs(int_x - int_x_from_x_pred)))
+#    int2_x = helper.compute_next_double_integral()
+#    print("compute double integral")
+#    int2_x_from_x_pred = helper.compute_double_integral_x_T(A, a, x_pred, dt, store=False)
+#    print("int2_x - int2_x_from_x_pred", np.max(np.abs(int2_x - int2_x_from_x_pred))) #this should be zero but it's not!
+
+
     T = 1
+    x_pred = helper.compute_x_T(A, a, x0, T)
     int_x_T     = helper.compute_integral_x_T(A, a, x0, T)
     int_x_T_2T  = helper.compute_next_integral()
+    int_x_T_2T  = helper.compute_integral_x_T(A, a, x_pred, T)
     int_x_2T_3T = helper.compute_next_integral()
     int_x_2T    = helper.compute_integral_x_T(A, a, x0, 2*T)
     int_x_3T    = helper.compute_integral_x_T(A, a, x0, 3*T)
     print("int_x_T + int_x_T_2T", int_x_T+int_x_T_2T)
     print("int_x_2T            ", int_x_2T)
+    print_error(int_x_2T, int_x_T+int_x_T_2T)
     print("int_x_2T + int_x_2T_3T", int_x_2T+int_x_2T_3T)
     print("int_x_3T              ", int_x_3T)
-    
-    int2_x_T     = helper.compute_double_integral_x_T(A, a, x0, T)
+    print_error(int_x_3T, int_x_2T+int_x_2T_3T)
+
+    x_pred = helper.compute_x_T(A, a, x0, T)
+    int2_x_T     = helper.compute_double_integral_x_T(A, a, x0, T)    
     int2_x_T_2T  = helper.compute_next_double_integral()
+    int2_x_T_2T  = int_x_T*T + helper.compute_double_integral_x_T(A, a, x_pred, T, store=False)
     int2_x_2T_3T = helper.compute_next_double_integral()
     int2_x_2T    = helper.compute_double_integral_x_T(A, a, x0, 2*T)
     int2_x_3T    = helper.compute_double_integral_x_T(A, a, x0, 3*T)
     print("int2_x_T + int_x_T_2T", int2_x_T+int2_x_T_2T)
     print("int2_x_2T            ", int2_x_2T)
+    print_error(int2_x_2T, int2_x_T+int2_x_T_2T)
     print("int2_x_2T + int_x_2T_3T", int2_x_2T+int2_x_2T_3T)
     print("int2_x_3T              ", int2_x_3T)
+    print_error(int2_x_3T, int2_x_2T+int2_x_2T_3T)
     
 #    MAX_MAT_MULT = 0
 #
