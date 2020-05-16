@@ -7,7 +7,7 @@ from pinocchio.robot_wrapper import RobotWrapper
 import os, sys
 from os.path import dirname, join
 import matplotlib.pyplot as plt 
-import utils.plot_utils as plut
+import consim_py.utils.plot_utils as plut
 
 pin.setNumpyType(np.matrix)
 
@@ -44,7 +44,7 @@ if __name__=="__main__":
     tau0 = np.zeros(robot.nv) [:,None]
     tau0[2] = -0.19 # complete it to 10 Nm  
     tau = np.zeros(robot.nv) [:,None]
-    tau[0] = 4. 
+    tau[0] = 10. 
     tau[2] = -0.19 # complete it to 10 Nm  
 
     contact_names = ['root_joint']

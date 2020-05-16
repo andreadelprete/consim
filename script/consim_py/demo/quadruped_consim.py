@@ -37,9 +37,9 @@ if __name__=="__main__":
     # simu_params += [{'name': 'euler 200',
     #                 'type': 'euler', 
     #                 'ndt': 200}]
-    simu_params += [{'name': 'euler 100',
+    simu_params += [{'name': 'euler 10',
                      'type': 'euler', 
-                     'ndt': 100}]
+                     'ndt': 10}]
 
 #    simu_params += [{'name': 'exponential 500',
 #                    'type': 'exponential', 
@@ -57,9 +57,9 @@ if __name__=="__main__":
 #                     'type': 'exponential', 
 #                     'ndt': 10}]
 
-    simu_params += [{'name': 'exponential 1',
+    simu_params += [{'name': 'exponential 10',
                      'type': 'exponential', 
-                     'ndt': 1}]
+                     'ndt': 10}]
     
     # simu_params += [{'name': 'euler 1',
     #                 'type': 'euler', 
@@ -69,7 +69,7 @@ if __name__=="__main__":
 
     i_ls = 0
     
-    mu = 0.9        # friction coefficient
+    mu = 0.5        # friction coefficient
     isSparse = False 
     isInvertible = False
     unilateral_contacts = True                   
@@ -167,9 +167,9 @@ if __name__=="__main__":
             contact_x[0,ci,:] = np.resize(cp.x,3)
             contact_v[0,ci,:] = np.resize(cp.v,3)
         
-        for ci, cframe in enumerate(conf.contact_frames):
-            print(('initial contact position for contact '+cframe))
-            print((contact_x[0,ci,:]))
+#        for ci, cframe in enumerate(conf.contact_frames):
+#            print(('initial contact position for contact '+cframe))
+#            print((contact_x[0,ci,:]))
 
         t = 0.0   # used for control frequency  
         time_start = time.time()
@@ -227,13 +227,17 @@ if __name__=="__main__":
         plt.legend()
         plt.title('Base Height vs time ')
 
-        # plot contact forces 
-        # for ci, ci_name in enumerate(conf.contact_frames):
-        #     plt.figure(ci_name+" normal force")
-        #     plt.plot(tt, sim_f[:, ci, 2], line_styles[i_ls], alpha=0.7, label=name)
-        #     plt.legend()
-        #     plt.title(ci_name+" normal force vs time")
-        
+        # plot contact forces             
+        for ci, ci_name in enumerate(conf.contact_frames):
+            (ff, ax) = plut.create_empty_figure(3, 1, name=ci_name+" normal force")
+            ax = ax.reshape(3)            
+            for i in range(3):
+                ax[i].plot(tt, sim_f[:, ci, i], line_styles[i_ls], alpha=0.7, label=name)
+                ax[i].set_xlabel('Time [s]')
+                ax[i].set_ylabel('Force [N]')
+            leg = ax[-1].legend()
+            if(leg): leg.get_frame().set_alpha(0.5)
+            ax[0].set_title(ci_name+" normal force vs time") 
         
         i_ls += 1 
         

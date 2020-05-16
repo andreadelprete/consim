@@ -371,6 +371,7 @@ void ExponentialSimulator::computeIntegrationTerms(){
       contacts_[i]->firstOrderContactKinematics(*data_);
       contacts_[i]->optr->computePenetration(*contacts_[i]);
       contacts_[i]->secondOrderContactKinematics(*data_, v_);
+      // computeForce updates the anchor point
       contacts_[i]->optr->contact_model_->computeForce(*contacts_[i]);
       f_.segment(3*i_active_,3) = contacts_[i]->f; 
       i_active_ += 1;  
@@ -394,7 +395,7 @@ void ExponentialSimulator::checkFrictionCone(){
   for(unsigned int i=0; i<nc_; i++){
     if (!contacts_[i]->active) continue;
     if (!contacts_[i]->unilateral) {
-      fpr_.segment(3*i_active_,3) = f_avg.segment(3*i_active_,3); 
+      fpr_.segment<3>(3*i_active_) = f_avg.segment<3>(3*i_active_); 
       i_active_ += 1; 
       continue;
     }
@@ -402,26 +403,27 @@ void ExponentialSimulator::checkFrictionCone(){
     fnor_ = contacts_[i]->contactNormal_.dot(f_avg);
     if (fnor_<0.){
       /*!< check for pulling force at contact i */  
-      // fpr_.segment(3*i_active_,3).fill(0); 
+      fpr_.segment<3>(3*i_active_).fill(0); 
       cone_flag_ = true; 
-      break; // no need to check any other contacts 
+      // break; // no need to check any other contacts 
     } else{
       /*!< check for friction bounds  */  
       normalFi_ = fnor_* contacts_[i]->contactNormal_; 
-      tangentFi_ = fpr_ - normalFi_; 
+      tangentFi_ = f_avg.segment<3>(3*i_active_) - normalFi_; 
       ftan_ = sqrt(tangentFi_.dot(tangentFi_));
-      if(ftan_ > (contacts_[i]->optr->contact_model_->friction_coeff_ * fnor_)){
+      double mu = contacts_[i]->optr->contact_model_->friction_coeff_;
+      if(ftan_ > mu * fnor_){
         /*!< cone violated */  
-        fpr_.segment(3*i_active_,3) = f_avg.segment(3*i_active_,3);   
+        fpr_.segment<3>(3*i_active_) = (mu*fnor_/ftan_)*tangentFi_; 
         cone_flag_ = true;
-        break; 
+        // break; 
       } 
       else {
         /*!< if not violated still fill out in case another contact violates the cone  */  
-        fpr_.segment(3*i_active_,3) = f_avg.segment(3*i_active_,3); 
+        fpr_.segment<3>(3*i_active_) = f_avg.segment<3>(3*i_active_); 
       }
-
     }
+    contacts_[i]->predictedF_ = fpr_.segment<3>(3*i_active_);
     i_active_ += 1; 
   }
 } // ExponentialSimulator::checkFrictionCone
