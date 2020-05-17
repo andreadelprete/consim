@@ -90,6 +90,7 @@ class RobotSimulator:
         self.max_mat_mult = 100
         self.use_second_integral = True
         self.update_expm_N = 1 # update the expm every self.update_expm_N inner simulation steps
+        self.fwd_dyn_method = 'Cholseky' # can be either Cholesky, aba, or pinMinv
         
         # se3.RobotWrapper.BuildFromURDF(conf.urdf, [conf.path, ], se3.JointModelFreeFlyer())
         self.robot = robot
@@ -196,6 +197,19 @@ class RobotSimulator:
             self.f[3*i:3*i+3] = c.compute_force()
 
         return self.f
+        
+    def forward_dyn(self, tau):
+        # self.fwd_dyn_method can be either Cholesky, aba, or pinMinv
+        if self.fwd_dyn_method == 'Cholesky':
+            return np.linalg.solve(self.data.M, tau - self.data.nle)
+        if self.fwd_dyn_method == 'aba':
+            return se3.aba(self.model, self.data, self.q, self.v, tau)
+        if self.fwa_dyn_method == 'pinMinv':
+            se3.cholesky.decompose(self.model, self.data, self.q)
+            se3.cholesky.computeMinv(self.model, self.data)
+#            Minv = se3.computeMinverse(self.model, self.data, self.q)
+            return self.data.Minv @ (tau - self.data.nle)
+        raise Exception("Unknown forward dynamics method "+self.fwd_dyn_method)
 
 
     def compute_exponential_LDS(self, u, update_expm):
@@ -203,7 +217,8 @@ class RobotSimulator:
             integrate with the matrix exponential.
         '''
         M, h = self.data.M, self.data.nle
-        dv_bar = np.linalg.solve(M, self.S.T@u - h)
+#        dv_bar = np.linalg.solve(M, self.S.T@u - h)
+        dv_bar = self.forward_dyn(self.S.T@u)
         for (i,c) in enumerate(self.contacts):
             self.p[  3*i:3*i+3] = c.p
             self.dp[ 3*i:3*i+3] = c.v
@@ -233,7 +248,6 @@ class RobotSimulator:
         se3.crba(self.model, self.data, self.q)
         se3.nonLinearEffects(self.model, self.data, self.q, self.v)
         
-        M, h = self.data.M, self.data.nle
         for (i,c) in enumerate(self.contacts):
             self.Jc[3*i:3*i+3, :] = c.getJacobianWorldFrame()
 
@@ -255,8 +269,8 @@ class RobotSimulator:
 #                for j in range(1, ndt_force_pred):
 #                    x_i = compute_x_T(self.A, self.a, np.copy(x0), j*dt_fp)
 #                    f_pred[:, j] = self.D @ x_i
-    
-            self.dv = np.linalg.solve(M, self.S.T@u - h + self.Jc.T@self.f)  # use last forces
+            self.dv = self.forward_dyn(self.S.T@u + self.Jc.T @ self.f)
+#            self.dv = np.linalg.solve(M, self.S.T@u - h + self.Jc.T@self.f)  # use last forces
             v_mean = self.v + 0.5*dt*self.dv
             self.v += self.dv*dt
             self.q = se3.integrate(self.model, self.q, v_mean*dt)
@@ -276,7 +290,6 @@ class RobotSimulator:
                 int_x = self.expMatHelper.compute_integral_x_T(self.A, self.a, x0, dt, self.max_mat_mult)
                 # store int_x because it may be needed to compute int2_x without updating expm in next iteration
                 self.int_x_prev = int_x
-#                self.x_pred = self.expMatHelper.compute_x_T(self.A, self.a, x0, dt, self.max_mat_mult)
             else:
                 int_x = self.expMatHelper.compute_next_integral()
             D_int_x = self.D @ int_x

@@ -25,7 +25,7 @@ print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
 i_min = 0
-i_max = 9
+i_max = 7
 i_ground_truth = i_max+2
 
 GROUND_TRUTH_SIMU_PARAMS = {
@@ -36,6 +36,8 @@ GROUND_TRUTH_SIMU_PARAMS = {
 }
 
 SIMU_PARAMS = []
+
+# EXPONENTIAL INTEGRATOR WITH STANDARD SETTINGS
 for i in range(i_min, i_max):
     SIMU_PARAMS += [{
         'name': 'exp%4d'%(2**i),
@@ -44,18 +46,18 @@ for i in range(i_min, i_max):
         'ndt': 2**i,
     }]
     
-# UPDATE MATRIX EXPONENTIAL EVERY FEW ITERATIONS
-for i in range(i_min, i_max):
-    for j in range(1,min(i,5)):
-        SIMU_PARAMS += [{
-            'name': 'exp%4d update%3d'%(2**i, 2**j),
-            'method_name': 'exp update%3d'%(2**j),
-            'use_exp_int': 1,
-            'ndt': 2**i,
-            'update_expm_N': 2**j
-        }]
+# EXPONENTIAL INTEGRATOR, UPDATE MATRIX EXPONENTIAL EVERY FEW ITERATIONS
+#for i in range(i_min, i_max):
+#    for j in range(1,min(i,5)):
+#        SIMU_PARAMS += [{
+#            'name': 'exp%4d update%3d'%(2**i, 2**j),
+#            'method_name': 'exp update%3d'%(2**j),
+#            'use_exp_int': 1,
+#            'ndt': 2**i,
+#            'update_expm_N': 2**j
+#        }]
     
-# USE ONLY FIRST INTEGRAL
+# EXPONENTIAL INTEGRATOR, USE ONLY FIRST INTEGRAL
 #for i in range(i_max):
 #    SIMU_PARAMS += [{
 #        'name': 'exp%4d n2i'%(2**i),
@@ -65,7 +67,7 @@ for i in range(i_min, i_max):
 #        'use_second_integral': False
 #    }]
 
-# REDUCE NUMBER OF MATRIX MULTIPLICATIONS
+# EXPONENTIAL INTEGRATOR, REDUCE NUMBER OF MATRIX MULTIPLICATIONS
 #for i in range(2,3):
 #    for j in range(0,7):
 #        SIMU_PARAMS += [{
@@ -76,14 +78,34 @@ for i in range(i_min, i_max):
 #            'max_mat_mult': j,
 #        }]
 
-# EULER SIMULATOR
+# EULER SIMULATOR with Cholesky
 for i in range(5, i_max):
     SIMU_PARAMS += [{
-        'name': 'euler%4d'%(2**i),
-        'method_name': 'euler',
+        'name': 'euler%4d Chol'%(2**i),
+        'method_name': 'euler Chol',
         'use_exp_int': 0,
         'ndt': 2**i,
     }]
+    
+## EULER SIMULATOR with ABA
+#for i in range(5, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'euler%4d ABA'%(2**i),
+#        'method_name': 'euler ABA',
+#        'use_exp_int': 0,
+#        'ndt': 2**i,
+#        'fwd_dyn_method': 'aba'
+#    }]
+    
+## EULER SIMULATOR with pinocchio::computeMinverse
+#for i in range(5, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'euler%4d pinMinv'%(2**i),
+#        'method_name': 'euler pinMinv',
+#        'use_exp_int': 0,
+#        'ndt': 2**i,
+#        'fwd_dyn_method': 'pinMinv'
+#    }]
 
 PLOT_UPSILON = 0
 PLOT_FORCES = 0
@@ -149,6 +171,11 @@ def run_simulation(q, v, simu_params):
         simu.update_expm_N = simu_params['update_expm_N']
     except:
         simu.update_expm_N = 1
+    try:
+        simu.fwd_dyn_method = simu_params['fwd_dyn_method']
+    except:
+        simu.fwd_dyn_method = 'Cholesky'
+        
     t = 0.0
     ndt = simu_params['ndt']
     time_start = time.time()
