@@ -215,10 +215,10 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
 */
 
 ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps,
-                                            int slipping_method) : AbstractSimulator(model, data, dt, n_integration_steps), 
-                                           sparse_(sparse), invertibleA_(invertibleA), slipping_method_(slipping_method)
+                                            int slipping_method) : AbstractSimulator(model, data, dt, n_integration_steps), slipping_method_(slipping_method)
 {
   dvMean_.resize(model_->nv);
+  dvMean2_.resize(model_->nv);
   Minv_.resize(model_->nv, model_->nv); Minv_.setZero();
   dv_bar.resize(model_->nv); dv_bar.setZero();
   temp01_.resize(model_->nv); temp01_.setZero();
@@ -249,37 +249,59 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       CONSIM_START_PROFILER("exponential_simulator::computeIntegralXt");
       utilDense_.ComputeIntegralXt(A, a_, x0_, sub_dt, intxt_);
       CONSIM_STOP_PROFILER("exponential_simulator::computeIntegralXt");
+      CONSIM_START_PROFILER("exponential_simulator::ComputeDoubleIntegralXt");
+      utilDense_.ComputeDoubleIntegralXt(A, a_, x0_, sub_dt, int2xt_); 
+      CONSIM_STOP_PROFILER("exponential_simulator::ComputeDoubleIntegralXt");
       CONSIM_START_PROFILER("exponential_simulator::checkFrictionCone");
       checkFrictionCone();
       CONSIM_STOP_PROFILER("exponential_simulator::checkFrictionCone");
       if(cone_flag_){
         //std::cout<<"friction cone activecated "<<std::endl;
         // computeSlipping();
-        temp01_.noalias() = JcT_*fpr_; 
-        temp02_ = tau_ - data_->nle + temp01_;
-        dvMean_.noalias() = Minv_*temp02_; 
-        vMean_ = v_ + .5 * sub_dt* dvMean_; 
+        if (slipping_method_==1){
+          /*!< f projection is computed then anchor point is updated */ 
+          temp01_.noalias() = JcT_*fpr_; 
+          temp02_ = tau_ - data_->nle + temp01_;
+          dvMean_.noalias() = Minv_*temp02_; 
+          temp01_.noalias() = JcT_*fpr2_; 
+          temp02_ = tau_ - data_->nle + temp01_;
+          dvMean2_.noalias() = Minv_*temp02_; 
+          vMean2_.noalias() = v_ + .5 * sub_dt * dvMean2_; 
+          pinocchio::integrate(*model_, q_, vMean2_ * sub_dt, qnext_);
+        }
+        else if(slipping_method_==2){
+          /*!< anchor point is optimized, then one f projection is computed and itegrated */ 
+          temp01_.noalias() = JcT_*fpr_; 
+          temp02_ = tau_ - data_->nle + temp01_;
+          dvMean_.noalias() = Minv_*temp02_; 
+          vMean_ = v_ + .5 * sub_dt* dvMean_; 
+          pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
+        }
+        else{
+          throw std::runtime_error("slipping method not recognized");
+        }
+        
       } // force violates friction cone 
       else{
         temp03_.noalias() = D*intxt_; 
         temp01_.noalias() = MinvJcT_ * temp03_;
         dvMean_.noalias() = dv_bar + temp01_/sub_dt ; 
-        CONSIM_START_PROFILER("exponential_simulator::ComputeDoubleIntegralXt");
-        utilDense_.ComputeDoubleIntegralXt(A, a_, x0_, sub_dt, int2xt_); 
-        CONSIM_STOP_PROFILER("exponential_simulator::ComputeDoubleIntegralXt");
+        
         temp03_.noalias() = D*int2xt_; 
         temp01_.noalias() = MinvJcT_ * temp03_;
         vMean_ = v_ + .5 * sub_dt * dv_bar + temp01_/sub_dt; 
+        pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
       } // force within friction cone 
     } // active contacts > 0 
     else{
       pinocchio::aba(*model_, *data_, q_, v_, tau_);
       dvMean_ = data_->ddq; 
       vMean_ = v_ + dvMean_ * .5 * sub_dt;
+      pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
     } // no active contacts 
 
     CONSIM_START_PROFILER("exponential_simulator::subIntegration");      
-    pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
+    
     q_ = qnext_;
     v_ += sub_dt*dvMean_;
     dv_ = dvMean_; 
@@ -390,38 +412,54 @@ void ExponentialSimulator::checkFrictionCone(){
    **/  
   temp03_.noalias() = D*intxt_;
   f_avg= kp0_ + temp03_/sub_dt; 
+  temp03_.noalias() = D*int2xt_;
+  temp03_.noalias() = 2.*temp03_;
+  temp03_.noalias() = (sub_dt*sub_dt)*temp03_;
+  f_avg2 = kp0_ +  temp03_; 
+
   i_active_ = 0; 
   cone_flag_ = false; 
   for(unsigned int i=0; i<nc_; i++){
     if (!contacts_[i]->active) continue;
     if (!contacts_[i]->unilateral) {
       fpr_.segment<3>(3*i_active_) = f_avg.segment<3>(3*i_active_); 
+      fpr2_.segment<3>(3*i_active_) = f_avg2.segment<3>(3*i_active_); 
       i_active_ += 1; 
       continue;
     }
     
     f_avg_i = f_avg.segment<3>(3*i_active_);
+    f_avg_i2 = f_avg2.segment<3>(3*i_active_);
     fnor_ = contacts_[i]->contactNormal_.dot(f_avg_i);
-    if (fnor_<0.){
+    fnor2_= contacts_[i]->contactNormal_.dot(f_avg_i2);
+    if (fnor_<0. || fnor2_<0.){
       /*!< check for pulling force at contact i */  
       fpr_.segment<3>(3*i_active_).fill(0); 
+      fpr2_.segment<3>(3*i_active_).fill(0); 
       cone_flag_ = true; 
       // break; // no need to check any other contacts 
     } else{
-      /*!< check for friction bounds  */  
+      /*!< check for friction bounds on average force   */  
       normalFi_ = fnor_* contacts_[i]->contactNormal_; 
       tangentFi_ = f_avg_i - normalFi_; 
       ftan_ = sqrt(tangentFi_.dot(tangentFi_));
+      /*!< check for friction bounds on average of average force */ 
+      normalFi_2 = fnor2_* contacts_[i]->contactNormal_; 
+      tangentFi_2 = f_avg_i2 - normalFi_2; 
+      ftan2_ = sqrt(tangentFi_2.dot(tangentFi_2));
+
       double mu = contacts_[i]->optr->contact_model_->friction_coeff_;
-      if(ftan_ > mu * fnor_){
+      if(ftan_ > mu * fnor_ || ftan2_ > mu * fnor2_){
         /*!< cone violated */  
         fpr_.segment<3>(3*i_active_) = normalFi_ + (mu*fnor_/ftan_)*tangentFi_; 
+        fpr2_.segment<3>(3*i_active_) = normalFi_2 + (mu*fnor2_/ftan2_)*tangentFi_2; 
         cone_flag_ = true;
         // break; 
       } 
       else {
         /*!< if not violated still fill out in case another contact violates the cone  */  
         fpr_.segment<3>(3*i_active_) = f_avg_i;
+        fpr2_.segment<3>(3*i_active_) = f_avg_i2;
       }
     }
     contacts_[i]->predictedF_ = fpr_.segment<3>(3*i_active_);
@@ -462,7 +500,7 @@ void ExponentialSimulator::computeSlipping(){
   
   
   if(slipping_method_==1){
-    throw std::runtime_error("Slipping update method not implemented yet ");
+    // throw std::runtime_error("Slipping update method not implemented yet ");
   }
   else if(slipping_method_==2){
     /**
@@ -568,7 +606,9 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
     dJv_.resize(3 * nactive_); dJv_.setZero();
     utilDense_.resize(6 * nactive_);
     f_avg.resize(3 * nactive_); f_avg.setZero();
+    f_avg2.resize(3 * nactive_); f_avg.setZero();
     fpr_.resize(3 * nactive_); fpr_.setZero();
+    fpr2_.resize(3 * nactive_); fpr2_.setZero();
     tempStepMat_.resize(3 * nactive_, 3 * nactive_); tempStepMat_.setZero();
     temp03_.resize(3*nactive_); temp03_.setZero();
     temp04_.resize(3*nactive_); temp04_.setZero();

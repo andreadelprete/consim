@@ -66,7 +66,7 @@ EulerSimulator* build_euler_simulator(
 
 ExponentialSimulator* build_exponential_simulator(
     float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data,
-    Eigen::Vector3d stifness, Eigen::Vector3d damping, double frictionCoefficient,int which_slipping)
+    Eigen::Vector3d stifness, Eigen::Vector3d damping, double frictionCoefficient, int which_slipping)
 {
   LinearPenaltyContactModel *contact_model = new LinearPenaltyContactModel(
       stifness, damping, frictionCoefficient);

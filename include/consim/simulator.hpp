@@ -204,15 +204,26 @@ namespace consim {
       Eigen::MatrixXd tempStepMat_; 
       // friction cone 
       Eigen::VectorXd f_avg;  // average force for cone 
+      Eigen::VectorXd f_avg2;  // average of average force for cone 
       Eigen::VectorXd fpr_;   // projected force on cone boundaries 
+      Eigen::VectorXd fpr2_;   // projected force on cone boundaries
       bool cone_flag_ = false; // cone violation status 
       double cone_direction_; // angle of tangential(to contact surface) force 
 
       Eigen::Vector3d f_avg_i; 
       Eigen::Vector3d normalFi_; // normal component of contact force Fi at contact Ci  
       Eigen::Vector3d tangentFi_; // normal component of contact force Fi at contact Ci  
+      Eigen::Vector3d f_avg_i2; 
+      Eigen::Vector3d normalFi_2; // normal component of contact force Fi at contact Ci  
+      Eigen::Vector3d tangentFi_2; // normal component of contact force Fi at contact Ci  
+
+      Eigen::VectorXd dvMean2_; // used in method 1 of contact slipping 
+      Eigen::VectorXd vMean2_; // used in method 1 of contact slipping 
+
       double fnor_;   // norm of normalFi_  
       double ftan_;   // norm of tangentFi_ 
+      double fnor2_;   // norm of normalFi_  
+      double ftan2_;   // norm of tangentFi_ 
       unsigned int i_active_; // index of the active contact      
 
       /**
