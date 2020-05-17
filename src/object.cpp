@@ -17,6 +17,7 @@ bool FloorObject::checkCollision(ContactPoint &cp)
 
   if (!cp.active) {
     cp.x_start = cp.x;
+    cp.predictedX0_ = cp.x;
     cp.contactNormal_ << 0.,0.,1.; 
     cp.contactTangentA_ << 1.,0.,0.;
     cp.contactTangentB_ << 0.,1.,0.;

@@ -63,9 +63,9 @@ if __name__=="__main__":
 #    simu_params += [{'name': 'euler 100',
 #                    'type': 'euler', 
 #                    'ndt': 100}]
-    simu_params += [{'name': 'euler 10',
+    simu_params += [{'name': 'euler 100',
                     'type': 'euler', 
-                    'ndt': 10}]
+                    'ndt': 100}]
 
     line_styles = ['-', '--', '-.', ':']
     i_ls = 0
@@ -89,6 +89,7 @@ if __name__=="__main__":
     
         fcnt = np.zeros([N+1, len(cpts), 3])
         xstart = np.zeros([N+1, len(cpts), 3])
+        predicted_xstart = np.zeros([N+1, len(cpts), 3])
     
         robot.forwardKinematics(q0)
         sim.reset_state(q0, dq0, True)
@@ -96,6 +97,8 @@ if __name__=="__main__":
     
         for i, cp in enumerate(cpts):
             fcnt[0,i,:] = np.resize(cp.f,3)
+            xstart[0,i,:] = np.resize(cp.x_start,3)
+            predicted_xstart[0,i,:] = np.resize(cp.predicted_x0,3)
     
         q = [q0]
         dq = [dq0]
@@ -112,6 +115,7 @@ if __name__=="__main__":
                 fcnt[t+1,i,:] = np.resize(cp.f,3)
 #                fcnt[t+1,i,:] = np.resize(cp.predicted_f,3)
                 xstart[t+1,i,:] = np.resize(cp.x_start,3)
+                predicted_xstart[t+1,i,:] = np.resize(cp.predicted_x0,3)
         print('Simulation done ')
 
         qz = []
@@ -162,6 +166,8 @@ if __name__=="__main__":
         plt.figure('Anchor Point')
         for i,cp in enumerate(cpts):
             plt.plot(dt*np.arange(N+1), xstart[:,i,0], line_styles[i_ls], alpha=0.7, label=name+' pnt %s'%i)
+            if(simu_type=='exponential'):
+                plt.plot(dt*np.arange(N+1), predicted_xstart[:,i,0], line_styles[i_ls], alpha=0.7, label=name+' pnt %s'%i + ' pred')
         plt.legend()
         plt.grid()
         plt.title('Anchor Point')
