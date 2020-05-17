@@ -24,8 +24,8 @@ print(" Test Solo ".center(conf.LINE_WIDTH, '#'))
 print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
-i_min = 3
-i_max = 6
+i_min = 0
+i_max = 9
 i_ground_truth = i_max+2
 
 GROUND_TRUTH_SIMU_PARAMS = {
@@ -46,10 +46,10 @@ for i in range(i_min, i_max):
     
 # UPDATE MATRIX EXPONENTIAL EVERY FEW ITERATIONS
 for i in range(i_min, i_max):
-    for j in range(1,2):
+    for j in range(1,min(i,5)):
         SIMU_PARAMS += [{
             'name': 'exp%4d update%3d'%(2**i, 2**j),
-            'method_name': 'exp update',
+            'method_name': 'exp update%3d'%(2**j),
             'use_exp_int': 1,
             'ndt': 2**i,
             'update_expm_N': 2**j
@@ -77,18 +77,18 @@ for i in range(i_min, i_max):
 #        }]
 
 # EULER SIMULATOR
-#for i in range(5, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'euler%4d'%(2**i),
-#        'method_name': 'euler',
-#        'use_exp_int': 0,
-#        'ndt': 2**i,
-#    }]
+for i in range(5, i_max):
+    SIMU_PARAMS += [{
+        'name': 'euler%4d'%(2**i),
+        'method_name': 'euler',
+        'use_exp_int': 0,
+        'ndt': 2**i,
+    }]
 
 PLOT_UPSILON = 0
 PLOT_FORCES = 0
 PLOT_BASE_POS = 0
-PLOT_FORCE_PREDICTIONS = 1
+PLOT_FORCE_PREDICTIONS = 0
 PLOT_INTEGRATION_ERRORS = 1
 PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
 PLOT_MAT_MULT_EXPM = 0

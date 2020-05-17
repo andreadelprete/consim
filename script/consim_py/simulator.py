@@ -276,15 +276,9 @@ class RobotSimulator:
                 int_x = self.expMatHelper.compute_integral_x_T(self.A, self.a, x0, dt, self.max_mat_mult)
                 # store int_x because it may be needed to compute int2_x without updating expm in next iteration
                 self.int_x_prev = int_x
-                self.x_pred = self.expMatHelper.compute_x_T(self.A, self.a, x0, dt, self.max_mat_mult)
-#                print("Update x_pred")
+#                self.x_pred = self.expMatHelper.compute_x_T(self.A, self.a, x0, dt, self.max_mat_mult)
             else:
                 int_x = self.expMatHelper.compute_next_integral()
-#                int_x_from_x_pred = self.expMatHelper.compute_integral_x_T(self.A, self.a, self.x_pred, dt, self.max_mat_mult, store=False)
-#                int_x_from_x_real = self.expMatHelper.compute_integral_x_T(self.A, self.a, x0, dt, self.max_mat_mult, store=False)
-#                print("int_x - int_x_from_x_pred", np.max(np.abs(int_x - int_x_from_x_pred)))
-#                print("int_x - int_x_from_x_real", np.max(np.abs(int_x - int_x_from_x_real)))
-#                int_x = int_x_from_x_real #+ 1e-9*np.random.rand(int_x.shape[0])
             D_int_x = self.D @ int_x
             dv_mean = dv_bar + JMinv.T @ D_int_x/dt
             
@@ -294,18 +288,12 @@ class RobotSimulator:
                 else:
                     int2_x = self.expMatHelper.compute_next_double_integral()
                     int2_x -= dt * self.int_x_prev
-#                    int2_x_from_x_pred = self.expMatHelper.compute_double_integral_x_T(self.A, self.a, self.x_pred, dt, self.max_mat_mult, store=False)
-#                    int2_x_from_x_real = self.expMatHelper.compute_double_integral_x_T(self.A, self.a, x0, dt, self.max_mat_mult, store=False)
-#                    print("int2_x - int2_x_from_x_pred", np.max(np.abs(int2_x - int2_x_from_x_pred))) #this should be zero but it's not!
-#                    print("int2_x - int2_x_from_x_real", np.max(np.abs(int2_x - int2_x_from_x_real)))
-#                    int2_x = int2_x_from_x_real
-#                    int2_x = int2_x_from_x_pred
+                    self.int_x_prev += int_x
                 D_int2_x = self.D @ int2_x
                 v_mean = self.v + 0.5*dt*dv_bar + JMinv.T@D_int2_x/dt
             else:
 #                f_avg = D_int_x/dt # average force during time step
                 v_mean  = self.v + 0.5*dt*dv_mean
-
 
             if(dt_force_pred is not None):
                 # predict intermediate forces using linear dynamical system (i.e. matrix exponential)
