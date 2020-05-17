@@ -257,7 +257,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       CONSIM_STOP_PROFILER("exponential_simulator::checkFrictionCone");
       if(cone_flag_){
         //std::cout<<"friction cone activecated "<<std::endl;
-        // computeSlipping();
+        computeSlipping();
         if (slipping_method_==1){
           /*!< f projection is computed then anchor point is updated */ 
           temp01_.noalias() = JcT_*fpr_; 
@@ -477,6 +477,7 @@ void ExponentialSimulator::computeInt_etA(){
   bool isInvertible_ = A.fullPivLu().isInvertible();
   
   if (isInvertible_){
+    std::cout<<"A is invertible "<<std::endl;
     invA_ = A.inverse();
     util_eDtA.compute(sub_dt*A,expAdt_);    
     inteAdt_ = invA_ * (expAdt_ - integralI_);  
@@ -509,9 +510,9 @@ void ExponentialSimulator::computeSlipping(){
      * compute the projected contact forces for integration 
      **/  
     computeInt_etA();
-    std::cout<<"intExpA"<<std::endl;
+    // std::cout<<"intExpA"<<std::endl;
     D_intExpA_integrator = D * inteAdt_ *contact_position_integrator_; 
-    std::cout<<"D_intExpA_integrator"<<std::endl;
+    // std::cout<<"D_intExpA_integrator"<<std::endl;
 
     Cineq_cone.block(0, 3*nactive_, nactive_, 3*nactive_) = -(normal_constraints_ + tangentA_constraints_) * D_intExpA_integrator;   
     Cineq_cone.block(nactive_, 0, nactive_, 3*nactive_) = (tangentA_constraints_- normal_constraints_) * D_intExpA_integrator;
@@ -522,22 +523,22 @@ void ExponentialSimulator::computeSlipping(){
     cineq_cone.segment(nactive_, nactive_) = (normal_constraints_ - tangentA_constraints_) * f_avg;
     cineq_cone.segment(2*nactive_, nactive_) = (normal_constraints_ + tangentB_constraints_) * f_avg;
     cineq_cone.segment(3*nactive_, nactive_) = (normal_constraints_ - tangentB_constraints_) * f_avg;  
-    std::cout<<"constraints populated "<<std::endl;
+    // std::cout<<"constraints populated "<<std::endl;
 
     qp.solve_quadprog(Q_cone, q_cone, Ceq_cone, ceq_cone, Cineq_cone, cineq_cone, optdP_cone);
     
-    std::cout<<"qp solved with dp \n"<< optdP_cone << std::endl;
+    // std::cout<<"qp solved with dp \n"<< optdP_cone << std::endl;
 
     i_active_ = 0; 
     for (unsigned int i = 0; i<nactive_; i++){
       if (!contacts_[i]->active || !contacts_[i]->unilateral) continue;
-      contacts_[i]->x_start += .5 * sub_dt * optdP_cone.segment(3*i_active_, 3); 
+      contacts_[i]->x_start += .5 * sub_dt * optdP_cone.segment<3>(3*i_active_); 
       contacts_[i]->optr->computePenetration(*contacts_[i]); 
       contacts_[i]->optr->contact_model_->computeForce(*contacts_[i]);
-      fpr_.segment(3*i_active_,3) = contacts_[i]-> f; 
+      fpr_.segment<3>(3*i_active_) = contacts_[i]-> f; 
       i_active_ += 1; 
     }
-    std::cout<<"forces updated"<<std::endl;
+    // std::cout<<"forces updated"<<std::endl;
   } 
   else{
     throw std::runtime_error("Slipping update method not recongnized ");

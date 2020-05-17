@@ -33,7 +33,7 @@ def state_diff(robot, x1, x2):
     return xdiff
 
 
-whichMotion = 'trot'  # options = ['trot', 'jump"]
+whichMotion = 'jump'  # options = ['trot', 'jump"]
 USE_CONTROLLER = True 
 DISPLAY_SIMULATION = True  
 
@@ -80,8 +80,7 @@ if __name__ == "__main__":
     i_ls = 0
     
     mu = 1.        # friction coefficient
-    isSparse = False 
-    isInvertible = False
+    anchor_slipping = 2 
     unilateral_contacts = True                   
     K = 1.e+5 * np.ones([3,1])
     B = 2.4e+2 * np.ones([3,1])
@@ -115,7 +114,7 @@ if __name__ == "__main__":
         # build the simulator 
         if(simu_type=='exponential'):
             sim = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
-                                        K, B , mu, isSparse, isInvertible)
+                                        K, B , mu, anchor_slipping)
         else:
             sim = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
                                             K, B , mu)

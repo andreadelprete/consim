@@ -61,6 +61,7 @@ class ContactPoint {
     Eigen::Vector3d     f;                      /*!< contact forces in world coordinates */
     Eigen::Vector3d     predictedF_;            /*!< contact forces predicted through exponential integration */
     Eigen::Vector3d     predictedX_;
+    Eigen::Vector3d     predictedX0_;
 
     Eigen::Vector3d    contactNormal_;
     Eigen::Vector3d    contactTangentA_;
