@@ -13,7 +13,6 @@
 #include "consim/object.hpp"
 #include "consim/contact.hpp"
 #include "eiquadprog/eiquadprog-fast.hpp"
-#include <Eigen/Cholesky>
 
 #define CONSIM_PROFILER
 #ifndef CONSIM_PROFILER
@@ -137,8 +136,14 @@ namespace consim {
   class ExponentialSimulator : public AbstractSimulator
   {
     public:
+      /**
+       * slipping metho selects anchor point update method during slipping 
+       * 1: compute average force over the integration step, project on the cone boundary then update p0 
+       * 2: a QP method to update the anchor point velocity, then average force is computed 
+       **/  
       ExponentialSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, 
-                          bool sparse=false, bool invertibleA=false); 
+                          int slipping_method=1); 
+
       ~ExponentialSimulator(){};
       void step(const Eigen::VectorXd &tau) override;
 
@@ -160,8 +165,9 @@ namespace consim {
       // convenience method to compute terms needed in integration  
       void computeIntegrationTerms();
 
-      bool sparse_; 
-      bool invertibleA_;
+      // bool sparse_; 
+      // bool invertibleA_;
+      int slipping_method_; 
       
       Eigen::VectorXd f_;  // total force 
       Eigen::MatrixXd Jc_; // contact jacobian for all contacts 
@@ -202,6 +208,7 @@ namespace consim {
       bool cone_flag_ = false; // cone violation status 
       double cone_direction_; // angle of tangential(to contact surface) force 
 
+      Eigen::Vector3d f_avg_i; 
       Eigen::Vector3d normalFi_; // normal component of contact force Fi at contact Ci  
       Eigen::Vector3d tangentFi_; // normal component of contact force Fi at contact Ci  
       double fnor_;   // norm of normalFi_  
@@ -224,6 +231,13 @@ namespace consim {
       Eigen::VectorXd optdP_cone; 
       //
       Eigen::Vector3d xstart_new; // invK*cone_force_offset_03
+      // terms to approximate integral of e^{\tau A}
+      expokit::MatrixExponential<double, Dynamic> util_eDtA;
+      Eigen::MatrixXd expAdt_; 
+      Eigen::MatrixXd integralI_; 
+      Eigen::MatrixXd invA_;
+      Eigen::MatrixXd inteAdt_;
+      void computeInt_etA(); //\brief computes the integral of exponential of A  
 
       Eigen::MatrixXd normal_constraints_;
       Eigen::MatrixXd tangentA_constraints_;
