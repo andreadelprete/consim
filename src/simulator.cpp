@@ -502,14 +502,13 @@ void ExponentialSimulator::computeInt_etA(){
   bool isInvertible_ = A.fullPivLu().isInvertible();
   
   if (isInvertible_){
-    
     invA_ = A.inverse();
     util_eDtA.compute(sub_dt*A,expAdt_);    
     inteAdt_ = invA_ * (expAdt_ - integralI_);  
   }
   else{
     // std::cout<<"A is NOT invertible "<<std::endl;
-    inteAdt_ = integralI_; // \brief e^0 
+    inteAdt_.setZero(); 
     double ddt_ = .1 * sub_dt; // 10 integration steps for testing    
 
     double intdt_ = 0.; 
