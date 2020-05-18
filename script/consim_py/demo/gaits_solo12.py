@@ -80,7 +80,7 @@ if __name__ == "__main__":
     i_ls = 0
     
     mu = 1.        # friction coefficient
-    anchor_slipping = 2 
+    anchor_slipping = 1 
     unilateral_contacts = True                   
     K = 1.e+5 * np.ones([3,1])
     B = 2.4e+2 * np.ones([3,1])

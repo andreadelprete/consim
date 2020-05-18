@@ -432,10 +432,9 @@ void ExponentialSimulator::checkFrictionCone(){
     f_avg_i2 = f_avg2.segment<3>(3*i_active_);
     fnor_ = contacts_[i]->contactNormal_.dot(f_avg_i);
     fnor2_= contacts_[i]->contactNormal_.dot(f_avg_i2);
-    if (fnor_<0. || fnor2_<0.){
+    if (fnor_<0.){
       /*!< check for pulling force at contact i */  
       fpr_.segment<3>(3*i_active_).fill(0); 
-      fpr2_.segment<3>(3*i_active_).fill(0); 
       cone_flag_ = true; 
       // break; // no need to check any other contacts 
     } else{
@@ -443,22 +442,48 @@ void ExponentialSimulator::checkFrictionCone(){
       normalFi_ = fnor_* contacts_[i]->contactNormal_; 
       tangentFi_ = f_avg_i - normalFi_; 
       ftan_ = sqrt(tangentFi_.dot(tangentFi_));
-      /*!< check for friction bounds on average of average force */ 
-      normalFi_2 = fnor2_* contacts_[i]->contactNormal_; 
-      tangentFi_2 = f_avg_i2 - normalFi_2; 
-      ftan2_ = sqrt(tangentFi_2.dot(tangentFi_2));
-
       double mu = contacts_[i]->optr->contact_model_->friction_coeff_;
-      if(ftan_ > mu * fnor_ || ftan2_ > mu * fnor2_){
+      if(ftan_ > mu * fnor_){
         /*!< cone violated */  
         fpr_.segment<3>(3*i_active_) = normalFi_ + (mu*fnor_/ftan_)*tangentFi_; 
-        fpr2_.segment<3>(3*i_active_) = normalFi_2 + (mu*fnor2_/ftan2_)*tangentFi_2; 
+        /*!< move predicted x0 if update method is 1  */
+        if(slipping_method_==1){
+          contacts_[i]->predictedX0_ = K.inverse()*(fpr_.segment<3>(3*i_active_) + K.block<3,3>(3*i_active_,3*i_active_) * p_.segment<3>(3*i_active_) + B.block<3,3>(3*i_active_,3*i_active_) * dp_.segment<3>(3*i_active_));
+        }
         cone_flag_ = true;
         // break; 
       } 
       else {
         /*!< if not violated still fill out in case another contact violates the cone  */  
         fpr_.segment<3>(3*i_active_) = f_avg_i;
+      }
+    }
+    // for second integral, update seperately ?  
+
+    if (fnor2_<0.){
+      /*!< check for pulling force at contact i */  
+      fpr2_.segment<3>(3*i_active_).fill(0); 
+      cone_flag_ = true; 
+      // break; // no need to check any other contacts 
+    } else{
+      /*!< check for friction bounds on average of average force */ 
+      normalFi_2 = fnor2_* contacts_[i]->contactNormal_; 
+      tangentFi_2 = f_avg_i2 - normalFi_2; 
+      ftan2_ = sqrt(tangentFi_2.dot(tangentFi_2));
+
+      double mu = contacts_[i]->optr->contact_model_->friction_coeff_;
+      if(ftan2_ > mu * fnor2_){
+        /*!< cone violated */  
+        fpr2_.segment<3>(3*i_active_) = normalFi_2 + (mu*fnor2_/ftan2_)*tangentFi_2; 
+        /*!< move predicted x0 if update method is 1  */
+        if(slipping_method_==1){
+          contacts_[i]->predictedX0_ = K.inverse()*(fpr2_.segment<3>(3*i_active_) + K.block<3,3>(3*i_active_,3*i_active_) * p_.segment<3>(3*i_active_) + B.block<3,3>(3*i_active_,3*i_active_) * dp_.segment<3>(3*i_active_));
+        }
+        cone_flag_ = true;
+        // break; 
+      } 
+      else {
+        /*!< if not violated still fill out in case another contact violates the cone  */  
         fpr2_.segment<3>(3*i_active_) = f_avg_i2;
       }
     }
@@ -483,7 +508,7 @@ void ExponentialSimulator::computeInt_etA(){
     inteAdt_ = invA_ * (expAdt_ - integralI_);  
   }
   else{
-    std::cout<<"A is NOT invertible "<<std::endl;
+    // std::cout<<"A is NOT invertible "<<std::endl;
     inteAdt_ = integralI_; // \brief e^0 
     double ddt_ = .1 * sub_dt; // 10 integration steps for testing    
 
@@ -503,6 +528,8 @@ void ExponentialSimulator::computeSlipping(){
   
   if(slipping_method_==1){
     // throw std::runtime_error("Slipping update method not implemented yet ");
+    // std::cout<<"updating anchor point with method A"<<std::endl;
+
   }
   else if(slipping_method_==2){
     /**
@@ -511,9 +538,9 @@ void ExponentialSimulator::computeSlipping(){
      * compute the projected contact forces for integration 
      **/  
     computeInt_etA();
-    std::cout<<"intExpA"<<std::endl;
+    // std::cout<<"intExpA"<<std::endl;
     D_intExpA_integrator = D * inteAdt_ *contact_position_integrator_; 
-    std::cout<<"D_intExpA_integrator"<<std::endl;
+    // std::cout<<"D_intExpA_integrator"<<std::endl;
 
     Cineq_cone.block(0, 3*nactive_, nactive_, 3*nactive_) = -(normal_constraints_ + tangentA_constraints_) * D_intExpA_integrator;   
     Cineq_cone.block(nactive_, 0, nactive_, 3*nactive_) = (tangentA_constraints_- normal_constraints_) * D_intExpA_integrator;
@@ -524,7 +551,7 @@ void ExponentialSimulator::computeSlipping(){
     cineq_cone.segment(nactive_, nactive_) = (normal_constraints_ - tangentA_constraints_) * f_avg;
     cineq_cone.segment(2*nactive_, nactive_) = (normal_constraints_ + tangentB_constraints_) * f_avg;
     cineq_cone.segment(3*nactive_, nactive_) = (normal_constraints_ - tangentB_constraints_) * f_avg;  
-    std::cout<<"constraints populated "<<std::endl;
+    // std::cout<<"constraints populated "<<std::endl;
 
     qp.solve_quadprog(Q_cone, q_cone, Ceq_cone, ceq_cone, Cineq_cone, cineq_cone, optdP_cone);
     
@@ -538,7 +565,7 @@ void ExponentialSimulator::computeSlipping(){
       fpr_.segment<3>(3*i_active_) = contacts_[i]-> f; 
       i_active_ += 1; 
     }
-    std::cout<<"forces updated"<<std::endl;
+    // std::cout<<"forces updated"<<std::endl;
   } 
   else{
     throw std::runtime_error("Slipping update method not recongnized ");
@@ -668,9 +695,9 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
       // fill up contact normals and tangents for constraints 
       // for the normal approximate the cone directly on it 
       // a long sequence of dereferencing. maybe better to use a getter method in contact ?  
-      // normal_constraints_.block(i_active_, 3 + 3*i_active_, 1, 3) = .5 * sqrt(2) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose(); 
-      // tangentA_constraints_.block(i_active_, 3 + 3*i_active_, 1, 3) = contacts_[i]->contactTangentA_.transpose();
-      // tangentB_constraints_.block(i_active_, 3 + 3*i_active_, 1, 3) = contacts_[i]->contactTangentB_.transpose(); 
+      normal_constraints_.block(i_active_, 3*i_active_, 1, 3) = .5 * sqrt(2) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose(); 
+      tangentA_constraints_.block(i_active_, 3*i_active_, 1, 3) = contacts_[i]->contactTangentA_.transpose();
+      tangentB_constraints_.block(i_active_, 3*i_active_, 1, 3) = contacts_[i]->contactTangentB_.transpose(); 
 
       i_active_ += 1; 
     }
