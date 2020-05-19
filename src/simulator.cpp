@@ -403,12 +403,48 @@ void ExponentialSimulator::computeIntegrationTerms(){
 
 
 
+void ExponentialSimulator::computePredictedXandF(){
+  /**
+   * computes e^{dt*A}
+   * computes \int{e^{dt*A}}
+   * computes predictedXf = edtA x0 + int_edtA_ * b 
+   * updates predicted x & v in each contact point 
+   **/  
+  util_eDtA.compute(sub_dt*A,expAdt_);   
+  inteAdt_.fill(0);
+  switch (nactive_)
+  {
+  case 1:
+    util_int_eDtA_one.computeExpIntegral(A, inteAdt_, sub_dt);
+    break;
+  
+  case 2:
+    util_int_eDtA_two.computeExpIntegral(A, inteAdt_, sub_dt);
+    break;
+  
+  case 3:
+    util_int_eDtA_three.computeExpIntegral(A, inteAdt_, sub_dt);
+    break;
+  
+  case 4:
+    util_int_eDtA_four.computeExpIntegral(A, inteAdt_, sub_dt);
+    break;
+  
+  default:
+    break;
+  }
+  predictedXf_ = expAdt_*x0_ + inteAdt_*a_; 
+  predictedForce_ = kp0_ + D*predictedXf_;
+}
+
+
 void ExponentialSimulator::checkFrictionCone(){
   /**
    * computes the average force on the integration interval 
    * checks for pulling force constraints
    * checks for friction forces constraints 
    * sets a flag needed to complete the integration step 
+   * predictedF should be F at end of integration step unless saturated 
    **/  
   temp03_.noalias() = D*intxt_;
   f_avg= kp0_ + temp03_/sub_dt; 
@@ -416,14 +452,21 @@ void ExponentialSimulator::checkFrictionCone(){
   temp03_.noalias() = 2.*temp03_;
   temp03_.noalias() = (sub_dt*sub_dt)*temp03_;
   f_avg2 = kp0_ +  temp03_; 
-
+  // also update contact position, velocity and force at the end of step 
+  computePredictedXandF();
   i_active_ = 0; 
   cone_flag_ = false; 
   for(unsigned int i=0; i<nc_; i++){
     if (!contacts_[i]->active) continue;
+
+    contacts_[i]->predictedX_ = predictedXf_.segment<3>(3*i_active_); 
+    contacts_[i]->predictedV_ = predictedXf_.segment<3>(3*nactive_+3*i_active_);
+    contacts_[i]->predictedF_ = predictedForce_.segment<3>(3*i_active_); 
+    
     if (!contacts_[i]->unilateral) {
       fpr_.segment<3>(3*i_active_) = f_avg.segment<3>(3*i_active_); 
       fpr2_.segment<3>(3*i_active_) = f_avg2.segment<3>(3*i_active_); 
+      contacts_[i]->predictedF_ = fpr_.segment<3>(3*i_active_);
       i_active_ += 1; 
       continue;
     }
@@ -435,8 +478,8 @@ void ExponentialSimulator::checkFrictionCone(){
     if (fnor_<0.){
       /*!< check for pulling force at contact i */  
       fpr_.segment<3>(3*i_active_).fill(0); 
+      contacts_[i]->predictedF_.fill(0);
       cone_flag_ = true; 
-      // break; // no need to check any other contacts 
     } else{
       /*!< check for friction bounds on average force   */  
       normalFi_ = fnor_* contacts_[i]->contactNormal_; 
@@ -446,48 +489,37 @@ void ExponentialSimulator::checkFrictionCone(){
       if(ftan_ > mu * fnor_){
         /*!< cone violated */  
         fpr_.segment<3>(3*i_active_) = normalFi_ + (mu*fnor_/ftan_)*tangentFi_; 
+        contacts_[i]->predictedF_ = fpr_.segment<3>(3*i_active_);
         /*!< move predicted x0 if update method is 1  */
         if(slipping_method_==1){
-          contacts_[i]->predictedX0_ = K.inverse()*(fpr_.segment<3>(3*i_active_) + K.block<3,3>(3*i_active_,3*i_active_) * p_.segment<3>(3*i_active_) + B.block<3,3>(3*i_active_,3*i_active_) * dp_.segment<3>(3*i_active_));
+          contacts_[i]->predictedX0_ = invK_.block<3,3>(3*i_active_,3*i_active_)*(fpr_.segment<3>(3*i_active_) + K.block<3,3>(3*i_active_,3*i_active_) * contacts_[i]->predictedX_ + B.block<3,3>(3*i_active_,3*i_active_) * contacts_[i]->predictedV_);
         }
         cone_flag_ = true;
         // break; 
       } 
       else {
-        /*!< if not violated still fill out in case another contact violates the cone  */  
         fpr_.segment<3>(3*i_active_) = f_avg_i;
       }
     }
     // for second integral, update seperately ?  
 
     if (fnor2_<0.){
-      /*!< check for pulling force at contact i */  
-      fpr2_.segment<3>(3*i_active_).fill(0); 
+      fpr2_.segment<3>(3*i_active_).fill(0);
       cone_flag_ = true; 
-      // break; // no need to check any other contacts 
     } else{
       /*!< check for friction bounds on average of average force */ 
       normalFi_2 = fnor2_* contacts_[i]->contactNormal_; 
       tangentFi_2 = f_avg_i2 - normalFi_2; 
       ftan2_ = sqrt(tangentFi_2.dot(tangentFi_2));
-
       double mu = contacts_[i]->optr->contact_model_->friction_coeff_;
       if(ftan2_ > mu * fnor2_){
-        /*!< cone violated */  
         fpr2_.segment<3>(3*i_active_) = normalFi_2 + (mu*fnor2_/ftan2_)*tangentFi_2; 
-        /*!< move predicted x0 if update method is 1  */
-        if(slipping_method_==1){
-          contacts_[i]->predictedX0_ = K.inverse()*(fpr2_.segment<3>(3*i_active_) + K.block<3,3>(3*i_active_,3*i_active_) * p_.segment<3>(3*i_active_) + B.block<3,3>(3*i_active_,3*i_active_) * dp_.segment<3>(3*i_active_));
-        }
         cone_flag_ = true;
-        // break; 
       } 
       else {
-        /*!< if not violated still fill out in case another contact violates the cone  */  
         fpr2_.segment<3>(3*i_active_) = f_avg_i2;
       }
     }
-    contacts_[i]->predictedF_ = fpr_.segment<3>(3*i_active_);
     i_active_ += 1; 
   }
 } // ExponentialSimulator::checkFrictionCone
@@ -495,7 +527,7 @@ void ExponentialSimulator::checkFrictionCone(){
 void ExponentialSimulator::computeInt_etA(){
   /**
    * computes integral of e^{dt*A}
-   * if A is invertible then int = invA*(e^{dt*A} - I)
+   * if A is invertible then int = invA*(e^{dt*A} - I)m
    * else it uses trapizoid rule to approximate the integral 
    **/ 
 
@@ -527,8 +559,6 @@ void ExponentialSimulator::computeSlipping(){
   
   if(slipping_method_==1){
     // throw std::runtime_error("Slipping update method not implemented yet ");
-    // std::cout<<"updating anchor point with method A"<<std::endl;
-
   }
   else if(slipping_method_==2){
     /**
@@ -573,34 +603,6 @@ void ExponentialSimulator::computeSlipping(){
 }
 
 
-void ExponentialSimulator::computePredictedForces(){
-  /*!< prefictedF_ = kp0 + D x(t)
-  doesn't have to be updated at each sub_step, only at the end of the integration step 
-  contact location of Inactive Contacts caonnot be predicted here, only through forward kinematics 
-  */ 
-  // z(6*nactive_) = 1;
-  // z.head(6*nactive_) = x0_;  
-  // C.setZero();
-  // C.topLeftCorner(6 * nactive_, 6 * nactive_) = sub_dt*A; 
-  // C.block(0, 6*nactive_, 6*nactive_,1) = sub_dt* a_;
-  // utilD.compute(C,expDtC); 
-  // nextZ = expDtC * z; 
-  // predictedForce_ = kp0_ + D * nextZ.head(6*nactive_); 
-  
-  // // 
-  // i_active_ = 0; 
-  // for(unsigned int i=0; i<nc_; i++){
-  //   if (!contacts_[i]->active) {
-  //     contacts_[i]->predictedF_.fill(0);
-  //     contacts_[i]->predictedX_ = data_->oMf[contacts_[i]->frame_id].translation(); 
-  //     continue;
-  //   }
-  //   contacts_[i]->predictedF_ = predictedForce_.segment(3*i_active_,3);
-  //   contacts_[i]->predictedX_ = nextZ.segment(3*i_active_,3);
-  //   i_active_ += 1; 
-  // }
-}
-
 
 void ExponentialSimulator::resizeVectorsAndMatrices()
 {
@@ -616,11 +618,12 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
     a_.resize(6 * nactive_); a_.setZero();
     b_.resize(3 * nactive_); b_.setZero();
     x0_.resize(6 * nactive_); x0_.setZero();
-    xt_.resize(6 * nactive_); xt_.setZero();
+    predictedXf_.resize(6 * nactive_); predictedXf_.setZero();
     intxt_.resize(6 * nactive_); intxt_.setZero();
     int2xt_.resize(6 * nactive_); int2xt_.setZero();
     kp0_.resize(3 * nactive_); kp0_.setZero();
     K.resize(3 * nactive_, 3 * nactive_); K.setZero();
+    invK_.resize(3 * nactive_, 3 * nactive_); invK_.setZero();
     B.resize(3 * nactive_, 3 * nactive_); B.setZero();
     D.resize(3 * nactive_, 6 * nactive_); D.setZero();
     A.resize(6 * nactive_, 6 * nactive_); A.setZero();
@@ -703,6 +706,8 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
     // fillout D 
     D.block(0,0, 3*nactive_, 3*nactive_).noalias() = -K;
     D.block(0,3*nactive_, 3*nactive_, 3*nactive_).noalias() = -B; 
+
+    invK_ = K.inverse();
 
     // std::cout<<"resize vectors and matrices"<<std::endl;
     

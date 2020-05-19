@@ -88,17 +88,21 @@ if __name__=="__main__":
         print('Contacts added to simulator Successfully!')
     
         fcnt = np.zeros([N+1, len(cpts), 3])
+        xcnt = np.zeros([N+1, len(cpts), 3])
         xstart = np.zeros([N+1, len(cpts), 3])
         predicted_xstart = np.zeros([N+1, len(cpts), 3])
-    
+        predicted_x = np.zeros([N+1, len(cpts), 3])
+
         robot.forwardKinematics(q0)
         sim.reset_state(q0, dq0, True)
         print('Reset state done !') 
     
         for i, cp in enumerate(cpts):
             fcnt[0,i,:] = np.resize(cp.f,3)
+            xcnt[0,i,:] = np.resize(cp.x,3)
             xstart[0,i,:] = np.resize(cp.x_start,3)
             predicted_xstart[0,i,:] = np.resize(cp.predicted_x0,3)
+            predicted_x[0,i,:] = np.resize(cp.x,3)
     
         q = [q0]
         dq = [dq0]
@@ -113,9 +117,10 @@ if __name__=="__main__":
             dq += [sim.get_v()]
             for i, cp in enumerate(cpts):
                 fcnt[t+1,i,:] = np.resize(cp.f,3)
-#                fcnt[t+1,i,:] = np.resize(cp.predicted_f,3)
+                xcnt[t+1,i,:] = np.resize(cp.x,3)
                 xstart[t+1,i,:] = np.resize(cp.x_start,3)
                 predicted_xstart[t+1,i,:] = np.resize(cp.predicted_x0,3)
+                predicted_x[t+1,i,:] = np.resize(cp.predicted_x,3)
         print('Simulation done ')
 
         qz = []
@@ -162,6 +167,16 @@ if __name__=="__main__":
         plt.legend()
         plt.grid()
         plt.title('ratio tangent-normal contact forces')
+
+        plt.figure('Contact X Position')
+        for i,cp in enumerate(cpts):
+            plt.plot(dt*np.arange(N+1), xcnt[:,i,0], line_styles[i_ls], alpha=0.7, label=name+' pnt %s'%i)
+            if(simu_type=='exponential'):
+                plt.plot(dt*np.arange(N+1), predicted_x[:,i,0], line_styles[i_ls], alpha=0.7, label=name+' pnt %s'%i + ' pred')
+        plt.legend()
+        plt.grid()
+        plt.title('Contact X Position')
+
 
         plt.figure('Anchor Point')
         for i,cp in enumerate(cpts):

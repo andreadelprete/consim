@@ -33,7 +33,7 @@ def state_diff(robot, x1, x2):
     return xdiff
 
 
-whichMotion = 'jump'  # options = ['trot', 'jump"]
+whichMotion = 'trot'  # options = ['trot', 'jump"]
 USE_CONTROLLER = True 
 DISPLAY_SIMULATION = True  
 
@@ -64,13 +64,13 @@ if __name__ == "__main__":
 #                     'type': 'euler', 
 #                     'ndt': 10}]
 
-#    simu_params += [{'name': 'exponential 10',
-#                     'type': 'exponential', 
-#                     'ndt': 10}]
+    simu_params += [{'name': 'exponential 10',
+                    'type': 'exponential', 
+                    'ndt': 10}]
 #
-    simu_params += [{'name': 'exponential 1',
-                     'type': 'exponential', 
-                     'ndt': 1}]
+    # simu_params += [{'name': 'exponential 1',
+    #                  'type': 'exponential', 
+    #                  'ndt': 1}]
     
 #    simu_params += [{'name': 'euler 1',
 #                     'type': 'euler', 

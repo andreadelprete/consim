@@ -9,6 +9,7 @@
 
 #include <MatrixExponential.hpp>
 #include <LDSUtility.hpp>
+#include <MatExpIntegral.hpp>
 
 #include "consim/object.hpp"
 #include "consim/contact.hpp"
@@ -177,7 +178,6 @@ namespace consim {
       Eigen::VectorXd x0_;
       Eigen::VectorXd a_;
       Eigen::VectorXd b_;
-      Eigen::VectorXd xt_;  // containts p and dp for all active contact points 
       Eigen::VectorXd intxt_;
       Eigen::VectorXd int2xt_;
       Eigen::VectorXd kp0_; 
@@ -196,6 +196,16 @@ namespace consim {
       // expokit 
       expokit::LDSUtility<double, Dynamic> utilDense_;
       // 
+      void computePredictedXandF();  // predicts xf at end of integration step 
+      expokit::MatrixExponential<double, Dynamic> util_eDtA;
+      expokit::MatExpIntegral<double>  util_int_eDtA_one = expokit::MatExpIntegral<double>(6);   // current implementation static 
+      expokit::MatExpIntegral<double>  util_int_eDtA_two = expokit::MatExpIntegral<double>(12);   // current implementation static 
+      expokit::MatExpIntegral<double>  util_int_eDtA_three = expokit::MatExpIntegral<double>(18);   // current implementation static 
+      expokit::MatExpIntegral<double>  util_int_eDtA_four = expokit::MatExpIntegral<double>(24);   // current implementation static 
+      // expokit::MatExpIntegral<double>  util_int_eDtA_two(12);  // can handle a maximum of 4 contacts now 
+      // expokit::MatExpIntegral<double>  util_int_eDtA_three(18);
+      // expokit::MatExpIntegral<double>  util_int_eDtA_four(24);
+      Eigen::VectorXd predictedXf_; 
       Eigen::VectorXd dvMean_;
       Eigen::VectorXd temp01_;
       Eigen::VectorXd temp02_;
@@ -226,6 +236,8 @@ namespace consim {
       double ftan2_;   // norm of tangentFi_ 
       unsigned int i_active_; // index of the active contact      
 
+      Eigen::MatrixXd invK_; 
+
       /**
        * solves a QP to update anchor points of sliding contacts
        * min || dp0_avg || ^ 2 
@@ -243,7 +255,7 @@ namespace consim {
       //
       Eigen::Vector3d xstart_new; // invK*cone_force_offset_03
       // terms to approximate integral of e^{\tau A}
-      expokit::MatrixExponential<double, Dynamic> util_eDtA;
+      
       Eigen::MatrixXd expAdt_; 
       Eigen::MatrixXd integralI_; 
       Eigen::MatrixXd invA_;
@@ -256,12 +268,11 @@ namespace consim {
       Eigen::MatrixXd contact_position_integrator_; 
       Eigen::MatrixXd D_intExpA_integrator; 
 
-      void computePredictedForces();
       // Eigen::MatrixXd C; 
       // Eigen::VectorXd z; 
       // Eigen::VectorXd nextZ; 
       // Eigen::MatrixXd expDtC;
-      // Eigen::VectorXd predictedForce_;  
+      Eigen::VectorXd predictedForce_;  
       // expokit::MatrixExponential<double, Dynamic> utilD; // Dynamic
       Eigen::VectorXd fkDv_; // filled with zeros for second order kinematics  
   }; // class ExponentialSimulator
