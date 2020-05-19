@@ -202,9 +202,11 @@ namespace consim {
       expokit::MatExpIntegral<double>  util_int_eDtA_two = expokit::MatExpIntegral<double>(12);   // current implementation static 
       expokit::MatExpIntegral<double>  util_int_eDtA_three = expokit::MatExpIntegral<double>(18);   // current implementation static 
       expokit::MatExpIntegral<double>  util_int_eDtA_four = expokit::MatExpIntegral<double>(24);   // current implementation static 
-      // expokit::MatExpIntegral<double>  util_int_eDtA_two(12);  // can handle a maximum of 4 contacts now 
-      // expokit::MatExpIntegral<double>  util_int_eDtA_three(18);
-      // expokit::MatExpIntegral<double>  util_int_eDtA_four(24);
+
+
+      Eigen::VectorXd fkDv_; // filled with zeros for second order kinematics  
+      Eigen::VectorXd predictedForce_;
+      igen::VectorXd predictedX0_;  
       Eigen::VectorXd predictedXf_; 
       Eigen::VectorXd dvMean_;
       Eigen::VectorXd temp01_;
@@ -268,13 +270,7 @@ namespace consim {
       Eigen::MatrixXd contact_position_integrator_; 
       Eigen::MatrixXd D_intExpA_integrator; 
 
-      // Eigen::MatrixXd C; 
-      // Eigen::VectorXd z; 
-      // Eigen::VectorXd nextZ; 
-      // Eigen::MatrixXd expDtC;
-      Eigen::VectorXd predictedForce_;  
-      // expokit::MatrixExponential<double, Dynamic> utilD; // Dynamic
-      Eigen::VectorXd fkDv_; // filled with zeros for second order kinematics  
+      
   }; // class ExponentialSimulator
 
 } // namespace consim 

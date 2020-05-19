@@ -92,6 +92,7 @@ if __name__=="__main__":
         xstart = np.zeros([N+1, len(cpts), 3])
         predicted_xstart = np.zeros([N+1, len(cpts), 3])
         predicted_x = np.zeros([N+1, len(cpts), 3])
+        predicted_f = np.zeros([N+1, len(cpts), 3])
 
         robot.forwardKinematics(q0)
         sim.reset_state(q0, dq0, True)
@@ -103,6 +104,7 @@ if __name__=="__main__":
             xstart[0,i,:] = np.resize(cp.x_start,3)
             predicted_xstart[0,i,:] = np.resize(cp.predicted_x0,3)
             predicted_x[0,i,:] = np.resize(cp.x,3)
+            predicted_f[0,i,:] = np.resize(cp.predicted_f,3)
     
         q = [q0]
         dq = [dq0]
@@ -121,6 +123,7 @@ if __name__=="__main__":
                 xstart[t+1,i,:] = np.resize(cp.x_start,3)
                 predicted_xstart[t+1,i,:] = np.resize(cp.predicted_x0,3)
                 predicted_x[t+1,i,:] = np.resize(cp.predicted_x,3)
+                predicted_f[t+1,i,:] = np.resize(cp.predicted_f,3)
         print('Simulation done ')
 
         qz = []
@@ -149,6 +152,8 @@ if __name__=="__main__":
         plt.figure('normal contact forces')
         for i,cp in enumerate(cpts):
             plt.plot(dt*np.arange(N+1), fcnt[:,i,2], line_styles[i_ls], alpha=0.7, label=name+' pnt %s'%i)
+            if(simu_type=='exponential'):
+                plt.plot(dt*np.arange(N+1), predicted_f[:,i,2], line_styles[i_ls], alpha=0.7, label=name+' pnt %s'%i + ' pred')
         plt.legend()
         plt.grid()
         plt.title('normal contact forces')

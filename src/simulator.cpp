@@ -566,11 +566,9 @@ void ExponentialSimulator::computeSlipping(){
      * update x_start 
      * compute the projected contact forces for integration 
      **/  
-    computeInt_etA();
-    // std::cout<<"intExpA"<<std::endl;
-    D_intExpA_integrator = D * inteAdt_ *contact_position_integrator_; 
-    // std::cout<<"D_intExpA_integrator"<<std::endl;
 
+    D_intExpA_integrator = D * inteAdt_ *contact_position_integrator_; 
+    
     Cineq_cone.block(0, 3*nactive_, nactive_, 3*nactive_) = -(normal_constraints_ + tangentA_constraints_) * D_intExpA_integrator;   
     Cineq_cone.block(nactive_, 0, nactive_, 3*nactive_) = (tangentA_constraints_- normal_constraints_) * D_intExpA_integrator;
     Cineq_cone.block(2*nactive_, 0, nactive_, 3*nactive_) = -(normal_constraints_ + tangentB_constraints_) * D_intExpA_integrator;
@@ -587,7 +585,6 @@ void ExponentialSimulator::computeSlipping(){
     i_active_ = 0; 
     for (unsigned int i = 0; i<nactive_; i++){
       if (!contacts_[i]->active || !contacts_[i]->unilateral) continue;
-      contacts_[i]->x_start += .5 * sub_dt * optdP_cone.segment<3>(3*i_active_); 
       contacts_[i]->predictedX0_ += .5 * sub_dt * optdP_cone.segment<3>(3*i_active_); 
       contacts_[i]->optr->computePenetration(*contacts_[i]); 
       contacts_[i]->optr->contact_model_->computeForce(*contacts_[i]);
@@ -678,7 +675,7 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
 
 
     //
-    expAdt_.resize(6 * nactive_, 6 * nactive_); expAdt_.setZero();
+    expAdt_.resize(6 * nactive_, 6 * nactive_); expAdt_.setZero();0
     integralI_.resize(6 * nactive_, 6 * nactive_); integralI_ =  Eigen::MatrixXd::Identity(6 * nactive_, 6 * nactive_);
     util_eDtA.resize(6 * nactive_);
     invA_.resize(6 * nactive_, 6 * nactive_); invA_.setZero();
