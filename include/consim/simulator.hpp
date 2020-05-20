@@ -206,7 +206,7 @@ namespace consim {
 
       Eigen::VectorXd fkDv_; // filled with zeros for second order kinematics  
       Eigen::VectorXd predictedForce_;
-      igen::VectorXd predictedX0_;  
+      Eigen::VectorXd predictedX0_;  
       Eigen::VectorXd predictedXf_; 
       Eigen::VectorXd dvMean_;
       Eigen::VectorXd temp01_;
@@ -259,10 +259,7 @@ namespace consim {
       // terms to approximate integral of e^{\tau A}
       
       Eigen::MatrixXd expAdt_; 
-      Eigen::MatrixXd integralI_; 
-      Eigen::MatrixXd invA_;
       Eigen::MatrixXd inteAdt_;
-      void computeInt_etA(); //\brief computes the integral of exponential of A  
 
       Eigen::MatrixXd normal_constraints_;
       Eigen::MatrixXd tangentA_constraints_;

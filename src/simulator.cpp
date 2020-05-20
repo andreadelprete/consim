@@ -524,34 +524,7 @@ void ExponentialSimulator::checkFrictionCone(){
   }
 } // ExponentialSimulator::checkFrictionCone
 
-void ExponentialSimulator::computeInt_etA(){
-  /**
-   * computes integral of e^{dt*A}
-   * if A is invertible then int = invA*(e^{dt*A} - I)m
-   * else it uses trapizoid rule to approximate the integral 
-   **/ 
 
-  bool isInvertible_ = A.fullPivLu().isInvertible();
-  
-  if (isInvertible_){
-    invA_ = A.inverse();
-    util_eDtA.compute(sub_dt*A,expAdt_);    
-    inteAdt_ = invA_ * (expAdt_ - integralI_);  
-  }
-  else{
-    // std::cout<<"A is NOT invertible "<<std::endl;
-    inteAdt_.setZero(); 
-    double ddt_ = .1 * sub_dt; // 10 integration steps for testing    
-
-    double intdt_ = 0.; 
-    for (unsigned int i = 0; i<10; i++){
-      util_eDtA.compute((intdt_+ .5*ddt_)*A,expAdt_);  
-      inteAdt_ += expAdt_;
-      intdt_ += ddt_; 
-    }
-    inteAdt_ *= ddt_; 
-  }
-}
 
 
 void ExponentialSimulator::computeSlipping(){
@@ -586,9 +559,9 @@ void ExponentialSimulator::computeSlipping(){
     for (unsigned int i = 0; i<nactive_; i++){
       if (!contacts_[i]->active || !contacts_[i]->unilateral) continue;
       contacts_[i]->predictedX0_ += .5 * sub_dt * optdP_cone.segment<3>(3*i_active_); 
-      contacts_[i]->optr->computePenetration(*contacts_[i]); 
-      contacts_[i]->optr->contact_model_->computeForce(*contacts_[i]);
-      fpr_.segment<3>(3*i_active_) = contacts_[i]-> f; 
+      contacts_[i]->predictedF_ = K.block<3,3>(3*i_active_, 3*i_active_)*(contacts_[i]->predictedX0_-contacts_[i]->predictedX_); 
+      contacts_[i]->predictedF_ -= B.block<3,3>(3*i_active_, 3*i_active_)*contacts_[i]->predictedV_; 
+      fpr_.segment<3>(3*i_active_) = contacts_[i]->predictedF_;
       i_active_ += 1; 
     }
     // std::cout<<"forces updated"<<std::endl;
@@ -675,10 +648,8 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
 
 
     //
-    expAdt_.resize(6 * nactive_, 6 * nactive_); expAdt_.setZero();0
-    integralI_.resize(6 * nactive_, 6 * nactive_); integralI_ =  Eigen::MatrixXd::Identity(6 * nactive_, 6 * nactive_);
+    expAdt_.resize(6 * nactive_, 6 * nactive_); expAdt_.setZero();
     util_eDtA.resize(6 * nactive_);
-    invA_.resize(6 * nactive_, 6 * nactive_); invA_.setZero();
     inteAdt_.resize(6 * nactive_, 6 * nactive_); inteAdt_.setZero();
     // fillout K & B only needed whenever number of active contacts changes 
     i_active_ = 0; 
