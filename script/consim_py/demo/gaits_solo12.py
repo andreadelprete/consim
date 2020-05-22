@@ -56,17 +56,17 @@ if __name__ == "__main__":
     #                 'type': 'exponential', 
     #                 'ndt': 500}]
 
-#    simu_params += [{'name': 'exponential 100',
-#                     'type': 'exponential', 
-#                     'ndt': 100}]
+    simu_params += [{'name': 'exponential 100',
+                    'type': 'exponential', 
+                    'ndt': 100}]
         
 #    simu_params += [{'name': 'euler 10',
 #                     'type': 'euler', 
 #                     'ndt': 10}]
 
-    simu_params += [{'name': 'exponential 10',
-                    'type': 'exponential', 
-                    'ndt': 10}]
+    # simu_params += [{'name': 'exponential 10',
+    #                 'type': 'exponential', 
+    #                 'ndt': 10}]
 #
     # simu_params += [{'name': 'exponential 1',
     #                  'type': 'exponential', 

@@ -261,11 +261,13 @@ namespace consim {
       Eigen::MatrixXd expAdt_; 
       Eigen::MatrixXd inteAdt_;
 
-      Eigen::MatrixXd normal_constraints_;
-      Eigen::MatrixXd tangentA_constraints_;
-      Eigen::MatrixXd tangentB_constraints_;
+      Eigen::MatrixXd cone_constraints_;
       Eigen::MatrixXd contact_position_integrator_; 
       Eigen::MatrixXd D_intExpA_integrator; 
+
+      eiquadprog::solvers::EiquadprogFast_status expected_qp = eiquadprog::solvers::EIQUADPROG_FAST_OPTIMAL;
+
+      eiquadprog::solvers::EiquadprogFast_status status_qp;
 
       
   }; // class ExponentialSimulator

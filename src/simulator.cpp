@@ -355,10 +355,6 @@ void ExponentialSimulator::computeIntegrationTerms(){
   a_.tail(3*nactive_) = b_;
   x0_.head(3*nactive_) = p_; 
   x0_.tail(3*nactive_) = dp_; 
-  // \brief compute the predicted contact forces at end of the step before recomputing contacts  
-  // CONSIM_START_PROFILER("exponential_simulator::predictedForces");  
-  // computePredictedForces(); 
-  // CONSIM_STOP_PROFILER("exponential_simulator::predictedForces"); 
 }
 
 
@@ -540,29 +536,29 @@ void ExponentialSimulator::computeSlipping(){
      * compute the projected contact forces for integration 
      **/  
 
-    D_intExpA_integrator = D * inteAdt_ *contact_position_integrator_; 
-    
-    Cineq_cone.block(0, 3*nactive_, nactive_, 3*nactive_) = -(normal_constraints_ + tangentA_constraints_) * D_intExpA_integrator;   
-    Cineq_cone.block(nactive_, 0, nactive_, 3*nactive_) = (tangentA_constraints_- normal_constraints_) * D_intExpA_integrator;
-    Cineq_cone.block(2*nactive_, 0, nactive_, 3*nactive_) = -(normal_constraints_ + tangentB_constraints_) * D_intExpA_integrator;
-    Cineq_cone.block(3*nactive_, 0, nactive_, 3*nactive_) = (tangentB_constraints_ - normal_constraints_) * D_intExpA_integrator;
-    
-    cineq_cone.segment(0, nactive_) = (normal_constraints_ + tangentA_constraints_) * f_avg;
-    cineq_cone.segment(nactive_, nactive_) = (normal_constraints_ - tangentA_constraints_) * f_avg;
-    cineq_cone.segment(2*nactive_, nactive_) = (normal_constraints_ + tangentB_constraints_) * f_avg;
-    cineq_cone.segment(3*nactive_, nactive_) = (normal_constraints_ - tangentB_constraints_) * f_avg;  
-    // std::cout<<"constraints populated "<<std::endl;
+    D_intExpA_integrator = D * inteAdt_ * contact_position_integrator_; 
 
-    qp.solve_quadprog(Q_cone, q_cone, Ceq_cone, ceq_cone, Cineq_cone, cineq_cone, optdP_cone);
+    Cineq_cone.setZero();
+    Cineq_cone = - cone_constraints_* D_intExpA_integrator; 
+    cineq_cone.setZero();
+    cineq_cone = cone_constraints_ * f_avg;
+
+    optdP_cone.setZero();
+
+    status_qp = qp.solve_quadprog(Q_cone, q_cone, Ceq_cone, ceq_cone, Cineq_cone, cineq_cone, optdP_cone);
     
-    i_active_ = 0; 
-    for (unsigned int i = 0; i<nactive_; i++){
-      if (!contacts_[i]->active || !contacts_[i]->unilateral) continue;
-      contacts_[i]->predictedX0_ += .5 * sub_dt * optdP_cone.segment<3>(3*i_active_); 
-      contacts_[i]->predictedF_ = K.block<3,3>(3*i_active_, 3*i_active_)*(contacts_[i]->predictedX0_-contacts_[i]->predictedX_); 
-      contacts_[i]->predictedF_ -= B.block<3,3>(3*i_active_, 3*i_active_)*contacts_[i]->predictedV_; 
-      fpr_.segment<3>(3*i_active_) = contacts_[i]->predictedF_;
-      i_active_ += 1; 
+    if (status_qp == expected_qp){
+      i_active_ = 0; 
+      for (unsigned int i = 0; i<nactive_; i++){
+        if (!contacts_[i]->active || !contacts_[i]->unilateral) continue;
+        contacts_[i]->predictedX0_ += .5 * sub_dt * optdP_cone.segment<3>(3*i_active_); 
+        contacts_[i]->predictedF_ = K.block<3,3>(3*i_active_, 3*i_active_)*(contacts_[i]->predictedX0_-contacts_[i]->predictedX_); 
+        contacts_[i]->predictedF_ -= B.block<3,3>(3*i_active_, 3*i_active_)*contacts_[i]->predictedV_; 
+        fpr_.segment<3>(3*i_active_) = contacts_[i]->predictedF_;
+        i_active_ += 1; 
+      }
+    } else{
+      throw std::runtime_error("solver did not converge ");
     }
     // std::cout<<"forces updated"<<std::endl;
   } 
@@ -613,23 +609,12 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
     temp03_.resize(3*nactive_); temp03_.setZero();
     temp04_.resize(3*nactive_); temp04_.setZero();
 
-    // predictedF_ resizing 
-    // C.resize(1+6*nactive_,1+6*nactive_); C.setZero(); 
-    // expDtC.resize(1+6*nactive_,1+6*nactive_); expDtC.setZero(); 
-    // z.resize(1+6*nactive_); z.setZero(); 
-    // nextZ.resize(1+6*nactive_); nextZ.setZero(); 
-    // predictedForce_.resize(3*nactive_); predictedForce_.setZero();
-    // utilD.resize(1+6*nactive_);
-
-
 
     // qp resizing 
     // constraints should account for both directions of friction 
     // and positive normal force, this implies 5 constraints per active contact
-    // will be arranged as follows [normal, +ve_basisA, -ve_BasisA, +ve_BasisB, -ve_BasisB]
-    normal_constraints_.resize(nactive_,3*nactive_); normal_constraints_.setZero(); 
-    tangentA_constraints_.resize(nactive_,3*nactive_); tangentA_constraints_.setZero(); 
-    tangentB_constraints_.resize(nactive_,3*nactive_); tangentB_constraints_.setZero(); 
+    // will be arranged as follows [+ve_basisA, -ve_BasisA, +ve_BasisB, -ve_BasisB]
+    cone_constraints_.resize(4*nactive_,3*nactive_); cone_constraints_.setZero(); 
     contact_position_integrator_.resize(6*nactive_,3*nactive_); contact_position_integrator_.setZero(); 
     // divide integrator matrix by sub_dt directly 
     contact_position_integrator_.block(0,0, 3*nactive_, 3*nactive_) = .5 * Eigen::MatrixXd::Identity(3*nactive_, 3*nactive_);
@@ -663,11 +648,10 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
       B(3*i_active_+2, 3*i_active_+2) = contacts_[i]->optr->contact_model_->damping_(2);
 
       // fill up contact normals and tangents for constraints 
-      // for the normal approximate the cone directly on it 
-      // a long sequence of dereferencing. maybe better to use a getter method in contact ?  
-      normal_constraints_.block(i_active_, 3*i_active_, 1, 3) = .5 * sqrt(2) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose(); 
-      tangentA_constraints_.block(i_active_, 3*i_active_, 1, 3) = contacts_[i]->contactTangentA_.transpose();
-      tangentB_constraints_.block(i_active_, 3*i_active_, 1, 3) = contacts_[i]->contactTangentB_.transpose(); 
+      cone_constraints_.block<1,3>(i_active_, 3*i_active_) = sqrt(2) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose() - contacts_[i]->contactTangentA_.transpose();
+      cone_constraints_.block<1,3>(i_active_+1, 3*i_active_) = sqrt(2) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose() + contacts_[i]->contactTangentA_.transpose();
+      cone_constraints_.block<1,3>(i_active_+2, 3*i_active_) = sqrt(2) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose() - contacts_[i]->contactTangentB_.transpose();
+      cone_constraints_.block<1,3>(i_active_+3, 3*i_active_) = sqrt(2) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose() + contacts_[i]->contactTangentB_.transpose();
 
       i_active_ += 1; 
     }
