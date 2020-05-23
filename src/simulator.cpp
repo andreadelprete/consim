@@ -497,7 +497,6 @@ void ExponentialSimulator::checkFrictionCone(){
         fpr_.segment<3>(3*i_active_) = f_avg_i;
       }
     }
-    // for second integral, update seperately ?  
 
     if (fnor2_<0.){
       fpr2_.segment<3>(3*i_active_).fill(0);
@@ -538,15 +537,24 @@ void ExponentialSimulator::computeSlipping(){
 
     D_intExpA_integrator = D * inteAdt_ * contact_position_integrator_; 
 
+    // std::cout<<"A bar \n"<< D_intExpA_integrator << std::endl; 
+
     Cineq_cone.setZero();
     Cineq_cone = - cone_constraints_* D_intExpA_integrator; 
     cineq_cone.setZero();
     cineq_cone = cone_constraints_ * f_avg;
+    // try to ensure normal force stays the same 
+    // Ceq_cone.setZero(); 
+    // Ceq_cone = -eq_cone_constraints_ * D_intExpA_integrator;
+
+    // std::cout<<"A_ineq  \n"<< Cineq_cone << std::endl; 
+    // std::cout<<"b_ineq  \n"<< cineq_cone << std::endl; 
+    // std::cout<<"A_eq  \n"<< Ceq_cone << std::endl; 
 
     optdP_cone.setZero();
 
     status_qp = qp.solve_quadprog(Q_cone, q_cone, Ceq_cone, ceq_cone, Cineq_cone, cineq_cone, optdP_cone);
-    
+    // std::cout<<"optimizer status\n"<<status_qp<<std::endl; 
     if (status_qp == expected_qp){
       i_active_ = 0; 
       for (unsigned int i = 0; i<nactive_; i++){
@@ -560,7 +568,6 @@ void ExponentialSimulator::computeSlipping(){
     } else{
       throw std::runtime_error("solver did not converge ");
     }
-    // std::cout<<"forces updated"<<std::endl;
   } 
   else{
     throw std::runtime_error("Slipping update method not recongnized ");
@@ -615,6 +622,7 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
     // and positive normal force, this implies 5 constraints per active contact
     // will be arranged as follows [+ve_basisA, -ve_BasisA, +ve_BasisB, -ve_BasisB]
     cone_constraints_.resize(4*nactive_,3*nactive_); cone_constraints_.setZero(); 
+    eq_cone_constraints_.resize(nactive_,3*nactive_); eq_cone_constraints_.setZero(); 
     contact_position_integrator_.resize(6*nactive_,3*nactive_); contact_position_integrator_.setZero(); 
     // divide integrator matrix by sub_dt directly 
     contact_position_integrator_.block(0,0, 3*nactive_, 3*nactive_) = .5 * Eigen::MatrixXd::Identity(3*nactive_, 3*nactive_);
@@ -627,8 +635,8 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
     q_cone.resize(3*nactive_); q_cone.setZero();
     Cineq_cone.resize(4 * nactive_,3 * nactive_); Cineq_cone.setZero();
     cineq_cone.resize(4 * nactive_);  cineq_cone.setZero();
-    Ceq_cone.resize(0,3 * nactive_); Ceq_cone.setZero();
-    ceq_cone.resize(0);  ceq_cone.setZero();
+    Ceq_cone.resize(nactive_,3 * nactive_); Ceq_cone.setZero();
+    ceq_cone.resize(nactive_);  ceq_cone.setZero();
     optdP_cone.resize(3*nactive_), optdP_cone.setZero();
 
 
@@ -652,6 +660,7 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
       cone_constraints_.block<1,3>(i_active_+1, 3*i_active_) = sqrt(2) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose() + contacts_[i]->contactTangentA_.transpose();
       cone_constraints_.block<1,3>(i_active_+2, 3*i_active_) = sqrt(2) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose() - contacts_[i]->contactTangentB_.transpose();
       cone_constraints_.block<1,3>(i_active_+3, 3*i_active_) = sqrt(2) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose() + contacts_[i]->contactTangentB_.transpose();
+      eq_cone_constraints_.block<1,3>(i_active_, 3*i_active_) = contacts_[i]->contactNormal_.transpose();
 
       i_active_ += 1; 
     }
@@ -665,6 +674,8 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
     
   } // nactive_ > 0
   
+  // std::cout<<"cone constraints \n"<<cone_constraints_<<std::endl; 
+  // std::cout<<"contact velocity integrator \n"<<contact_position_integrator_<<std::endl; 
 
 
   Eigen::internal::set_is_malloc_allowed(false);

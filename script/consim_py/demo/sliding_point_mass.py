@@ -124,6 +124,8 @@ if __name__=="__main__":
                 predicted_xstart[t+1,i,:] = np.resize(cp.predicted_x0,3)
                 predicted_x[t+1,i,:] = np.resize(cp.predicted_x,3)
                 predicted_f[t+1,i,:] = np.resize(cp.predicted_f,3)
+            # if t == 20:
+            #     break 
         print('Simulation done ')
 
         qz = []

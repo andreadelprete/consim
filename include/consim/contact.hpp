@@ -27,7 +27,7 @@ class ContactPoint {
     void updatePosition(pinocchio::Data &data);  /*!< updates cartesian position */ 
     void firstOrderContactKinematics(pinocchio::Data &data);  /*!< computes c, world_J_ and relative penetration */ 
     void secondOrderContactKinematics(pinocchio::Data &data, Eigen::VectorXd &v); /*!< computes dJv_ */
-    // void computeContactForce();  /*!< calls contact model from object pointer to compute the force  */
+    void resestAnchorPoint(Eigen::VectorXd &x0);  /*!< resets the anchor point for the contact  */
     
     std::string name_;
     const pinocchio::Model *model_;

@@ -46,6 +46,12 @@ void ContactPoint::secondOrderContactKinematics(pinocchio::Data &data, Eigen::Ve
 }
 
 
+void ContactPoint::resestAnchorPoint(Eigen::VectorXd &x0){
+  x_start = x0; 
+  predictedX0_ = x0;  
+}
+
+
 // --------------------------------------------------------------------------------------------------------// 
 
 LinearPenaltyContactModel::LinearPenaltyContactModel(Eigen::Vector3d &stiffness, Eigen::Vector3d &damping, double frictionCoeff){

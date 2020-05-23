@@ -27,7 +27,6 @@
 
 
 
-
 namespace consim {
 
   class AbstractSimulator {
@@ -262,6 +261,7 @@ namespace consim {
       Eigen::MatrixXd inteAdt_;
 
       Eigen::MatrixXd cone_constraints_;
+      Eigen::MatrixXd eq_cone_constraints_;
       Eigen::MatrixXd contact_position_integrator_; 
       Eigen::MatrixXd D_intExpA_integrator; 
 
@@ -269,7 +269,6 @@ namespace consim {
 
       eiquadprog::solvers::EiquadprogFast_status status_qp;
 
-      
   }; // class ExponentialSimulator
 
 } // namespace consim 
