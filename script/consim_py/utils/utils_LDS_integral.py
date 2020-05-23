@@ -252,6 +252,7 @@ def compute_x_T_and_two_integrals(A, a, x0, T):
 
 
 def compute_integral_expm(A, T, dt=None):
+    ''' Compute the integral of expm(tau*A) for tau from 0 to T. '''
     n = A.shape[0]
     
     if(dt is not None):

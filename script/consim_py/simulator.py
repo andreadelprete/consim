@@ -204,10 +204,10 @@ class RobotSimulator:
             return np.linalg.solve(self.data.M, tau - self.data.nle)
         if self.fwd_dyn_method == 'aba':
             return se3.aba(self.model, self.data, self.q, self.v, tau)
-        if self.fwa_dyn_method == 'pinMinv':
-            se3.cholesky.decompose(self.model, self.data, self.q)
-            se3.cholesky.computeMinv(self.model, self.data)
-#            Minv = se3.computeMinverse(self.model, self.data, self.q)
+        if self.fwd_dyn_method == 'pinMinv':
+#            se3.cholesky.decompose(self.model, self.data, self.q)
+#            se3.cholesky.computeMinv(self.model, self.data)
+            se3.computeMinverse(self.model, self.data, self.q)
             return self.data.Minv @ (tau - self.data.nle)
         raise Exception("Unknown forward dynamics method "+self.fwd_dyn_method)
 

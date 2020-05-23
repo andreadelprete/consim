@@ -38,13 +38,13 @@ GROUND_TRUTH_SIMU_PARAMS = {
 SIMU_PARAMS = []
 
 # EXPONENTIAL INTEGRATOR WITH STANDARD SETTINGS
-for i in range(i_min, i_max):
-    SIMU_PARAMS += [{
-        'name': 'exp%4d'%(2**i),
-        'method_name': 'exp',
-        'use_exp_int': 1,
-        'ndt': 2**i,
-    }]
+#for i in range(i_min, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'exp%4d'%(2**i),
+#        'method_name': 'exp',
+#        'use_exp_int': 1,
+#        'ndt': 2**i,
+#    }]
     
 # EXPONENTIAL INTEGRATOR, UPDATE MATRIX EXPONENTIAL EVERY FEW ITERATIONS
 #for i in range(i_min, i_max):
@@ -87,25 +87,25 @@ for i in range(5, i_max):
         'ndt': 2**i,
     }]
     
-## EULER SIMULATOR with ABA
-#for i in range(5, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'euler%4d ABA'%(2**i),
-#        'method_name': 'euler ABA',
-#        'use_exp_int': 0,
-#        'ndt': 2**i,
-#        'fwd_dyn_method': 'aba'
-#    }]
+# EULER SIMULATOR with ABA
+for i in range(5, i_max):
+    SIMU_PARAMS += [{
+        'name': 'euler%4d ABA'%(2**i),
+        'method_name': 'euler ABA',
+        'use_exp_int': 0,
+        'ndt': 2**i,
+        'fwd_dyn_method': 'aba'
+    }]
     
 ## EULER SIMULATOR with pinocchio::computeMinverse
-#for i in range(5, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'euler%4d pinMinv'%(2**i),
-#        'method_name': 'euler pinMinv',
-#        'use_exp_int': 0,
-#        'ndt': 2**i,
-#        'fwd_dyn_method': 'pinMinv'
-#    }]
+for i in range(5, i_max):
+    SIMU_PARAMS += [{
+        'name': 'euler%4d pinMinv'%(2**i),
+        'method_name': 'euler pinMinv',
+        'use_exp_int': 0,
+        'ndt': 2**i,
+        'fwd_dyn_method': 'pinMinv'
+    }]
 
 PLOT_UPSILON = 0
 PLOT_FORCES = 0
@@ -256,7 +256,8 @@ def run_simulation(q, v, simu_params):
     #                print("\t||v||: %.3f\t ||dv||: %.3f" % (norm(v, 2), norm(dv)))
     
             t += dt
-    except:
+    except Exception as e:
+        print(e)
         print("ERROR WHILE RUNNING SIMULATION")
 
     time_spent = time.time() - time_start
