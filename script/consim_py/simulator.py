@@ -495,6 +495,8 @@ class RobotSimulator:
             with open(self.logFileName + 'xInit', 'a+') as f:
                 np.savetxt(f, [np.asarray(x0)[:, 0]], '%.18f', '\t')
 
+
+
 '''
 def solve_dense_expo_system(self, U, K, B, a, x0, dt):
         n = U.shape[0]
