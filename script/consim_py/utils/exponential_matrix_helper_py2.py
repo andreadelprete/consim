@@ -168,6 +168,31 @@ class ExponentialMatrixHelper:
             X = D.dot(X.dot(Dinv))
 #        assert(np.max(np.abs(expm(A) - X)) == 0.0)
         return X
+
+    def compute_integral_expm(self, A, T, dt=None):
+        ''' Compute the integral of expm(tau*A) for tau from 0 to T. '''
+        n = A.shape[0]
+        
+        if(dt is not None):
+            N = int(T/dt)
+            int_expm = np.zeros((n,n))
+            for i in range(1, N):
+                ex = self.expm(i*dt*A)
+                int_expm += dt*ex
+            return int_expm
+        
+        C = np.zeros((n+n, n+n))
+        C[0:n,     0:n] = A
+        C[0:n,     n:] = np.identity(n)
+        z0 = np.zeros((n+n, n))
+    #    z0[:n, 0] = x0
+        z0[-n:, :] = np.identity(n)
+        e_TC = self.expm(T*C, verbose=True)
+        z = e_TC.dot(z0)
+    #    z = expm_times_v(T*C, z0, verbose=True)
+        res = z[:n, :]
+        return res
+    
     
     def expm_times_v(self, A, v, max_mat_mult=100, balance=True):
         X = self.expm(A, max_mat_mult, balance)
