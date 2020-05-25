@@ -187,7 +187,7 @@ class ExponentialMatrixHelper:
         z0 = np.zeros((n+n, n))
     #    z0[:n, 0] = x0
         z0[-n:, :] = np.identity(n)
-        e_TC = self.expm(T*C, verbose=True)
+        e_TC = self.expm(T*C)
         z = e_TC.dot(z0)
     #    z = expm_times_v(T*C, z0, verbose=True)
         res = z[:n, :]

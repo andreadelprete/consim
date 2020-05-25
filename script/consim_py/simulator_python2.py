@@ -31,7 +31,7 @@ class Contact:
         self.invK = np.linalg.inv(K)
         self.B = B
         self.frame_id = model.getFrameId(frame_name)
-        self.reset_contact_position()
+        
         self.unilateral = True
         self.active = False  
         self.friction_coeff = 0.5
@@ -43,6 +43,8 @@ class Contact:
         self.pNext = np.zeros(3)
         self.vNext = np.zeros(3)
         self.fNext = np.zeros(3)
+
+        # self.reset_contact_position()
     
 
     def check_contact(self): 
@@ -58,11 +60,12 @@ class Contact:
 
     def reset_contact_position(self, p0=None):
         # Initial (0-load) position of the spring
-        if(p0 is None):
-            self.p0 = self.data.oMf[self.frame_id].translation.copy()
-        else:
-            self.p0 = np.copy(p0)
-        self.in_contact = True
+        if not self.active:
+            if(p0 is None):
+                self.p0 = self.data.oMf[self.frame_id].translation.copy()
+            else:
+                self.p0 = np.copy(p0)
+            self.in_contact = True
 
     def compute_force(self):
         if self.unilateral and not self.active:
@@ -285,7 +288,7 @@ class RobotSimulator:
         # TODO: I removed p0 from self.x0, must be added here 
         JMinv = np.linalg.solve(M, self.Jc.T).T
         self.Upsilon = self.Jc.dot(JMinv.T)
-        self.a[3*self.n_active_:] = JMinv.dot((self.S.T.dot(u)-h)) + self.dJv
+        self.a[3*self.n_active_:] = JMinv.dot((self.S.T.dot(u)-h)) + self.dJv + self.Upsilon.dot(self.K.dot(self.p0))
         self.A[3*self.n_active_:, :3*self.n_active_] = -self.Upsilon.dot(self.K)
         self.A[3*self.n_active_:, 3*self.n_active_:] = -self.Upsilon.dot(self.B)
         return self.x0, dv_bar, JMinv
@@ -420,6 +423,7 @@ class RobotSimulator:
         f_average = self.K.dot(self.p0) + D_int_x/dt  # average force over integration interval 
         # loop over contacts 
         f_projection = zero(3*self.n_active_)
+        self.computePredictedXandF(dt)
         i_active = 0 
         for i,c in enumerate(self.contacts):
             if not c.active:
@@ -440,7 +444,7 @@ class RobotSimulator:
                 if (tangent_norm>c.friction_coeff*normal_force_value):
                     if self.cone_method=="average":
                         f_projection[3*i_active:3*i_active+3]  = normal_force + (c.friction_coeff*normal_force_value/tangent_norm)*tangent_force
-                        c.p0 = c.invK.dot(f_projection[3*i_active:3*i_active+3] + c.K.dot(c.pNext) + c.V.dot(c.vNext))
+                        c.p0 = c.invK.dot(f_projection[3*i_active:3*i_active+3] + c.K.dot(c.pNext) + c.B.dot(c.vNext))
                     else:
                         f_projection[3*i_active:3*i_active+3] = f_average[3*i_active:3*i_active+3]
                     self.cone_violation_ = True 
