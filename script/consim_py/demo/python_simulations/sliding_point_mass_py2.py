@@ -69,6 +69,7 @@ if __name__=="__main__":
             sim.contacts[-1].unilateral = True
         else:
             sim.contacts[-1].unilateral = False 
+        sim.contacts[-1].friction_coeff = mu
     print('Contacts added to simulator Successfully!')
 
     q = np.zeros((robot.nq, N_SIMULATION+1))*np.nan

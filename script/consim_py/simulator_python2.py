@@ -34,7 +34,7 @@ class Contact:
         
         self.unilateral = True
         self.active = False  
-        self.friction_coeff = 0.5
+        self.friction_coeff = 0.3
         self.f = np.zeros(3)
         self.p0 = np.zeros(3)
         self.p = np.zeros(3)
@@ -48,15 +48,22 @@ class Contact:
     
 
     def check_contact(self): 
-        if self.unilateral or not self.active:
-            if self.data.oMf[self.frame_id].translation[2]<=0.:
-                self.reset_contact_position()
-                self.active = True 
-            else:
-                if self.unilateral: 
-                    self.active = False 
-                    self.in_contact = False 
-                    self.f = np.zeros(3)
+        if self.data.oMf[self.frame_id].translation[2]<=0.:
+            if self.unilateral:
+                if not self.active: 
+                    self.reset_contact_position()
+                    self.active = True  
+                    self.in_contact = True  
+            else: 
+                if not self.active:
+                    self.reset_contact_position()
+                    self.active = True 
+        else: 
+            if self.unilateral:
+                self.active = False   
+                self.in_contact = False   
+                self.f = zero(3)
+                
 
     def reset_contact_position(self, p0=None):
         # Initial (0-load) position of the spring
@@ -234,9 +241,9 @@ class RobotSimulator:
             i_active = 0
             for (i,c) in enumerate(self.contacts):
                 if c.active:
-                    self.K[3*i_active:3*i_active+3, 3*i_active:3*i_active+3] = c.K
-                    self.B[3*i_active:3*i_active+3, 3*i_active:3*i_active+3] = c.B
-                    self.p0[3*i_active:3*i_active+3]           = c.p0
+                    self.K[3*i_active:3*i_active+3, 3*i_active:3*i_active+3] = c.K.copy()
+                    self.B[3*i_active:3*i_active+3, 3*i_active:3*i_active+3] = c.B.copy()
+                    self.p0[3*i_active:3*i_active+3]           = c.p0.copy()
                     i_active += 1 
             self.D = np.hstack((-self.K, -self.B))
 
@@ -438,7 +445,9 @@ class RobotSimulator:
                 # pulling force 
                 self.cone_violation_ = True 
                 f_projection[3*i_active:3*i_active+3] = zero(3)
+                continue
             else:
+                "checking for tangent force "
                 tangent_force = f_average[3*i_active:3*i_active+3] - normal_force
                 tangent_norm = np.linalg.norm(tangent_force)
                 if (tangent_norm>c.friction_coeff*normal_force_value):
