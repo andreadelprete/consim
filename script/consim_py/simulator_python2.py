@@ -12,11 +12,13 @@ import gepetto.corbaserver
 import time
 import subprocess
 
-from cvxopt.solvers import qp 
-from cvxopt import matrix 
+from cvxopt.solvers import  qp as solverQP
+from cvxopt import matrix
 #from consim_py.utils.utils_LDS_integral import compute_integral_x_T, compute_double_integral_x_T
 from consim_py.utils.exponential_matrix_helper_py2 import ExponentialMatrixHelper
 
+from cvxopt import solvers
+solvers.options['show_progress'] = False
 
 class Contact:
     def __init__(self, model, data, frame_name, normal, K, B):
@@ -116,6 +118,7 @@ class RobotSimulator:
             f = open(logFileName + 'xInit', 'w')  # Starting from empty file
             f.close()
 
+        self.dt = 1.e-3 
         self.conf = conf
         self.expMatHelper = ExponentialMatrixHelper()
         self.assume_A_invertible = False
@@ -143,6 +146,7 @@ class RobotSimulator:
         self.n_active_ = 0 
         self.cone_violation_ = False 
         self.cone_method = "average"  # options = ["qp", "average"]
+        self.withEquality = False
         
         self.init(conf.q0, None, True)
         
@@ -226,7 +230,7 @@ class RobotSimulator:
             c.check_contact()
             if c.active:
                 self.n_active_ += 1 
-        if not (self.f.shape[0]==3*self.n_active_):
+        if not (self.f.shape[0]==3*self.n_active_) or self.first_iter:
             self.f = zero(3*self.n_active_)
             self.Jc = np.zeros((3*self.n_active_, self.model.nv))
             self.K = np.zeros((3*self.n_active_, 3*self.n_active_))
@@ -239,6 +243,10 @@ class RobotSimulator:
             self.A = np.zeros((6*self.n_active_, 6*self.n_active_))
             self.A[:3*self.n_active_, 3*self.n_active_:] = np.eye(3*self.n_active_)
             self.cone_constraints = np.zeros([4*self.n_active_, 3*self.n_active_])
+            self.anchor_integrator= np.vstack([.5 * np.eye(3*self.n_active_), np.eye(3*self.n_active_)/self.dt ]) 
+            self.qp_Q = matrix(2.*np.identity(3*self.n_active_))
+            self.qp_q = matrix([0.]*(3*self.n_active_))
+            self.cone_equality = np.zeros([self.n_active_, 3*self.n_active_])
             i_active = 0
             for (i,c) in enumerate(self.contacts):
                 if c.active:
@@ -254,6 +262,7 @@ class RobotSimulator:
                         self.cone_constraints[4*i_active+2, 3*i_active:3*i_active+3] -= c.tangentB
                         self.cone_constraints[4*i_active+3, 3*i_active:3*i_active+3] = (c.friction_coeff/np.sqrt(2))*c.normal
                         self.cone_constraints[4*i_active+3, 3*i_active:3*i_active+3] += c.tangentB
+                        self.cone_equality[i_active,:] = c.normal
                     i_active += 1 
             self.D = np.hstack((-self.K, -self.B))
 
@@ -315,6 +324,9 @@ class RobotSimulator:
              update_expm=True):
         if dt is None:
             dt = self.dt
+        else:
+            self.dt = dt 
+
 
         if self.first_iter:
             self.compute_forces()
@@ -439,7 +451,7 @@ class RobotSimulator:
         self.cone_violation_ = False
         f_average = self.K.dot(self.p0) + D_int_x/dt  # average force over integration interval 
         # loop over contacts 
-        f_projection = zero(3*self.n_active_)
+        self.f_projection = zero(3*self.n_active_)
         self.computePredictedXandF(dt)
         i_active = 0 
         for i,c in enumerate(self.contacts):
@@ -454,7 +466,7 @@ class RobotSimulator:
             if normal_force_value<0.:
                 # pulling force 
                 self.cone_violation_ = True 
-                f_projection[3*i_active:3*i_active+3] = zero(3)
+                self.f_projection[3*i_active:3*i_active+3] = zero(3)
                 continue
             else:
                 "checking for tangent force "
@@ -470,16 +482,16 @@ class RobotSimulator:
                         raise Exception("Cone Update Method not Recognized")
                     self.cone_violation_ = True 
                 else:
-                    f_projection[3*i_active:3*i_active+3] = f_average[3*i_active:3*i_active+3]
+                    self.f_projection[3*i_active:3*i_active+3] = f_average[3*i_active:3*i_active+3]
 
             i_active += 1 
         
         # method 2 is applied when all constraints are satisfied 
         if self.cone_violation_ and  self.cone_method=="qp":
-            self.qpAnchorPointUpdate()
+            self.qpAnchorPointUpdate(f_average)
 
             
-        return f_projection
+        return self.f_projection
 
 
     def computePredictedXandF(self, dt):
@@ -502,17 +514,30 @@ class RobotSimulator:
                 i_active += 1 
 
 
-    def qpAnchorPointUpdate(self):
-        i_active = 0 
-        for i,c in enumerate(self.contacts):
-            """ fill the constraints """
-            pass 
+    def qpAnchorPointUpdate(self, f_average):
+        "updating anchor through QP"
         
-        """ solve the qp """
+        D_inte_integrator = self.D.dot(self.int_e_Adt).dot(self.anchor_integrator)  
 
+        Aineq = matrix(-self.cone_constraints.dot(D_inte_integrator)) 
+        bineq = matrix(self.cone_constraints.dot(f_average))
+        Aeq = matrix(self.cone_equality.dot(D_inte_integrator))
+        beq = matrix(np.zeros(self.n_active_))
+
+    
+        if self.withEquality:
+            soln = solverQP(self.qp_Q, self.qp_q, G=-Aineq, h=bineq, A=Aeq, b=beq)
+        else:
+            soln = solverQP(self.qp_Q, self.qp_q, G=-Aineq, h=bineq)
+
+
+        dp = np.resize(np.array(soln['x']), 3*self.n_active_)
 
         i_active = 0 
         for i,c in enumerate(self.contacts):
-            """ fill the solution """
-            pass 
+            if not c.active: 
+                continue
+            c.p0 += .5 * self.dt * dp[3*i_active:3*i_active+3] 
+            self.f_projection[3*i_active:3*i_active+3] = c.K.dot(c.p0 - c.pNext) - c.B.dot(c.vNext)
+            i_active += 1 
 

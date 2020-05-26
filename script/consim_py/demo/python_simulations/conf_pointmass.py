@@ -3,8 +3,8 @@
 import numpy as np
 
 
-np.set_printoptions(precision=2, linewidth=200, suppress=True,
-                    formatter={'all':lambda x: "%.3f, "%x})
+np.set_printoptions(precision=10, linewidth=200, suppress=True,
+                    formatter={'all':lambda x: "%.10f, "%x})
 LINE_WIDTH = 60
 
 # N_SIMULATION = 4000             # number of time steps simulated
