@@ -656,10 +656,10 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
       B(3*i_active_+2, 3*i_active_+2) = contacts_[i]->optr->contact_model_->damping_(2);
 
       // fill up contact normals and tangents for constraints 
-      cone_constraints_.block<1,3>(i_active_, 3*i_active_) = sqrt(2) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose() - contacts_[i]->contactTangentA_.transpose();
-      cone_constraints_.block<1,3>(i_active_+1, 3*i_active_) = sqrt(2) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose() + contacts_[i]->contactTangentA_.transpose();
-      cone_constraints_.block<1,3>(i_active_+2, 3*i_active_) = sqrt(2) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose() - contacts_[i]->contactTangentB_.transpose();
-      cone_constraints_.block<1,3>(i_active_+3, 3*i_active_) = sqrt(2) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose() + contacts_[i]->contactTangentB_.transpose();
+      cone_constraints_.block<1,3>(4*i_active_, 3*i_active_) = (1/sqrt(2)) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose() - contacts_[i]->contactTangentA_.transpose();
+      cone_constraints_.block<1,3>(4*i_active_+1, 3*i_active_) = (1/sqrt(2)) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose() + contacts_[i]->contactTangentA_.transpose();
+      cone_constraints_.block<1,3>(4*i_active_+2, 3*i_active_) = (1/sqrt(2)) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose() - contacts_[i]->contactTangentB_.transpose();
+      cone_constraints_.block<1,3>(4*i_active_+3, 3*i_active_) = (1/sqrt(2)) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose() + contacts_[i]->contactTangentB_.transpose();
       eq_cone_constraints_.block<1,3>(i_active_, 3*i_active_) = contacts_[i]->contactNormal_.transpose();
 
       i_active_ += 1; 

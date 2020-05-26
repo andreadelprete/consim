@@ -238,12 +238,22 @@ class RobotSimulator:
             self.a = zero(6*self.n_active_)
             self.A = np.zeros((6*self.n_active_, 6*self.n_active_))
             self.A[:3*self.n_active_, 3*self.n_active_:] = np.eye(3*self.n_active_)
+            self.cone_constraints = np.zeros([4*self.n_active_, 3*self.n_active_])
             i_active = 0
             for (i,c) in enumerate(self.contacts):
                 if c.active:
                     self.K[3*i_active:3*i_active+3, 3*i_active:3*i_active+3] = c.K.copy()
                     self.B[3*i_active:3*i_active+3, 3*i_active:3*i_active+3] = c.B.copy()
                     self.p0[3*i_active:3*i_active+3]           = c.p0.copy()
+                    if self.cone_method == "qp":
+                        self.cone_constraints[4*i_active, 3*i_active:3*i_active+3] = (c.friction_coeff/np.sqrt(2))*c.normal
+                        self.cone_constraints[4*i_active, 3*i_active:3*i_active+3] -= c.tangentA
+                        self.cone_constraints[4*i_active+1, 3*i_active:3*i_active+3] = (c.friction_coeff/np.sqrt(2))*c.normal
+                        self.cone_constraints[4*i_active+1, 3*i_active:3*i_active+3] += c.tangentA
+                        self.cone_constraints[4*i_active+2, 3*i_active:3*i_active+3] = (c.friction_coeff/np.sqrt(2))*c.normal
+                        self.cone_constraints[4*i_active+2, 3*i_active:3*i_active+3] -= c.tangentB
+                        self.cone_constraints[4*i_active+3, 3*i_active:3*i_active+3] = (c.friction_coeff/np.sqrt(2))*c.normal
+                        self.cone_constraints[4*i_active+3, 3*i_active:3*i_active+3] += c.tangentB
                     i_active += 1 
             self.D = np.hstack((-self.K, -self.B))
 
@@ -454,13 +464,20 @@ class RobotSimulator:
                     if self.cone_method=="average":
                         f_projection[3*i_active:3*i_active+3]  = normal_force + (c.friction_coeff*normal_force_value/tangent_norm)*tangent_force
                         c.p0 = c.invK.dot(f_projection[3*i_active:3*i_active+3] + c.K.dot(c.pNext) + c.B.dot(c.vNext))
+                    elif self.cone_method=="qp":
+                        pass 
                     else:
-                        f_projection[3*i_active:3*i_active+3] = f_average[3*i_active:3*i_active+3]
+                        raise Exception("Cone Update Method not Recognized")
                     self.cone_violation_ = True 
                 else:
                     f_projection[3*i_active:3*i_active+3] = f_average[3*i_active:3*i_active+3]
 
             i_active += 1 
+        
+        # method 2 is applied when all constraints are satisfied 
+        if self.cone_violation_ and  self.cone_method=="qp":
+            self.qpAnchorPointUpdate()
+
             
         return f_projection
 
@@ -485,4 +502,17 @@ class RobotSimulator:
                 i_active += 1 
 
 
+    def qpAnchorPointUpdate(self):
+        i_active = 0 
+        for i,c in enumerate(self.contacts):
+            """ fill the constraints """
+            pass 
+        
+        """ solve the qp """
+
+
+        i_active = 0 
+        for i,c in enumerate(self.contacts):
+            """ fill the solution """
+            pass 
 
