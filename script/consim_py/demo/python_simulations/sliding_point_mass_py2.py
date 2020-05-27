@@ -33,13 +33,14 @@ if __name__=="__main__":
     mu = 0.3        # friction coefficient
     # isSparse = False 
     # isInvertible = False
-    anchor_slipping = 2 
+    anchor_slipping = 2
     unilateral_contacts = True  
     K = 1e5 * np.eye(3)
     B = 2e2 * np.eye(3)
     normal = np.array([0., 0., 1.])
-    N_SIMULATION = 200 
-    QPwithEquality = True  
+    N_SIMULATION = 100 
+    # equality constraint sets f_avg_normal = f_optimized_normal  
+    QPwithEquality = False   
     q0 = np.array([0., 0., 0., 0., 0., 0., 1.])
     v0 = np.array([0., 0., 0., 0., 0., 0.])
 

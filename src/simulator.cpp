@@ -554,20 +554,30 @@ void ExponentialSimulator::computeSlipping(){
     optdP_cone.setZero();
 
     status_qp = qp.solve_quadprog(Q_cone, q_cone, Ceq_cone, ceq_cone, Cineq_cone, cineq_cone, optdP_cone);
-    // std::cout<<"optimizer status\n"<<status_qp<<std::endl; 
-    if (status_qp == expected_qp){
-      i_active_ = 0; 
-      for (unsigned int i = 0; i<nactive_; i++){
-        if (!contacts_[i]->active || !contacts_[i]->unilateral) continue;
-        contacts_[i]->predictedX0_ += .5 * sub_dt * optdP_cone.segment<3>(3*i_active_); 
-        contacts_[i]->predictedF_ = K.block<3,3>(3*i_active_, 3*i_active_)*(contacts_[i]->predictedX0_-contacts_[i]->predictedX_); 
-        contacts_[i]->predictedF_ -= B.block<3,3>(3*i_active_, 3*i_active_)*contacts_[i]->predictedV_; 
-        fpr_.segment<3>(3*i_active_) = contacts_[i]->predictedF_;
-        i_active_ += 1; 
-      }
-    } else{
-      throw std::runtime_error("solver did not converge ");
+
+    i_active_ = 0; 
+    for (unsigned int i = 0; i<nactive_; i++){
+      if (!contacts_[i]->active || !contacts_[i]->unilateral) continue;
+      contacts_[i]->predictedX0_ += .5 * sub_dt * optdP_cone.segment<3>(3*i_active_); 
+      contacts_[i]->predictedF_ = K.block<3,3>(3*i_active_, 3*i_active_)*(contacts_[i]->predictedX0_-contacts_[i]->predictedX_); 
+      contacts_[i]->predictedF_ -= B.block<3,3>(3*i_active_, 3*i_active_)*contacts_[i]->predictedV_; 
+      fpr_.segment<3>(3*i_active_) = contacts_[i]->predictedF_;
+      i_active_ += 1; 
     }
+    // std::cout<<"optimizer status\n"<<status_qp<<std::endl; 
+    // if (status_qp == expected_qp){
+    //   i_active_ = 0; 
+    //   for (unsigned int i = 0; i<nactive_; i++){
+    //     if (!contacts_[i]->active || !contacts_[i]->unilateral) continue;
+    //     contacts_[i]->predictedX0_ += .5 * sub_dt * optdP_cone.segment<3>(3*i_active_); 
+    //     contacts_[i]->predictedF_ = K.block<3,3>(3*i_active_, 3*i_active_)*(contacts_[i]->predictedX0_-contacts_[i]->predictedX_); 
+    //     contacts_[i]->predictedF_ -= B.block<3,3>(3*i_active_, 3*i_active_)*contacts_[i]->predictedV_; 
+    //     fpr_.segment<3>(3*i_active_) = contacts_[i]->predictedF_;
+    //     i_active_ += 1; 
+    //   }
+    // } else{
+    //   throw std::runtime_error("solver did not converge ");
+    // }
   } 
   else{
     throw std::runtime_error("Slipping update method not recongnized ");
@@ -635,8 +645,10 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
     q_cone.resize(3*nactive_); q_cone.setZero();
     Cineq_cone.resize(4 * nactive_,3 * nactive_); Cineq_cone.setZero();
     cineq_cone.resize(4 * nactive_);  cineq_cone.setZero();
-    Ceq_cone.resize(nactive_,3 * nactive_); Ceq_cone.setZero();
-    ceq_cone.resize(nactive_);  ceq_cone.setZero();
+    // Ceq_cone.resize(nactive_,3 * nactive_); Ceq_cone.setZero();
+    // ceq_cone.resize(nactive_);  ceq_cone.setZero();
+    Ceq_cone.resize(0,3 * nactive_); Ceq_cone.setZero();
+    ceq_cone.resize(0);  ceq_cone.setZero();
     optdP_cone.resize(3*nactive_), optdP_cone.setZero();
 
 

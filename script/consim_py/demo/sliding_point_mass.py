@@ -22,7 +22,7 @@ if __name__=="__main__":
     mu = 0.3        # friction coefficient
     # isSparse = False 
     # isInvertible = False
-    anchor_slipping = 2 
+    anchor_slipping = 2  # 1 -> update such that f_avg is on boundary, 2-> solve qp  
     unilateral_contacts = True  
     K = 1e5 * np.ones([3,1])
     B = 2e2 * np.ones([3,1])

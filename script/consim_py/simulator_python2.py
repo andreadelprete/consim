@@ -227,6 +227,7 @@ class RobotSimulator:
         """ loops over all contacts to check active status and update matrix size """
         self.n_active_ = 0 
         for (i,c) in enumerate(self.contacts):
+            c.f = zero(0)
             c.check_contact()
             if c.active:
                 self.n_active_ += 1 
@@ -474,8 +475,8 @@ class RobotSimulator:
                 tangent_norm = np.linalg.norm(tangent_force)
                 if (tangent_norm>c.friction_coeff*normal_force_value):
                     if self.cone_method=="average":
-                        f_projection[3*i_active:3*i_active+3]  = normal_force + (c.friction_coeff*normal_force_value/tangent_norm)*tangent_force
-                        c.p0 = c.invK.dot(f_projection[3*i_active:3*i_active+3] + c.K.dot(c.pNext) + c.B.dot(c.vNext))
+                        self.f_projection[3*i_active:3*i_active+3]  = normal_force + (c.friction_coeff*normal_force_value/tangent_norm)*tangent_force
+                        c.p0 = c.invK.dot(self.f_projection[3*i_active:3*i_active+3] + c.K.dot(c.pNext) + c.B.dot(c.vNext))
                     elif self.cone_method=="qp":
                         pass 
                     else:
