@@ -10,20 +10,28 @@ import gepetto.corbaserver
 import time
 import subprocess
 
-#from consim_py.utils.utils_LDS_integral import compute_integral_x_T, compute_double_integral_x_T
+from consim_py.utils.utils_LDS_integral import compute_integral_expm #compute_integral_x_T, compute_double_integral_x_T
 from consim_py.utils.exponential_matrix_helper import ExponentialMatrixHelper
 
 
 class Contact:
-    def __init__(self, model, data, frame_name, normal, K, B):
+    def __init__(self, model, data, frame_name, normal, K, B, mu):
         self.model = model
         self.data = data
         self.frame_name = frame_name
         self.normal = normal
         self.K = K
+        self.Kinv = np.linalg.inv(self.K)
         self.B = B
         self.frame_id = model.getFrameId(frame_name)
+        self.mu = mu
         self.reset_contact_position()
+        
+        self.t1 = np.cross(normal, np.array([1., 0., 0.]))
+        self.t1 /= norm(self.t1)
+        self.t2 = np.cross(normal, self.t1)
+        self.t2 /= norm(self.t2)
+        
 
     def reset_contact_position(self, p0=None):
         # Initial (0-load) position of the spring
@@ -31,9 +39,11 @@ class Contact:
             self.p0 = self.data.oMf[self.frame_id].translation.copy()
         else:
             self.p0 = np.copy(p0)
-        self.in_contact = True
+        self.dp0 = np.zeros(3)
+        self.in_contact = False
+        self.slipping = False
 
-    def compute_force(self):
+    def compute_force(self, project_in_friction_cone):
         M = self.data.oMf[self.frame_id]
         self.p = M.translation
         delta_p = self.p0 - self.p
@@ -46,22 +56,69 @@ class Contact:
         dJv_local.linear += np.cross(v_local.angular, v_local.linear, axis=0)
         dJv_world = (R.act(dJv_local)).linear
 
-        #        if(delta_p.T * self.normal < -1e-6):
-        #            self.f = zero(3)
-        #            self.v = zero(3)
-        #            self.dJv = zero(3)
-        # print 'Contact %s delta_p*Normal='%(self.frame_name), delta_p.T*self.normal
-        #            if(self.in_contact):
-        #                self.in_contact = False
-        #                print "\nINFO: contact %s broken!"%(self.frame_name), delta_p.T, self.normal.T
-        #        else:
-        #            if(not self.in_contact):
-        #                self.in_contact = True
-        #                print "\nINFO: contact %s made!"%(self.frame_name)
-        self.f = self.K@delta_p - self.B@v_world
         self.v = v_world
         self.dJv = dJv_world
+        if(self.slipping):
+            self.dp0 = self.v - self.v.dot(self.normal)*self.normal
+            
+        self.f = self.K@delta_p + self.B@(self.dp0-v_world)
+        
+        
+        if(project_in_friction_cone):
+            self.dp0 = zero(3)
+            # check whether point is in contact
+            if(delta_p.T @ self.normal <= 0.0):
+                self.f = zero(3)
+                self.v = zero(3)
+                self.dJv = zero(3)
+                if(self.in_contact):
+                    self.in_contact = False
+                    print("\nINFO: contact %s broken!"%(self.frame_name), delta_p.T, self.normal.T)
+            else:
+                if(not self.in_contact):
+                    self.in_contact = True
+                    print("\nINFO: contact %s made!"%(self.frame_name))
+                # check whether contact force is outside friction cone
+                f_N = self.f.dot(self.normal)   # norm of normal force
+                f_T = self.f - f_N*self.normal  # tangential force (3d)
+                f_T_norm = norm(f_T)            # norm of tangential force
+                if(f_T_norm > self.mu*f_N):  # contact is slipping 
+                    t_dir = f_T / f_T_norm  # direction of tangential force
+                    # saturate force at the friction cone boundary
+                    f_T = self.mu*f_N*t_dir                    
+                    self.f = f_N*self.normal + f_T
+                                        
+                    # update anchor point assuming anchor point vel is equal to contact point vel
+                    self.dp0 = self.v - self.v.dot(self.normal)*self.normal                    
+                    # f = K@(p0-p) + B@(v0-v) => p0 = p + f/K - B@(v0-v)/K
+                    self.p0 = self.p +self.Kinv @ (self.f - self.B@(self.dp0-self.v))
+                    
+                    if(self.slipping==False):
+                        self.slipping = True
+                        print('INFO: contact %s started slipping'%(self.frame_name), f_T_norm-self.mu*f_N)
+                    
+                elif(self.slipping==True):
+                    self.slipping = False
+                    print('INFO: contact %s stopped slipping'%(self.frame_name), f_T_norm-self.mu*f_N)
         return self.f
+        
+            
+    def project_force_in_cone(self, f):
+        # check whether point is in contact
+        f_N = f.dot(self.normal)   # norm of normal force
+        if(f_N <= 0.0):
+            return zero(3)
+            
+        # check whether contact force is outside friction cone
+        f_T = f - f_N*self.normal       # tangential force (3d)
+        f_T_norm = norm(f_T)            # norm of tangential force
+        if(f_T_norm > self.mu*f_N):     # contact is slipping 
+            t_dir = f_T / f_T_norm      # direction of tangential force
+            # saturate force at the friction cone boundary
+            f_T = self.mu*f_N*t_dir
+            f = f_N*self.normal + f_T                
+                
+        return f
 
     def getJacobianWorldFrame(self):
         J_local = se3.getFrameJacobian(self.model, self.data, self.frame_id, se3.ReferenceFrame.LOCAL_WORLD_ALIGNED)
@@ -91,6 +148,7 @@ class RobotSimulator:
         self.use_second_integral = True
         self.update_expm_N = 1 # update the expm every self.update_expm_N inner simulation steps
         self.fwd_dyn_method = 'Cholseky' # can be either Cholesky, aba, or pinMinv
+        self.unilateral_contacts = 'projection' # None, 'QP', 'projection'
         
         # se3.RobotWrapper.BuildFromURDF(conf.urdf, [conf.path, ], se3.JointModelFreeFlyer())
         self.robot = robot
@@ -157,16 +215,22 @@ class RobotSimulator:
         self.compute_forces(compute_data=True)
 
     # Adds a contact, resets all quantities
-    def add_contact(self, frame_name, normal, K, B):
-        c = Contact(self.model, self.data, frame_name, normal, K, B)
+    def add_contact(self, frame_name, normal, K, B, mu):
+        c = Contact(self.model, self.data, frame_name, normal, K, B, mu)
         self.contacts += [c]
         self.nc = len(self.contacts)
         self.nk = 3*self.nc
         self.f = zero(self.nk)
+        self.f_avg = zero(self.nk)
+        self.f_avg2 = zero(self.nk)
+        self.f_avg_pre_projection = zero(self.nk)
+        self.f_avg2_pre_projection = zero(self.nk)
         self.Jc = np.zeros((self.nk, self.model.nv))
         self.K = np.zeros((self.nk, self.nk))
         self.B = np.zeros((self.nk, self.nk))
         self.p0 = zero(self.nk)
+        self.dp0 = zero(self.nk)
+        self.dp0_qp = zero(self.nk)
         self.p = zero(self.nk)
         self.dp = zero(self.nk)
         self.dJv = zero(self.nk)
@@ -183,6 +247,8 @@ class RobotSimulator:
         self.debug_dJv = zero(self.nk)
         self.debug_dp_fd  = zero(self.nk)
         self.debug_dJv_fd = zero(self.nk)
+        self.x_pred  = zero(2*self.nk)
+        self.x_pred2 = zero(2*self.nk)
 
 
 
@@ -194,7 +260,10 @@ class RobotSimulator:
             se3.updateFramePlacements(self.model, self.data)
 
         for (i,c) in enumerate(self.contacts):
-            self.f[3*i:3*i+3] = c.compute_force()
+            self.f[3*i:3*i+3] = c.compute_force(self.unilateral_contacts)
+            self.p[  3*i:3*i+3] = c.p
+            self.p0[ 3*i:3*i+3] = c.p0
+            self.dp0[ 3*i:3*i+3] = c.dp0
 
         return self.f
         
@@ -216,23 +285,27 @@ class RobotSimulator:
         ''' Compute matrix A and vector a that define the Linear Dynamical System to
             integrate with the matrix exponential.
         '''
-        M, h = self.data.M, self.data.nle
-#        dv_bar = np.linalg.solve(M, self.S.T@u - h)
+        M = self.data.M
         dv_bar = self.forward_dyn(self.S.T@u)
         for (i,c) in enumerate(self.contacts):
             self.p[  3*i:3*i+3] = c.p
+            self.p0[ 3*i:3*i+3] = c.p0
             self.dp[ 3*i:3*i+3] = c.v
             self.dJv[3*i:3*i+3] = c.dJv
+        # always assume anchor point is not slipping because the spring-damper
+        # force is computed based on that assumption and then projected if necessary
         x0 = np.concatenate((self.p-self.p0, self.dp))
+        # x0 = np.concatenate((self.p-self.p0, self.dp-self.dp0)) # this works really BAD!
+        
         JMinv = np.linalg.solve(M, self.Jc.T).T
         if(update_expm):
             self.Upsilon = self.Jc @ JMinv.T
-            self.a[self.nk:] = JMinv@(self.S.T@u-h) + self.dJv
+            self.a[self.nk:] = self.Jc@dv_bar + self.dJv
             self.A[self.nk:, :self.nk] = -self.Upsilon@self.K
             self.A[self.nk:, self.nk:] = -self.Upsilon@self.B
         return x0, dv_bar, JMinv
-
-
+        
+        
     def step(self, u, dt=None, use_exponential_integrator=True, dt_force_pred=None, ndt_force_pred=None,
              update_expm=True):
         if dt is None:
@@ -258,27 +331,14 @@ class RobotSimulator:
             f_pred = None
         f_pred_int = None
         
-        if(not use_exponential_integrator):            
-#            if(dt_force_pred is not None):
-                # predict forces using Exponential integrator
-#                x0, dv_bar, JMinv = self.compute_exponential_LDS(u)
-#                
-#                # predict intermediate forces using linear dynamical system (i.e. matrix exponential)
-#                dt_fp = dt_force_pred/ndt_force_pred
-#                f_pred[:, 0] = self.D @ x0
-#                for j in range(1, ndt_force_pred):
-#                    x_i = compute_x_T(self.A, self.a, np.copy(x0), j*dt_fp)
-#                    f_pred[:, j] = self.D @ x_i
+        if(not use_exponential_integrator):
             self.dv = self.forward_dyn(self.S.T@u + self.Jc.T @ self.f)
-#            self.dv = np.linalg.solve(M, self.S.T@u - h + self.Jc.T@self.f)  # use last forces
             v_mean = self.v + 0.5*dt*self.dv
             self.v += self.dv*dt
-            self.q = se3.integrate(self.model, self.q, v_mean*dt)
-            
+            self.q = se3.integrate(self.model, self.q, v_mean*dt)            
         else:
             x0, dv_bar, JMinv = self.compute_exponential_LDS(u, update_expm)
                 
-            
             # Sanity check on contact point Jacobian and dJv
 #            self.compute_dJv_finite_difference()
             # USE THE VALUE COMPUTED WITH FINITE DIFFERENCING FOR NOW
@@ -287,13 +347,25 @@ class RobotSimulator:
             self.logToFile(x0)
             
             if(update_expm):
+                if(self.unilateral_contacts=='QP'):
+                    self.int_exp_A = compute_integral_expm(self.A, dt)
+                    self.dp0_qp = self.solve_friction_QP(x0, dt)
+                    x0[self.nk:]     -= self.dp0_qp
+                    
                 int_x = self.expMatHelper.compute_integral_x_T(self.A, self.a, x0, dt, self.max_mat_mult)
                 # store int_x because it may be needed to compute int2_x without updating expm in next iteration
                 self.int_x_prev = int_x
             else:
                 int_x = self.expMatHelper.compute_next_integral()
-            D_int_x = self.D @ int_x
-            dv_mean = dv_bar + JMinv.T @ D_int_x/dt
+            # compute average force
+            self.f_avg = self.D @ int_x / dt
+            
+            if(self.unilateral_contacts=='projection'):
+                # project average forces in friction cones
+                self.f_avg_pre_projection = np.copy(self.f_avg)
+                for (i, c) in enumerate(self.contacts):
+                    self.f_avg[3*i:3*i+3] = c.project_force_in_cone(self.f_avg[3*i:3*i+3]) 
+            dv_mean = dv_bar + JMinv.T @ self.f_avg
             
             if(self.use_second_integral):
                 if(update_expm):
@@ -302,10 +374,15 @@ class RobotSimulator:
                     int2_x = self.expMatHelper.compute_next_double_integral()
                     int2_x -= dt * self.int_x_prev
                     self.int_x_prev += int_x
-                D_int2_x = self.D @ int2_x
-                v_mean = self.v + 0.5*dt*dv_bar + JMinv.T@D_int2_x/dt
+                self.f_avg2 = self.D @ int2_x / (0.5*dt*dt)
+                
+                if(self.unilateral_contacts=='projection'):
+                    # project average forces in friction cones
+                    self.f_avg2_pre_projection = np.copy(self.f_avg2)
+                    for (i, c) in enumerate(self.contacts):
+                        self.f_avg2[3*i:3*i+3] = c.project_force_in_cone(self.f_avg2[3*i:3*i+3])
+                v_mean = self.v + 0.5*dt*(dv_bar + JMinv.T @ self.f_avg2)
             else:
-#                f_avg = D_int_x/dt # average force during time step
                 v_mean  = self.v + 0.5*dt*dv_mean
 
             if(dt_force_pred is not None):
@@ -333,8 +410,9 @@ class RobotSimulator:
                 se3.forwardKinematics(self.model, self.data, q_pred, v_pred)
                 se3.updateFramePlacements(self.model, self.data)
                 f_pred_int = np.zeros(self.nk)
-                for (i,c) in enumerate(self.contacts):
-                    f_pred_int[3*i:3*i+3] = c.compute_force()
+                # comment these lines because they were messing up the anchor point updates
+#                for (i,c) in enumerate(self.contacts):
+#                    f_pred_int[3*i:3*i+3] = c.compute_force(self.unilateral_contacts)
                     
                 # DEBUG: predict forces integrating contact point dynamics while updating robot dynamics M and h
 #                t = dt_force_pred/ndt_force_pred
@@ -415,8 +493,10 @@ class RobotSimulator:
         self.t += dt
         return self.q, self.v, f_pred, f_pred_int
 
+
     def reset(self):
         self.first_iter = True
+
 
     def simulate(self, u, dt=0.001, ndt=1, use_exponential_integrator=True):
         ''' Perform ndt steps, each lasting dt/ndt seconds '''
@@ -434,6 +514,11 @@ class RobotSimulator:
         
         # forces computed in the inner simulation steps (ndt)
         self.f_inner = np.zeros((self.nk, ndt))
+        self.F_avg  = np.zeros((self.nk, ndt))
+        self.F_avg2 = np.zeros((self.nk, ndt))
+        self.F_avg_pre_projection  = np.zeros((self.nk, ndt))
+        self.F_avg2_pre_projection = np.zeros((self.nk, ndt))
+        
         # forces predicted at the first of the inner simulation steps
 #        self.f_pred = np.zeros((self.nk, self.ndt_force))
         update_expm_counter = 1
@@ -452,10 +537,16 @@ class RobotSimulator:
             else:
                 self.q, self.v, tmp1, tmp2 = self.step(u, dt/ndt, use_exponential_integrator, update_expm=update_expm)
                 self.f_inner[:,i] = np.copy(self.f)
+            
+            self.F_avg[:,i]  = np.copy(self.f_avg)
+            self.F_avg2[:,i] = np.copy(self.f_avg2)
+            self.F_avg_pre_projection[:,i]  = np.copy(self.f_avg_pre_projection)
+            self.F_avg2_pre_projection[:,i] = np.copy(self.f_avg2_pre_projection)
 
             self.display(self.q, dt/ndt)
 
         return self.q, self.v, self.f
+        
         
     def display(self, q, dt):
         if(self.conf.use_viewer):
@@ -465,6 +556,81 @@ class RobotSimulator:
                 self.display_counter = self.DISPLAY_T
                 
     
+    def solve_friction_QP(self, x0, dt):
+        from quadprog import solve_qp
+        '''
+        Solve a strictly convex quadratic program
+        
+        Minimize     1/2 x^T G x - a^T x
+        Subject to   C.T x >= b
+        
+        Input Parameters:
+        G : array, shape=(n, n)
+        a : array, shape=(n,)
+        C : array, shape=(n, m) matrix defining the constraints
+        b : array, shape=(m), default=None, vector defining the constraints
+        meq : int, default=0
+            the first meq constraints are treated as equality constraints,
+            all further as inequality constraints
+        Output: a tuple, where the first element is the optimal x.
+        '''
+        nc, nk = self.nc, self.nk
+        # constraint matrix and vector
+        C = np.zeros((nc*4, nc*3))
+        c = np.zeros(nc*4)
+        # matrices of normal and tangential contact directions
+        N = np.zeros((nc, nc*3))
+        T1 = np.zeros((nc, nc*3))
+        T2 = np.zeros((nc, nc*3))
+        # cost Hessian matrix and gradient vector
+        G = np.identity(2*nc)
+        g = np.zeros(2*nc)
+        # fill in constraint matrix
+        S0 = np.zeros((2*nk,2*nc))
+        S1 = np.zeros((2*nk,2*nc))
+        for (i, c) in enumerate(self.contacts):
+            N[i,:] = c.normal
+            T1[i,:] = c.t1
+            T2[i,:] = c.t2
+            S0[3*i:3*i+3, 2*i+0]        = c.t1
+            S0[3*i:3*i+3, 2*i+1]        = c.t2
+            S1[nk+3*i:nk+3*i+3, 2*i+0]  = c.t1
+            S1[nk+3*i:nk+3*i+3, 2*i+1]  = c.t2
+
+        # TO FIX: align linearized friction cones with current tangential force directions
+        muu = self.conf.mu #/np.sqrt(2.)
+        
+        # Compute matrix to constrain contact forces: C*f >= 0
+        C[0*nc:1*nc,:] = +T1 + muu*N
+        C[1*nc:2*nc,:] = +T2 + muu*N
+        C[2*nc:3*nc,:] = -T1 + muu*N
+        C[3*nc:4*nc,:] = -T2 + muu*N
+        # compute matrix M that maps anchor point vel dp0 to contact forces
+        # at the end of the time step: f = f0 + M*dp0
+        Mx = (S1 + self.int_exp_A @ self.A @ S1)
+        M = -self.D @ Mx
+        xNs = (x0 + self.int_exp_A @ (self.A@x0 + self.a))
+        f0 = self.D @ xNs
+        # put things together: C*M*dp0 >= -C*f0
+        c = -C@f0
+        C = C@M
+            
+        # DEBUG: check we get same prediction with these two methods
+#        self.x_pred = self.expMatHelper.compute_x_T(self.A, self.a, x0, dt, self.max_mat_mult)
+#        self.x_pred2 = x0 + self.int_exp_A@(self.A@x0 + self.a)
+        # END DEBUG
+        
+        solution = solve_qp(G, g, C.T, c, 0)
+        dp_0 = solution[0]            
+        dp0_3d = S0[:nk,:] @ dp_0
+        
+        # DEBUG
+        self.x_pred = self.expMatHelper.compute_x_T(self.A, self.a, x0-S1@dp_0, dt, self.max_mat_mult)
+        self.x_pred2 = xNs - Mx@dp_0
+            
+        return dp0_3d
+        
+        
     def compute_dJv_finite_difference(self):
         # Sanity check on contact point Jacobian and dJv
         self.debug_dp = self.Jc @ self.v
@@ -478,7 +644,7 @@ class RobotSimulator:
         p_next = np.zeros_like(self.p)
         dp_next = np.zeros_like(self.dp)
         for (i,c) in enumerate(self.contacts):
-            c.compute_force()
+            c.compute_force(self.unilateral_contacts)
             p_next[ 3*i:3*i+3] = c.p
             dp_next[3*i:3*i+3] = c.v
         self.debug_dp_fd  = (p_next-self.p)/eps

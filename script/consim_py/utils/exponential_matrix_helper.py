@@ -172,7 +172,7 @@ class ExponentialMatrixHelper:
     
     def expm_times_v(self, A, v, max_mat_mult=100, balance=True):
         X = self.expm(A, max_mat_mult, balance)
-        return X.dot(v)
+        return X @ v
     
 #    def compute_both_integrals(self, A, a, x0, T, max_mat_mult=100, balance=True):
     
@@ -184,11 +184,8 @@ class ExponentialMatrixHelper:
         z0 = np.zeros(n+1)
         z0[:n] = x0
         z0[-1] = 1.0
-#        e_TC = expm(T*C, verbose=True)
-#        z = e_TC@z0
         z = self.expm_times_v(T*C, z0, max_mat_mult, balance)
-        x_T = z[:n]
-        return x_T
+        return z[:n]
     
     
     def compute_integral_x_T(self, A, a, x0, T, max_mat_mult=100, balance=False, store=True):
