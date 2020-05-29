@@ -27,18 +27,21 @@ class ContactPoint {
     void updatePosition(pinocchio::Data &data);  /*!< updates cartesian position */ 
     void firstOrderContactKinematics(pinocchio::Data &data);  /*!< computes c, world_J_ and relative penetration */ 
     void secondOrderContactKinematics(pinocchio::Data &data, Eigen::VectorXd &v); /*!< computes dJv_ */
-    void resestAnchorPoint(Eigen::VectorXd &x0);  /*!< resets the anchor point for the contact  */
+    void resetAnchorPoint(Eigen::VectorXd &x0);  /*!< resets the anchor point for the contact  */
+    void projectForceInCone(Eigen::Vector3d &f);
     
     std::string name_;
     const pinocchio::Model *model_;
     unsigned int frame_id;
 
-    bool active;
+    bool active;            // true if the point is in collision with the environment, false otherwise
+    bool slipping;          // true if the contact is slipping, false otherwise
     bool unilateral;      /*!< true if the contact is unilateral, false if bilateral */
 
     ContactObject* optr;         /*!< pointer to current contact object, changes with each new contact switch */  
 
-    Eigen::Vector3d     x_start;                /*!< anchor point for visco-elastic contact models  */
+    Eigen::Vector3d     x_anchor;               /*!< anchor point for visco-elastic contact models  */
+    Eigen::Vector3d     v_anchor;               /*!< anchor point velocity for visco-elastic contact models  */
     Eigen::Vector3d     x;                      /*!< contact point position in world frame */
     Eigen::Vector3d     v;                      /*!< contact point translation velocity in world frame */
     Eigen::Vector3d     dJv_; 
@@ -79,7 +82,9 @@ public:
   ContactModel(){};
   ~ContactModel(){};
   virtual void computeForce(ContactPoint &cp) = 0;
+  virtual void projectForceInCone(Eigen::Vector3d &f, ContactPoint& cp) = 0;
   Eigen::Vector3d  stiffness_; 
+  Eigen::Vector3d  stiffnessInverse_; 
   Eigen::Vector3d  damping_; 
   double friction_coeff_;
 };
@@ -89,6 +94,7 @@ public:
   LinearPenaltyContactModel(Eigen::Vector3d &stiffness, Eigen::Vector3d &damping, double frictionCoeff);    
   
   void computeForce(ContactPoint& cp) override;
+  void projectForceInCone(Eigen::Vector3d &f, ContactPoint& cp);
 
   Eigen::Vector3d normalF_;
   Eigen::Vector3d tangentF_; 

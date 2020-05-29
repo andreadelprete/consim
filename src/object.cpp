@@ -16,7 +16,8 @@ bool FloorObject::checkCollision(ContactPoint &cp)
   }
 
   if (!cp.active) {
-    cp.x_start = cp.x;
+    cp.x_anchor = cp.x;
+    cp.v_anchor.setZero();
     cp.predictedX0_ = cp.x;
     cp.contactNormal_ << 0.,0.,1.; 
     cp.contactTangentA_ << 1.,0.,0.;
@@ -34,7 +35,7 @@ void FloorObject::computePenetration(ContactPoint &cp){
    * normalvel: velocity along normal to contact object
    * tanvel: velocity along tangent to contact object
    * */ 
-  cp.delta_x = cp.x_start - cp.x; 
+  cp.delta_x = cp.x_anchor - cp.x; 
   cp.normal = cp.delta_x.dot(cp.contactNormal_) * cp.contactNormal_; 
   cp.tangent = cp.delta_x - cp.normal; 
   cp.normvel = (cp.v).dot(cp.contactNormal_) * cp.contactNormal_; 

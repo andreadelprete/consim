@@ -1,4 +1,5 @@
 #include "consim/contact.hpp"
+#include "consim/object.hpp"
 #include <pinocchio/algorithm/kinematics.hpp>
 #include <pinocchio/algorithm/frames.hpp>
 #include <math.h>
@@ -12,6 +13,7 @@ namespace consim {
 ContactPoint::ContactPoint(const pinocchio::Model &model, std::string name, unsigned int frameId, unsigned int nv, bool isUnilateral): 
         model_(&model), name_(name), frame_id(frameId), unilateral(isUnilateral) {
           active = false; 
+          slipping = false;
           f.fill(0);
           predictedF_.fill(0);
           predictedX_.fill(0);
@@ -46,9 +48,15 @@ void ContactPoint::secondOrderContactKinematics(pinocchio::Data &data, Eigen::Ve
 }
 
 
-void ContactPoint::resestAnchorPoint(Eigen::VectorXd &x0){
-  x_start = x0; 
+void ContactPoint::resetAnchorPoint(Eigen::VectorXd &x0){
+  x_anchor = x0; 
+  v_anchor.setZero();
+  slipping = false;
   predictedX0_ = x0;  
+}
+
+void ContactPoint::projectForceInCone(Eigen::Vector3d &f){
+  optr->contact_model_->projectForceInCone(f, *this);
 }
 
 
@@ -58,6 +66,8 @@ LinearPenaltyContactModel::LinearPenaltyContactModel(Eigen::Vector3d &stiffness,
   stiffness_=stiffness;
   damping_=damping; 
   friction_coeff_=frictionCoeff;
+  for(int i=0; i<3; i++)
+    stiffnessInverse_(i) = 1.0/stiffness_(i);
  }
 
 
@@ -69,24 +79,52 @@ void LinearPenaltyContactModel::computeForce(ContactPoint& cp)
   /*!< unilateral force, no pulling into contact object */ 
   if (cp.unilateral && normalF_.dot(cp.contactNormal_)<0){
     cp.f.fill(0);
+    cp.active = false;
+    cp.slipping = false;
+    return;
   } 
-  else{
-    normalNorm_ = sqrt(normalF_.transpose()*normalF_);
-    tangentF_ = stiffness_.cwiseProduct(cp.tangent) - damping_.cwiseProduct(cp.tanvel);
-    tangentNorm_ = sqrt(tangentF_.transpose()*tangentF_);
-    cp.f = normalF_; 
-    //
-    if (cp.unilateral && (tangentNorm_ > friction_coeff_*normalNorm_)){
-      tangentDir_ = tangentF_/tangentNorm_; 
-      cp.f += friction_coeff_*normalNorm_*tangentDir_; 
-      // TODO: different friction coefficient along x,y will have to do 
-      //       the update below in vector form  
-      delAnchor_ = (tangentNorm_ - friction_coeff_*normalNorm_)/stiffness_(0);  
-      cp.x_start -= delAnchor_ * tangentDir_;  
-    } // friction cone violation
-    else{
-      cp.f += tangentF_;
-    }
+
+  if(cp.slipping){
+    // assume that if you were slipping at previous iteration you're still slipping
+    // TODO: could be better to check whether velocity has changed direction
+    cp.v_anchor = cp.v - (cp.v.dot(cp.normal))*cp.normal;
+  }
+  tangentF_ = stiffness_.cwiseProduct(cp.tangent) + damping_.cwiseProduct(cp.v_anchor - cp.tanvel);
+  normalNorm_ = normalF_.norm();
+  tangentNorm_ = tangentF_.norm();
+  cp.f = normalF_; 
+  if (cp.unilateral && (tangentNorm_ > friction_coeff_*normalNorm_)){
+    cp.slipping = true;
+    tangentDir_ = tangentF_/tangentNorm_; 
+    cp.f += friction_coeff_*normalNorm_*tangentDir_; 
+    
+    // assume anchor point tangent vel is equal to contact point tangent vel
+    cp.v_anchor = cp.v - (cp.v.dot(cp.normal))*cp.normal;
+    // f = K@(p0-p) + B@(v0-v) => p0 = p + (f - B@(v0-v))/K
+    cp.x_anchor = cp.x + stiffnessInverse_.cwiseProduct(cp.f - damping_.cwiseProduct(cp.v_anchor-cp.v));
+    return;
+  } 
+    
+  cp.f += tangentF_;
+  cp.slipping = false;
+}
+
+void LinearPenaltyContactModel::projectForceInCone(Eigen::Vector3d &f, ContactPoint& cp)
+{
+  /*!< force along normal to contact object */ 
+  normalNorm_ = f.dot(cp.contactNormal_); 
+
+  /*!< unilateral force, no pulling into contact object */ 
+  if (cp.unilateral && normalNorm_<0.0){
+    f.setZero();
+    return;
+  } 
+  
+  tangentF_ = f - normalNorm_*cp.contactNormal_;
+  tangentNorm_ = tangentF_.norm();
+  if (cp.unilateral && (tangentNorm_ > friction_coeff_*normalNorm_)){
+    tangentDir_ = tangentF_/tangentNorm_; 
+    f = normalNorm_*cp.contactNormal_ + (friction_coeff_*normalNorm_)*tangentDir_; 
   }
 }
 

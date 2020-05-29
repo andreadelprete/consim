@@ -255,48 +255,31 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       CONSIM_START_PROFILER("exponential_simulator::checkFrictionCone");
       checkFrictionCone();
       CONSIM_STOP_PROFILER("exponential_simulator::checkFrictionCone");
-      if(cone_flag_){
-        //std::cout<<"friction cone activecated "<<std::endl;
-        computeSlipping();
-        if (slipping_method_==1){
-          /*!< f projection is computed then anchor point is updated */ 
-          temp01_.noalias() = JcT_*fpr_; 
-          temp02_ = tau_ - data_->nle + temp01_;
-          dvMean_.noalias() = Minv_*temp02_; 
+      if (!cone_flag_ || slipping_method_==1){
+        /*!< f projection is computed then anchor point is updated */ 
+        temp01_.noalias() = JcT_*fpr_; 
+        temp02_ = tau_ - data_->nle + temp01_;
+        dvMean_.noalias() = Minv_*temp02_; 
 
-          temp01_.noalias() = JcT_*fpr2_; 
-          temp02_ = tau_ - data_->nle + temp01_;
-          dvMean2_.noalias() = Minv_*temp02_; 
-          vMean2_.noalias() = v_ + .5 * sub_dt * dvMean2_; 
-          pinocchio::integrate(*model_, q_, vMean2_ * sub_dt, qnext_);
-          /* PSEUDO-CODE
-          dv_mean = dv_bar + JMinv.T @ f_pr
-          v_mean = v + 0.5*dt*(dv_bar + JMinv.T @ f_pr2)
-          */
-        }
-        else if(slipping_method_==2){
-          /*!< anchor point is optimized, then one f projection is computed and itegrated */ 
-          temp01_.noalias() = JcT_*fpr_; 
-          temp02_ = tau_ - data_->nle + temp01_;
-          dvMean_.noalias() = Minv_*temp02_; 
-          vMean_ = v_ + .5 * sub_dt* dvMean_; 
-          pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
-        }
-        else{
-          throw std::runtime_error("slipping method not recognized");
-        }
-        
-      } // force violates friction cone 
+        temp01_.noalias() = JcT_*fpr2_; 
+        temp02_ = tau_ - data_->nle + temp01_;
+        dvMean2_.noalias() = Minv_*temp02_; 
+        vMean2_.noalias() = v_ + .5 * sub_dt * dvMean2_; 
+        pinocchio::integrate(*model_, q_, vMean2_ * sub_dt, qnext_);
+        /* PSEUDO-CODE
+        dv_mean = dv_bar + JMinv.T @ f_pr
+        v_mean = v + 0.5*dt*(dv_bar + JMinv.T @ f_pr2)
+        */
+      }
       else{
-        temp03_.noalias() = D*intxt_; 
-        temp01_.noalias() = MinvJcT_ * temp03_;
-        dvMean_.noalias() = dv_bar + temp01_/sub_dt ; 
-        
-        temp03_.noalias() = D*int2xt_; 
-        temp01_.noalias() = MinvJcT_ * temp03_;
-        vMean_ = v_ + .5 * sub_dt * dv_bar + temp01_/sub_dt; 
+        /*!< anchor point is optimized, then one f projection is computed and itegrated */ 
+        computeSlipping();
+        temp01_.noalias() = JcT_*fpr_; 
+        temp02_ = tau_ - data_->nle + temp01_;
+        dvMean_.noalias() = Minv_*temp02_; 
+        vMean_ = v_ + .5 * sub_dt* dvMean_; 
         pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
-      } // force within friction cone 
+      }
     } // active contacts > 0 
     else{
       pinocchio::aba(*model_, *data_, q_, v_, tau_);
@@ -332,11 +315,11 @@ void ExponentialSimulator::computeIntegrationTerms(){
   for(unsigned int i=0; i<nc_; i++){
     if (!contacts_[i]->active) continue;
     Jc_.block(3*i_active_,0,3,model_->nv) = contacts_[i]->world_J_;
-    dJv_.segment(3*i_active_,3) = contacts_[i]->dJv_; 
-    p0_.segment(3*i_active_,3)=contacts_[i]->x_start; 
-    p_.segment(3*i_active_,3)=contacts_[i]->x; 
-    dp_.segment(3*i_active_,3)=contacts_[i]->v;  
-    kp0_.segment(3*i_active_,3).noalias() = contacts_[i]->optr->contact_model_->stiffness_.cwiseProduct(p0_.segment(3*i_active_,3));
+    dJv_.segment<3>(3*i_active_) = contacts_[i]->dJv_; 
+    p0_.segment<3>(3*i_active_)  = contacts_[i]->x_anchor; 
+    p_.segment<3>(3*i_active_)   = contacts_[i]->x; 
+    dp_.segment<3>(3*i_active_)  = contacts_[i]->v;  
+    kp0_.segment<3>(3*i_active_).noalias() = contacts_[i]->optr->contact_model_->stiffness_.cwiseProduct(p0_.segment<3>(3*i_active_));
     i_active_ += 1;  
   }
   CONSIM_START_PROFILER("exponential_simulator::computeMinverse");
@@ -384,9 +367,9 @@ void ExponentialSimulator::computeIntegrationTerms(){
 
   if (nactive_>0){
     if (f_.size()!=3*nactive_){
-    CONSIM_START_PROFILER("exponential_simulator::resizeVectorsAndMatrices");
-    resizeVectorsAndMatrices();
-    CONSIM_STOP_PROFILER("exponential_simulator::resizeVectorsAndMatrices");
+      CONSIM_START_PROFILER("exponential_simulator::resizeVectorsAndMatrices");
+      resizeVectorsAndMatrices();
+      CONSIM_STOP_PROFILER("exponential_simulator::resizeVectorsAndMatrices");
     }
     i_active_ = 0; 
     for(unsigned int i=0; i<nc_; i++){
@@ -396,7 +379,7 @@ void ExponentialSimulator::computeIntegrationTerms(){
       contacts_[i]->secondOrderContactKinematics(*data_, v_);
       // computeForce updates the anchor point
       contacts_[i]->optr->contact_model_->computeForce(*contacts_[i]);
-      f_.segment(3*i_active_,3) = contacts_[i]->f; 
+      f_.segment<3>(3*i_active_) = contacts_[i]->f; 
       i_active_ += 1;  
     }
   }
@@ -454,6 +437,7 @@ void ExponentialSimulator::checkFrictionCone(){
   */
   temp03_.noalias() = D*intxt_;
   f_avg  = kp0_ + temp03_/sub_dt; 
+
   temp03_.noalias() = D*int2xt_;
   temp03_.noalias() = temp03_/(0.5*sub_dt*sub_dt);
   f_avg2 = kp0_ +  temp03_; 
@@ -461,13 +445,14 @@ void ExponentialSimulator::checkFrictionCone(){
   computePredictedXandF();
   i_active_ = 0; 
   cone_flag_ = false; 
+  Vector3d f_tmp;
   for(unsigned int i=0; i<nc_; i++){
     if (!contacts_[i]->active) continue;
 
     contacts_[i]->predictedX_ = predictedXf_.segment<3>(3*i_active_); 
     contacts_[i]->predictedV_ = predictedXf_.segment<3>(3*nactive_+3*i_active_);
     contacts_[i]->predictedF_ = predictedForce_.segment<3>(3*i_active_); 
-    
+
     if (!contacts_[i]->unilateral) {
       fpr_.segment<3>(3*i_active_) = f_avg.segment<3>(3*i_active_); 
       fpr2_.segment<3>(3*i_active_) = f_avg2.segment<3>(3*i_active_); 
@@ -476,54 +461,64 @@ void ExponentialSimulator::checkFrictionCone(){
       continue;
     }
     
-    f_avg_i = f_avg.segment<3>(3*i_active_);
-    f_avg_i2 = f_avg2.segment<3>(3*i_active_);
-    fnor_ = contacts_[i]->contactNormal_.dot(f_avg_i);
-    fnor2_= contacts_[i]->contactNormal_.dot(f_avg_i2);
-    if (fnor_<0.){
-      /*!< check for pulling force at contact i */  
-      fpr_.segment<3>(3*i_active_).fill(0); 
-      contacts_[i]->predictedF_.fill(0);
-      cone_flag_ = true; 
-    } else{
-      /*!< check for friction bounds on average force   */  
-      normalFi_ = fnor_* contacts_[i]->contactNormal_; 
-      tangentFi_ = f_avg_i - normalFi_; 
-      ftan_ = sqrt(tangentFi_.dot(tangentFi_));
-      double mu = contacts_[i]->optr->contact_model_->friction_coeff_;
-      if(ftan_ > mu * fnor_){
-        /*!< cone violated */  
-        fpr_.segment<3>(3*i_active_) = normalFi_ + (mu*fnor_/ftan_)*tangentFi_; 
-        contacts_[i]->predictedF_ = fpr_.segment<3>(3*i_active_);
-        /*!< move predicted x0 if update method is 1  */
-        if(slipping_method_==1){
-          contacts_[i]->predictedX0_ = invK_.block<3,3>(3*i_active_,3*i_active_)*(fpr_.segment<3>(3*i_active_) + K.block<3,3>(3*i_active_,3*i_active_) * contacts_[i]->predictedX_ + B.block<3,3>(3*i_active_,3*i_active_) * contacts_[i]->predictedV_);
-        }
-        cone_flag_ = true;
-        // break; 
-      } 
-      else {
-        fpr_.segment<3>(3*i_active_) = f_avg_i;
-      }
-    }
+    f_tmp = f_avg.segment<3>(3*i_active_);
+    contacts_[i]->projectForceInCone(f_tmp);
+    fpr_.segment<3>(3*i_active_) = f_tmp;
 
-    if (fnor2_<0.){
-      fpr2_.segment<3>(3*i_active_).fill(0);
-      cone_flag_ = true; 
-    } else{
-      /*!< check for friction bounds on average of average force */ 
-      normalFi_2 = fnor2_* contacts_[i]->contactNormal_; 
-      tangentFi_2 = f_avg_i2 - normalFi_2; 
-      ftan2_ = sqrt(tangentFi_2.dot(tangentFi_2));
-      double mu = contacts_[i]->optr->contact_model_->friction_coeff_;
-      if(ftan2_ > mu * fnor2_){
-        fpr2_.segment<3>(3*i_active_) = normalFi_2 + (mu*fnor2_/ftan2_)*tangentFi_2; 
-        cone_flag_ = true;
-      } 
-      else {
-        fpr2_.segment<3>(3*i_active_) = f_avg_i2;
-      }
-    }
+    f_tmp = f_avg.segment<3>(3*i_active_);
+    contacts_[i]->projectForceInCone(f_tmp);
+    fpr2_.segment<3>(3*i_active_) = f_tmp;
+
+    cone_flag_ = true; 
+
+    // f_avg_i = f_avg.segment<3>(3*i_active_);
+    // f_avg_i2 = f_avg2.segment<3>(3*i_active_);
+    // fnor_ = contacts_[i]->contactNormal_.dot(f_avg_i);
+    // fnor2_= contacts_[i]->contactNormal_.dot(f_avg_i2);
+    // if (fnor_<0.){
+    //   /*!< check for pulling force at contact i */  
+    //   fpr_.segment<3>(3*i_active_).fill(0); 
+    //   contacts_[i]->predictedF_.fill(0);
+    //   cone_flag_ = true; 
+    // } else{
+    //   /*!< check for friction bounds on average force   */  
+    //   normalFi_ = fnor_* contacts_[i]->contactNormal_; 
+    //   tangentFi_ = f_avg_i - normalFi_; 
+    //   ftan_ = sqrt(tangentFi_.dot(tangentFi_));
+    //   double mu = contacts_[i]->optr->contact_model_->friction_coeff_;
+    //   if(ftan_ > mu * fnor_){
+    //     /*!< cone violated */  
+    //     fpr_.segment<3>(3*i_active_) = normalFi_ + (mu*fnor_/ftan_)*tangentFi_; 
+    //     contacts_[i]->predictedF_ = fpr_.segment<3>(3*i_active_);
+    //     /*!< move predicted x0 if update method is 1  */
+    //     if(slipping_method_==1){
+    //       contacts_[i]->predictedX0_ = invK_.block<3,3>(3*i_active_,3*i_active_)*(fpr_.segment<3>(3*i_active_) + K.block<3,3>(3*i_active_,3*i_active_) * contacts_[i]->predictedX_ + B.block<3,3>(3*i_active_,3*i_active_) * contacts_[i]->predictedV_);
+    //     }
+    //     cone_flag_ = true;
+    //     // break; 
+    //   } 
+    //   else {
+    //     fpr_.segment<3>(3*i_active_) = f_avg_i;
+    //   }
+    // }
+
+    // if (fnor2_<0.){
+    //   fpr2_.segment<3>(3*i_active_).fill(0);
+    //   cone_flag_ = true; 
+    // } else{
+    //   /*!< check for friction bounds on average of average force */ 
+    //   normalFi_2 = fnor2_* contacts_[i]->contactNormal_; 
+    //   tangentFi_2 = f_avg_i2 - normalFi_2; 
+    //   ftan2_ = sqrt(tangentFi_2.dot(tangentFi_2));
+    //   double mu = contacts_[i]->optr->contact_model_->friction_coeff_;
+    //   if(ftan2_ > mu * fnor2_){
+    //     fpr2_.segment<3>(3*i_active_) = normalFi_2 + (mu*fnor2_/ftan2_)*tangentFi_2; 
+    //     cone_flag_ = true;
+    //   } 
+    //   else {
+    //     fpr2_.segment<3>(3*i_active_) = f_avg_i2;
+    //   }
+    // }
     i_active_ += 1; 
   }
 } // ExponentialSimulator::checkFrictionCone
