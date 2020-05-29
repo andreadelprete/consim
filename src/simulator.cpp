@@ -263,11 +263,16 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
           temp01_.noalias() = JcT_*fpr_; 
           temp02_ = tau_ - data_->nle + temp01_;
           dvMean_.noalias() = Minv_*temp02_; 
+
           temp01_.noalias() = JcT_*fpr2_; 
           temp02_ = tau_ - data_->nle + temp01_;
           dvMean2_.noalias() = Minv_*temp02_; 
           vMean2_.noalias() = v_ + .5 * sub_dt * dvMean2_; 
           pinocchio::integrate(*model_, q_, vMean2_ * sub_dt, qnext_);
+          /* PSEUDO-CODE
+          dv_mean = dv_bar + JMinv.T @ f_pr
+          v_mean = v + 0.5*dt*(dv_bar + JMinv.T @ f_pr2)
+          */
         }
         else if(slipping_method_==2){
           /*!< anchor point is optimized, then one f projection is computed and itegrated */ 
@@ -442,11 +447,15 @@ void ExponentialSimulator::checkFrictionCone(){
    * sets a flag needed to complete the integration step 
    * predictedF should be F at end of integration step unless saturated 
    **/  
+
+  /**
+      f_avg = D @ int_x / dt
+      f_avg2 = D @ int2_x / (0.5*dt*dt)
+  */
   temp03_.noalias() = D*intxt_;
-  f_avg= kp0_ + temp03_/sub_dt; 
+  f_avg  = kp0_ + temp03_/sub_dt; 
   temp03_.noalias() = D*int2xt_;
-  temp03_.noalias() = 2.*temp03_;
-  temp03_.noalias() = (sub_dt*sub_dt)*temp03_;
+  temp03_.noalias() = temp03_/(0.5*sub_dt*sub_dt);
   f_avg2 = kp0_ +  temp03_; 
   // also update contact position, velocity and force at the end of step 
   computePredictedXandF();
