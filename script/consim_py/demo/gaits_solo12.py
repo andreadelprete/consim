@@ -56,17 +56,17 @@ if __name__ == "__main__":
     #                 'type': 'exponential', 
     #                 'ndt': 500}]
 
-    simu_params += [{'name': 'exponential 100',
-                    'type': 'exponential', 
-                    'ndt': 100}]
+#    simu_params += [{'name': 'exponential 100',
+#                    'type': 'exponential', 
+#                    'ndt': 100}]
         
 #    simu_params += [{'name': 'euler 10',
 #                     'type': 'euler', 
 #                     'ndt': 10}]
 
-    # simu_params += [{'name': 'exponential 10',
-    #                 'type': 'exponential', 
-    #                 'ndt': 10}]
+    simu_params += [{'name': 'exponential 10',
+                     'type': 'exponential', 
+                     'ndt': 10}]
 #
     # simu_params += [{'name': 'exponential 1',
     #                  'type': 'exponential', 
@@ -81,10 +81,10 @@ if __name__ == "__main__":
     
     mu = 1.        # friction coefficient
     anchor_slipping = 1 
+    predicted_forces = False
     unilateral_contacts = True                   
     K = 1.e+5 * np.ones([3,1])
     B = 2.4e+2 * np.ones([3,1])
-    T = 1 #  1 second simution  
     dt = 2.e-3 
     dt_ref = 1e-2 # time step of reference motion
 
@@ -114,7 +114,7 @@ if __name__ == "__main__":
         # build the simulator 
         if(simu_type=='exponential'):
             sim = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
-                                        K, B , mu, anchor_slipping)
+                                        K, B , mu, anchor_slipping, predicted_forces)
         else:
             sim = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
                                             K, B , mu)

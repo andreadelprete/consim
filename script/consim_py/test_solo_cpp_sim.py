@@ -1,18 +1,13 @@
 # from __future__ import print_function
 # from copy import deepcopy
 import numpy as np
-# from pinocchio.utils import  zero
 from numpy import zeros as zero
 import pinocchio as se3
-# se3.setNumpyType(np.matrix)
 
 import gepetto.corbaserver
 import time
 import subprocess
 import os
-
-# import eigenpy
-# eigenpy.switchToNumpyMatrix()
 
 import conf_solo as conf
 import consim
@@ -27,8 +22,7 @@ kp = 10
 kd = 0.05
 
 N = int(T/dt)
-# se3.RobotWrapper.BuildFromURDF(conf.urdf,
-# [conf.path, ], se3.JointModelFreeFlyer())
+# se3.RobotWrapper.BuildFromURDF(conf.urdf, [conf.path, ], se3.JointModelFreeFlyer())
 robot = loadSolo()
 
 robot.data = se3.Data(robot.model)
@@ -53,8 +47,7 @@ robot.forwardKinematics(q)
 sim.reset_state(q, dq, True)
 
 if(conf.use_viewer):
-    # se3.RobotWrapper.BuildFromURDF(conf.urdf,
-    # [conf.path, ], se3.JointModelFreeFlyer())
+    # se3.RobotWrapper.BuildFromURDF(conf.urdf, [conf.path, ], se3.JointModelFreeFlyer())
     robot_display = robot
     prompt = subprocess.getstatusoutput("ps aux |grep 'gepetto-gui'|grep -v 'grep'|wc -l")
     if int(prompt[1]) == 0:

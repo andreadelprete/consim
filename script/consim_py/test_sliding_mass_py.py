@@ -21,14 +21,14 @@ print(" Test Sliding Mass ".center(conf.LINE_WIDTH, '#'))
 print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
-i_min = 0
-i_max = i_min+6
-i_ground_truth = i_max+2
+i_min = 1
+i_max = i_min+9
+i_ground_truth = i_max
 
 GROUND_TRUTH_SIMU_PARAMS = {
     'name': 'ground-truth %d'%(2**i_ground_truth),
     'method_name': 'ground-truth',
-    'use_exp_int': 0,
+    'use_exp_int': 1,
     'ndt': 2**i_ground_truth,
 }
 

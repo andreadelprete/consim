@@ -215,7 +215,10 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
 */
 
 ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps,
-                                            int slipping_method) : AbstractSimulator(model, data, dt, n_integration_steps), slipping_method_(slipping_method)
+                                            int slipping_method, bool compute_predicted_forces) : 
+                                            AbstractSimulator(model, data, dt, n_integration_steps), 
+                                            slipping_method_(slipping_method),
+                                            compute_predicted_forces_(compute_predicted_forces)
 {
   dvMean_.resize(model_->nv);
   dvMean2_.resize(model_->nv);
@@ -245,18 +248,22 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
   
     if (nactive_> 0){
       Eigen::internal::set_is_malloc_allowed(false);
+      CONSIM_START_PROFILER("exponential_simulator::computeIntegrationTerms");
       computeIntegrationTerms();
-      CONSIM_START_PROFILER("exponential_simulator::computeIntegralXt");
+      CONSIM_STOP_PROFILER("exponential_simulator::computeIntegrationTerms");
+      
+      CONSIM_START_PROFILER("exponential_simulator::computeIntegralsXt");
       utilDense_.ComputeIntegralXt(A, a_, x0_, sub_dt, intxt_);
-      CONSIM_STOP_PROFILER("exponential_simulator::computeIntegralXt");
-      CONSIM_START_PROFILER("exponential_simulator::ComputeDoubleIntegralXt");
       utilDense_.ComputeDoubleIntegralXt(A, a_, x0_, sub_dt, int2xt_); 
-      CONSIM_STOP_PROFILER("exponential_simulator::ComputeDoubleIntegralXt");
+      CONSIM_STOP_PROFILER("exponential_simulator::computeIntegralsXt");
+
       CONSIM_START_PROFILER("exponential_simulator::checkFrictionCone");
       checkFrictionCone();
       CONSIM_STOP_PROFILER("exponential_simulator::checkFrictionCone");
+      
       if (!cone_flag_ || slipping_method_==1){
         /*!< f projection is computed then anchor point is updated */ 
+        CONSIM_START_PROFILER("exponential_simulator::subIntegration");
         temp01_.noalias() = JcT_*fpr_; 
         temp02_ = tau_ - data_->nle + temp01_;
         dvMean_.noalias() = Minv_*temp02_; 
@@ -266,6 +273,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
         dvMean2_.noalias() = Minv_*temp02_; 
         vMean2_.noalias() = v_ + .5 * sub_dt * dvMean2_; 
         pinocchio::integrate(*model_, q_, vMean2_ * sub_dt, qnext_);
+        CONSIM_STOP_PROFILER("exponential_simulator::subIntegration"); 
         /* PSEUDO-CODE
         dv_mean = dv_bar + JMinv.T @ f_pr
         v_mean = v + 0.5*dt*(dv_bar + JMinv.T @ f_pr2)
@@ -288,12 +296,10 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
     } // no active contacts 
 
-    CONSIM_START_PROFILER("exponential_simulator::subIntegration");      
-    
     q_ = qnext_;
     v_ += sub_dt*dvMean_;
     dv_ = dvMean_; 
-    CONSIM_STOP_PROFILER("exponential_simulator::subIntegration"); 
+    
     //
     computeContactForces();
     CONSIM_STOP_PROFILER("exponential_simulator::substep");
@@ -309,7 +315,8 @@ void ExponentialSimulator::computeIntegrationTerms(){
    * fills J, dJv, p0, p, dp, Kp0, and x0 
    * computes A and b 
    **/   
-  pinocchio::crba(*model_, *data_, q_);
+  // No need to compute M because we just need M inverse
+  //pinocchio::crba(*model_, *data_, q_);
   pinocchio::nonLinearEffects(*model_, *data_, q_, v_);
   i_active_ = 0; 
   for(unsigned int i=0; i<nc_; i++){
@@ -355,14 +362,14 @@ void ExponentialSimulator::computeIntegrationTerms(){
    * resizes matrices to match the number of active contacts if needed 
    * compute the contact froces of the active contacts 
    **/  
-  data_->M.fill(0);
+  //data_->M.fill(0);
   
-  CONSIM_START_PROFILER("pinocchio::computeAllTerms");
+  CONSIM_START_PROFILER("pinocchio::computeKinematics");
   pinocchio::forwardKinematics(*model_, *data_, q_, v_, fkDv_);
   pinocchio::computeJointJacobians(*model_, *data_);
   pinocchio::updateFramePlacements(*model_, *data_);
   // pinocchio::computeJointJacobiansTimeVariation(*model_, *data_, q_, v_);
-  CONSIM_STOP_PROFILER("pinocchio::computeAllTerms");
+  CONSIM_STOP_PROFILER("pinocchio::computeKinematics");
   detectContacts();
 
   if (nactive_>0){
@@ -394,31 +401,39 @@ void ExponentialSimulator::computePredictedXandF(){
    * computes predictedXf = edtA x0 + int_edtA_ * b 
    * updates predicted x & v in each contact point 
    **/  
-  util_eDtA.compute(sub_dt*A,expAdt_);   
-  inteAdt_.fill(0);
-  switch (nactive_)
-  {
-  case 1:
-    util_int_eDtA_one.computeExpIntegral(A, inteAdt_, sub_dt);
-    break;
   
-  case 2:
-    util_int_eDtA_two.computeExpIntegral(A, inteAdt_, sub_dt);
-    break;
-  
-  case 3:
-    util_int_eDtA_three.computeExpIntegral(A, inteAdt_, sub_dt);
-    break;
-  
-  case 4:
-    util_int_eDtA_four.computeExpIntegral(A, inteAdt_, sub_dt);
-    break;
-  
-  default:
-    break;
+  if(compute_predicted_forces_){
+    util_eDtA.compute(sub_dt*A,expAdt_);   
+    inteAdt_.fill(0);
+    switch (nactive_)
+    {
+    case 1:
+      util_int_eDtA_one.computeExpIntegral(A, inteAdt_, sub_dt);
+      break;
+    
+    case 2:
+      util_int_eDtA_two.computeExpIntegral(A, inteAdt_, sub_dt);
+      break;
+    
+    case 3:
+      util_int_eDtA_three.computeExpIntegral(A, inteAdt_, sub_dt);
+      break;
+    
+    case 4:
+      util_int_eDtA_four.computeExpIntegral(A, inteAdt_, sub_dt);
+      break;
+    
+    default:
+      break;
+    }
+    predictedXf_ = expAdt_*x0_ + inteAdt_*a_; 
+    predictedForce_ = kp0_ + D*predictedXf_;
   }
-  predictedXf_ = expAdt_*x0_ + inteAdt_*a_; 
-  predictedForce_ = kp0_ + D*predictedXf_;
+  else{
+    predictedXf_ = x0_;
+    predictedForce_ = kp0_;
+  }
+  
 }
 
 
@@ -430,6 +445,10 @@ void ExponentialSimulator::checkFrictionCone(){
    * sets a flag needed to complete the integration step 
    * predictedF should be F at end of integration step unless saturated 
    **/  
+  CONSIM_START_PROFILER("exponential_simulator::computePredictedXandF");
+  // also update contact position, velocity and force at the end of step 
+  computePredictedXandF();
+  CONSIM_STOP_PROFILER("exponential_simulator::computePredictedXandF");
 
   /**
       f_avg = D @ int_x / dt
@@ -441,9 +460,8 @@ void ExponentialSimulator::checkFrictionCone(){
   temp03_.noalias() = D*int2xt_;
   temp03_.noalias() = temp03_/(0.5*sub_dt*sub_dt);
   f_avg2 = kp0_ +  temp03_; 
-  // also update contact position, velocity and force at the end of step 
-  computePredictedXandF();
-  i_active_ = 0; 
+  
+  i_active_ = 0;
   cone_flag_ = false; 
   Vector3d f_tmp;
   for(unsigned int i=0; i<nc_; i++){

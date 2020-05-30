@@ -75,7 +75,7 @@ if __name__=="__main__":
         simu_type = simu_param['type']
         if(simu_type=='exponential'):
             sim = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
-                                        K, B , mu, anchor_slipping)
+                                        K, B , mu, anchor_slipping, True)
         else:
             sim = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
                                             K, B, mu)
@@ -101,7 +101,7 @@ if __name__=="__main__":
         for i, cp in enumerate(cpts):
             fcnt[0,i,:] = np.resize(cp.f,3)
             xcnt[0,i,:] = np.resize(cp.x,3)
-            xstart[0,i,:] = np.resize(cp.x_start,3)
+            xstart[0,i,:] = np.resize(cp.x_anchor,3)
             predicted_xstart[0,i,:] = np.resize(cp.predicted_x0,3)
             predicted_x[0,i,:] = np.resize(cp.x,3)
             predicted_f[0,i,:] = np.resize(cp.predicted_f,3)
@@ -120,7 +120,7 @@ if __name__=="__main__":
             for i, cp in enumerate(cpts):
                 fcnt[t+1,i,:] = np.resize(cp.f,3)
                 xcnt[t+1,i,:] = np.resize(cp.x,3)
-                xstart[t+1,i,:] = np.resize(cp.x_start,3)
+                xstart[t+1,i,:] = np.resize(cp.x_anchor,3)
                 predicted_xstart[t+1,i,:] = np.resize(cp.predicted_x0,3)
                 predicted_x[t+1,i,:] = np.resize(cp.predicted_x,3)
                 predicted_f[t+1,i,:] = np.resize(cp.predicted_f,3)

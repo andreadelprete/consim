@@ -142,7 +142,7 @@ namespace consim {
        * 2: a QP method to update the anchor point velocity, then average force is computed 
        **/  
       ExponentialSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, 
-                          int slipping_method=1); 
+                          int slipping_method=1, bool compute_predicted_forces=false); 
 
       ~ExponentialSimulator(){};
       void step(const Eigen::VectorXd &tau) override;
@@ -165,9 +165,8 @@ namespace consim {
       // convenience method to compute terms needed in integration  
       void computeIntegrationTerms();
 
-      // bool sparse_; 
-      // bool invertibleA_;
       int slipping_method_; 
+      bool compute_predicted_forces_;
       
       Eigen::VectorXd f_;  // total force 
       Eigen::MatrixXd Jc_; // contact jacobian for all contacts 

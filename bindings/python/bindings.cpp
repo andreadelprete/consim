@@ -66,7 +66,8 @@ EulerSimulator* build_euler_simulator(
 
 ExponentialSimulator* build_exponential_simulator(
     float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data,
-    Eigen::Vector3d stifness, Eigen::Vector3d damping, double frictionCoefficient, int which_slipping)
+    Eigen::Vector3d stifness, Eigen::Vector3d damping, double frictionCoefficient, int which_slipping,
+    bool compute_predicted_forces)
 {
   LinearPenaltyContactModel *contact_model = new LinearPenaltyContactModel(
       stifness, damping, frictionCoefficient);
@@ -78,7 +79,7 @@ ExponentialSimulator* build_exponential_simulator(
     std::cout<<"[build_exponential_simulator] Data is not consistent with specified model\n";
     data = pinocchio::Data(model);
   }
-  ExponentialSimulator* sim = new ExponentialSimulator(model, data, dt, n_integration_steps, which_slipping);
+  ExponentialSimulator* sim = new ExponentialSimulator(model, data, dt, n_integration_steps, which_slipping, compute_predicted_forces);
   sim->addObject(*obj);
 
   return sim;
