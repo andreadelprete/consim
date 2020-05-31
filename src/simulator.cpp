@@ -483,7 +483,7 @@ void ExponentialSimulator::checkFrictionCone(){
     contacts_[i]->projectForceInCone(f_tmp);
     fpr_.segment<3>(3*i_active_) = f_tmp;
 
-    f_tmp = f_avg.segment<3>(3*i_active_);
+    f_tmp = f_avg2.segment<3>(3*i_active_);
     contacts_[i]->projectForceInCone(f_tmp);
     fpr2_.segment<3>(3*i_active_) = f_tmp;
 
