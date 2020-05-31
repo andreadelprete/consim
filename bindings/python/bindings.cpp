@@ -31,8 +31,8 @@ namespace consim {
 class AbstractSimulatorWrapper : public AbstractSimulator, public boost::python::wrapper<AbstractSimulator>
 {
   public: 
-    AbstractSimulatorWrapper(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps) : 
-              AbstractSimulator(model, data, dt, n_integration_steps), boost::python::wrapper<AbstractSimulator>() {}
+    AbstractSimulatorWrapper(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD) : 
+              AbstractSimulator(model, data, dt, n_integration_steps, whichFD), boost::python::wrapper<AbstractSimulator>() {}
 
     void step(const Eigen::VectorXd &tau){
       this->get_override("step")(tau);
@@ -46,7 +46,7 @@ class AbstractSimulatorWrapper : public AbstractSimulator, public boost::python:
 
 EulerSimulator* build_euler_simulator(
     float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data,
-    Eigen::Vector3d stifness, Eigen::Vector3d damping, double frictionCoefficient)
+    Eigen::Vector3d stifness, Eigen::Vector3d damping, double frictionCoefficient, int whichFD)
 {
   LinearPenaltyContactModel *contact_model = new LinearPenaltyContactModel(
       stifness, damping, frictionCoefficient);
@@ -58,7 +58,7 @@ EulerSimulator* build_euler_simulator(
     std::cout<<"[build_euler_simulator] Data is not consistent with specified model\n";
     data = pinocchio::Data(model);
   }
-  EulerSimulator* sim = new EulerSimulator(model, data, dt, n_integration_steps);
+  EulerSimulator* sim = new EulerSimulator(model, data, dt, n_integration_steps, whichFD);
   sim->addObject(*obj);
 
   return sim;
@@ -67,7 +67,7 @@ EulerSimulator* build_euler_simulator(
 ExponentialSimulator* build_exponential_simulator(
     float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data,
     Eigen::Vector3d stifness, Eigen::Vector3d damping, double frictionCoefficient, int which_slipping,
-    bool compute_predicted_forces)
+    bool compute_predicted_forces, int whichFD)
 {
   LinearPenaltyContactModel *contact_model = new LinearPenaltyContactModel(
       stifness, damping, frictionCoefficient);
@@ -79,7 +79,7 @@ ExponentialSimulator* build_exponential_simulator(
     std::cout<<"[build_exponential_simulator] Data is not consistent with specified model\n";
     data = pinocchio::Data(model);
   }
-  ExponentialSimulator* sim = new ExponentialSimulator(model, data, dt, n_integration_steps, which_slipping, compute_predicted_forces);
+  ExponentialSimulator* sim = new ExponentialSimulator(model, data, dt, n_integration_steps, whichFD, which_slipping, compute_predicted_forces);
   sim->addObject(*obj);
 
   return sim;
@@ -124,7 +124,7 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
         .def("updatePosition", &ContactPoint::updatePosition, return_internal_reference<>())
         .def("firstOrderContactKinematics", &ContactPoint::firstOrderContactKinematics, return_internal_reference<>())
         .def("secondOrderContactKinematics", &ContactPoint::secondOrderContactKinematics, return_internal_reference<>())
-        // .def("computeContactForce", &ContactPoint::computeContactForce, return_internal_reference<>())
+        .def("resetAnchorPoint", &ContactPoint::resetAnchorPoint, return_internal_reference<>())
         .ADD_PROPERTY_RETURN_BY_VALUE("frame_id", &ContactPoint::frame_id)
         .ADD_PROPERTY_RETURN_BY_VALUE("x", &ContactPoint::x)
         .ADD_PROPERTY_RETURN_BY_VALUE("v", &ContactPoint::v)
@@ -141,11 +141,12 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
 
 
     bp::class_<AbstractSimulatorWrapper, boost::noncopyable>("AbstractSimulator", "Abstract Simulator Class", 
-                         bp::init<pinocchio::Model &, pinocchio::Data &, float, int>())
+                         bp::init<pinocchio::Model &, pinocchio::Data &, float, int, int>())
         .def("add_contact_point", &AbstractSimulatorWrapper::addContactPoint, return_internal_reference<>())
         .def("get_contact", &AbstractSimulatorWrapper::getContact, return_internal_reference<>())
         .def("add_object", &AbstractSimulatorWrapper::addObject)
         .def("reset_state", &AbstractSimulatorWrapper::resetState)
+        .def("reset_contact_anchor", &AbstractSimulatorWrapper::resetContactAnchorPoint)
         .def("set_joint_friction", &AbstractSimulatorWrapper::setJointFriction)
         .def("step", bp::pure_virtual(&AbstractSimulatorWrapper::step))
         .def("get_q", &AbstractSimulatorWrapper::get_q,bp::return_value_policy<bp::copy_const_reference>(), "configuration state vector")
@@ -156,11 +157,12 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
 
     bp::class_<EulerSimulator, bases<AbstractSimulatorWrapper>>("EulerSimulator",
                           "Euler Simulator class",
-                          bp::init<pinocchio::Model &, pinocchio::Data &, float, int>())
+                          bp::init<pinocchio::Model &, pinocchio::Data &, float, int, int>())
         .def("add_contact_point", &EulerSimulator::addContactPoint, return_internal_reference<>())
         .def("get_contact", &EulerSimulator::getContact, return_internal_reference<>())
         .def("add_object", &EulerSimulator::addObject)
         .def("reset_state", &EulerSimulator::resetState)
+        .def("reset_contact_anchor", &AbstractSimulatorWrapper::resetContactAnchorPoint)
         .def("set_joint_friction", &EulerSimulator::setJointFriction)
         .def("step", &EulerSimulator::step)
         .def("get_q", &EulerSimulator::get_q,bp::return_value_policy<bp::copy_const_reference>(), "configuration state vector")
@@ -170,11 +172,12 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
 
     bp::class_<ExponentialSimulator, bases<AbstractSimulatorWrapper>>("ExponentialSimulator",
                           "Exponential Simulator class",
-                          bp::init<pinocchio::Model &, pinocchio::Data &, float, int, int>())
+                          bp::init<pinocchio::Model &, pinocchio::Data &, float, int, int, int, bool>())
         .def("add_contact_point", &ExponentialSimulator::addContactPoint, return_internal_reference<>())
         .def("get_contact", &ExponentialSimulator::getContact, return_internal_reference<>())
         .def("add_object", &ExponentialSimulator::addObject)
         .def("reset_state", &ExponentialSimulator::resetState)
+        .def("reset_contact_anchor", &AbstractSimulatorWrapper::resetContactAnchorPoint)
         .def("set_joint_friction", &ExponentialSimulator::setJointFriction)
         .def("step", &ExponentialSimulator::step)
         .def("get_q", &ExponentialSimulator::get_q,bp::return_value_policy<bp::copy_const_reference>(), "configuration state vector")

@@ -37,22 +37,17 @@ void ContactPoint::firstOrderContactKinematics(pinocchio::Data &data){
 
 
 void ContactPoint::secondOrderContactKinematics(pinocchio::Data &data, Eigen::VectorXd &v){
-  // pinocchio::getFrameJacobianTimeVariation(*model_, data, frame_id, pinocchio::LOCAL, dJdt_);
   dJvlocal_ = pinocchio::getFrameAcceleration(*model_, data, frame_id); 
-  // // std::cout<<"dJv acceleration component "<< dJvlocal_.linear() << std::endl;
   dJvlocal_.linear() += vlocal_.angular().cross(vlocal_.linear());
-  // dJvlocal_.linear() = dJdt_.topRows<3>() * v; 
-  // dJvlocal_.angular() = dJdt_.bottomRows<3>() * v; 
   dJv_ = frameSE3_.act(dJvlocal_).linear();
-
 }
 
 
-void ContactPoint::resetAnchorPoint(Eigen::VectorXd &x0){
-  x_anchor = x0; 
+void ContactPoint::resetAnchorPoint(Eigen::Vector3d &p0){
+  x_anchor = p0; 
   v_anchor.setZero();
   slipping = false;
-  predictedX0_ = x0;  
+  predictedX0_ = p0;  
 }
 
 void ContactPoint::projectForceInCone(Eigen::Vector3d &f){
@@ -119,7 +114,6 @@ void LinearPenaltyContactModel::projectForceInCone(Eigen::Vector3d &f, ContactPo
     f.setZero();
     return;
   } 
-  
   tangentF_ = f - normalNorm_*cp.contactNormal_;
   tangentNorm_ = tangentF_.norm();
   if (cp.unilateral && (tangentNorm_ > friction_coeff_*normalNorm_)){

@@ -106,16 +106,25 @@ N_SIMULATION = 20
 q0[2] += 1.0         # make the robot fly
 #q0[2] -= 15.37e-3   # ensure contact points are inside the ground at t=0
 
+## Options 
+#  1: pinocchio.Minverse()
+#  2: pinocchio.aba()
+#  3: Cholesky factorization 
+
+whichFD = 2
+
+
+
 
 def run_simulation(q0, v0, simu_params):
     ndt = simu_params['ndt']
     if(simu_params['use_exp_int']):
         simu = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
                                     conf.K, conf.B, conf.mu, conf.anchor_slipping_method,
-                                    compute_predicted_forces)
+                                    compute_predicted_forces, whichFD)
     else:
         simu = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
-                                        conf.K, conf.B, conf.mu)
+                                        conf.K, conf.B, conf.mu, whichFD)
                                         
     cpts = []
     for cf in conf.contact_frames:

@@ -25,24 +25,29 @@ namespace consim {
  * AbstractSimulator Class 
 */
 
-AbstractSimulator::AbstractSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps): 
-model_(&model), data_(&data), dt_(dt), n_integration_steps_(n_integration_steps), sub_dt(dt / ((double)n_integration_steps)) {
+AbstractSimulator::AbstractSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD): 
+model_(&model), data_(&data), dt_(dt), n_integration_steps_(n_integration_steps), sub_dt(dt / ((double)n_integration_steps)), whichFD_(whichFD) {
   q_.resize(model.nq); q_.setZero();
   v_.resize(model.nv); v_.setZero();
   dv_.resize(model.nv); dv_.setZero();
   vMean_.resize(model.nv); vMean_.setZero();
   tau_.resize(model.nv); tau_.setZero();
   qnext_.resize(model.nq); qnext_.setZero();
+  inverseM_.resize(model.nv, model.nv); inverseM_.setZero();
+  mDv_.resize(model.nv); mDv_.setZero();
+  fkDv_.resize(model_->nv); fkDv_.setZero();
 } 
+
 
 const ContactPoint &AbstractSimulator::addContactPoint(std::string name, int frame_id, bool unilateral)
 {
   ContactPoint *cptr = new ContactPoint(*model_, name, frame_id, model_->nv, unilateral);
 	contacts_.push_back(cptr);
-  nc_ += 1; // increase contact points count  
-  resetflag_ = false; // enforce resetState() after adding a contact point
+  nc_ += 1; /*!< total number of defined contact points */ 
+  resetflag_ = false; /*!< cannot call Simulator::step() if resetflag is false */ 
   return getContact(name);
 }
+
 
 const ContactPoint &AbstractSimulator::getContact(std::string name)
 {
@@ -52,6 +57,21 @@ const ContactPoint &AbstractSimulator::getContact(std::string name)
     } 
   }
   throw std::runtime_error("Contact name not recongnized ");
+}
+
+
+void AbstractSimulator::resetContactAnchorPoint(std::string name, Eigen::Vector3d &p0, bool updateContactForces){
+  for (auto &cptr : contacts_) {
+    if (cptr->name_==name){
+      if (cptr->active){
+        cptr->resetAnchorPoint(p0); 
+      }
+      break; 
+    }
+  }
+  if (updateContactForces){
+    computeContactForces();
+  }
 }
 
 void AbstractSimulator::addObject(ContactObject& obj) {
@@ -139,28 +159,23 @@ void AbstractSimulator::setJointFriction(const Eigen::VectorXd& joint_friction)
  * EulerSimulator Class 
 */
 
-EulerSimulator::EulerSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps):
-AbstractSimulator(model, data, dt, n_integration_steps) 
-{
-  inverseM_.resize(model.nv, model.nv); inverseM_.setZero();
-  mDv_.resize(model.nv); mDv_.setZero();
-}
+EulerSimulator::EulerSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD):
+AbstractSimulator(model, data, dt, n_integration_steps, whichFD) {}
 
 
 void EulerSimulator::computeContactForces() 
 {
-  data_->M.fill(0);
   CONSIM_START_PROFILER("pinocchio::computeAllTerms");
-  pinocchio::forwardKinematics(*model_, *data_, q_, v_);
+  pinocchio::forwardKinematics(*model_, *data_, q_, v_, fkDv_);
   pinocchio::computeJointJacobians(*model_, *data_);
   pinocchio::updateFramePlacements(*model_, *data_);
-  pinocchio::crba(*model_, *data_, q_);
   pinocchio::nonLinearEffects(*model_, *data_, q_, v_);
+  /*!< loops over all contacts and objects to detect contacts and update contact positions*/ 
   detectContacts();
   CONSIM_START_PROFILER("compute_contact_forces");
   for (auto &cp : contacts_) {
     if (!cp->active) continue;
-    cp->firstOrderContactKinematics(*data_); // must be called before penetration, has velocity in it 
+    cp->firstOrderContactKinematics(*data_); /*!<  must be called before computePenetration() it updates cp.v and jacobian*/   
     cp->optr->computePenetration(*cp); 
     cp->optr->contact_model_->computeForce(*cp);
     tau_ += cp->world_J_.transpose() * cp->f; 
@@ -185,20 +200,40 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
       if (joint_friction_flag_){
         tau_ -= joint_friction_.cwiseProduct(v_);
       }
-      // Compute the acceloration ddq.
-      // // CONSIM_START_PROFILER("pinocchio::aba");
-      inverseM_ = pinocchio::computeMinverse(*model_, *data_, q_); //data_->M.inverse();
-      // lltM_.compute(data_->M);
-      mDv_ = tau_ - data_->nle; 
-      // dv_ = lltM_.solve(mDv_);
-      dv_ = inverseM_*mDv_; 
-      // pinocchio::aba(*model_, *data_, q_, v_, tau_);
+      /**
+       * Solving the Forward Dynamics  
+       *  1: pinocchio::computeMinverse()
+       *  2: pinocchio::aba()
+       *  3: cholesky decompostion 
+       **/  
+      switch (whichFD_)
+      {
+      case 1:
+        mDv_ = tau_ - data_->nle; 
+        inverseM_ = pinocchio::computeMinverse(*model_, *data_, q_);
+        dv_ = inverseM_*mDv_; 
+        break;
+      
+      case 2:
+        pinocchio::aba(*model_, *data_, q_, v_, tau_);
+        dv_ = data_-> ddq; 
+        break;
+      
+      case 3:
+        pinocchio::crba(*model_, *data_, q_);
+        mDv_ = tau_ - data_->nle; 
+        lltM_.compute(data_->M);
+        dv_ = lltM_.solve(mDv_);
+        break;
+      
+      default:
+        throw std::runtime_error("Forward Dynamics Method not recognized");
+      }
+      
+      /*!< integrate twice */  
       vMean_ = v_ + .5 * sub_dt*dv_;
-      // CONSIM_STOP_PROFILER("pinocchio::aba");
-      // vMean_ = v_ + .5 * sub_dt * data_->ddq;
       pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
       q_ = qnext_;
-      // v_ += data_->ddq * sub_dt;
       v_ += dv_ * sub_dt;
       
       tau_.fill(0);
@@ -214,9 +249,10 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
  * ExponentialSimulator Class 
 */
 
-ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps,
+ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, 
+                                            int n_integration_steps, int whichFD,
                                             int slipping_method, bool compute_predicted_forces) : 
-                                            AbstractSimulator(model, data, dt, n_integration_steps), 
+                                            AbstractSimulator(model, data, dt, n_integration_steps, whichFD), 
                                             slipping_method_(slipping_method),
                                             compute_predicted_forces_(compute_predicted_forces)
 {
@@ -226,7 +262,7 @@ ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocc
   dv_bar.resize(model_->nv); dv_bar.setZero();
   temp01_.resize(model_->nv); temp01_.setZero();
   temp02_.resize(model_->nv); temp02_.setZero();
-  fkDv_.resize(model_->nv); fkDv_.setZero();
+  
 }
 
 
@@ -281,20 +317,43 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       }
       else{
         /*!< anchor point is optimized, then one f projection is computed and itegrated */ 
-        computeSlipping();
+        // computeSlipping(); // slipping qp not implemented 
         temp01_.noalias() = JcT_*fpr_; 
         temp02_ = tau_ - data_->nle + temp01_;
         dvMean_.noalias() = Minv_*temp02_; 
         vMean_ = v_ + .5 * sub_dt* dvMean_; 
         pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
       }
-    } // active contacts > 0 
+    } /*!< active contacts */
     else{
-      pinocchio::aba(*model_, *data_, q_, v_, tau_);
-      dvMean_ = data_->ddq; 
-      vMean_ = v_ + dvMean_ * .5 * sub_dt;
+      pinocchio::nonLinearEffects(*model_, *data_, q_, v_);
+      switch (whichFD_)
+      {
+      case 1:
+        mDv_ = tau_ - data_->nle; 
+        inverseM_ = pinocchio::computeMinverse(*model_, *data_, q_);
+        dvMean_ = inverseM_*mDv_; 
+        break;
+      
+      case 2:
+        pinocchio::aba(*model_, *data_, q_, v_, tau_);
+        dvMean_ = data_-> ddq; 
+        break;
+      
+      case 3:
+        pinocchio::crba(*model_, *data_, q_);
+        mDv_ = tau_ - data_->nle; 
+        lltM_.compute(data_->M);
+        dvMean_ = lltM_.solve(mDv_);
+        break;
+      
+      default:
+        throw std::runtime_error("Forward Dynamics Method not recognized");
+      }
+
+      vMean_ = v_ + .5 * sub_dt*dvMean_;
       pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
-    } // no active contacts 
+    } /*!< no active contacts */
 
     q_ = qnext_;
     v_ += sub_dt*dvMean_;
@@ -362,15 +421,13 @@ void ExponentialSimulator::computeIntegrationTerms(){
    * resizes matrices to match the number of active contacts if needed 
    * compute the contact froces of the active contacts 
    **/  
-  //data_->M.fill(0);
   
   CONSIM_START_PROFILER("pinocchio::computeKinematics");
   pinocchio::forwardKinematics(*model_, *data_, q_, v_, fkDv_);
   pinocchio::computeJointJacobians(*model_, *data_);
   pinocchio::updateFramePlacements(*model_, *data_);
-  // pinocchio::computeJointJacobiansTimeVariation(*model_, *data_, q_, v_);
   CONSIM_STOP_PROFILER("pinocchio::computeKinematics");
-  detectContacts();
+  detectContacts(); /*!<inactive contacts get automatically filled with zero here */
 
   if (nactive_>0){
     if (f_.size()!=3*nactive_){
@@ -384,7 +441,7 @@ void ExponentialSimulator::computeIntegrationTerms(){
       contacts_[i]->firstOrderContactKinematics(*data_);
       contacts_[i]->optr->computePenetration(*contacts_[i]);
       contacts_[i]->secondOrderContactKinematics(*data_, v_);
-      // computeForce updates the anchor point
+      /*!< computeForce updates the anchor point */ 
       contacts_[i]->optr->contact_model_->computeForce(*contacts_[i]);
       f_.segment<3>(3*i_active_) = contacts_[i]->f; 
       i_active_ += 1;  
@@ -399,7 +456,6 @@ void ExponentialSimulator::computePredictedXandF(){
    * computes e^{dt*A}
    * computes \int{e^{dt*A}}
    * computes predictedXf = edtA x0 + int_edtA_ * b 
-   * updates predicted x & v in each contact point 
    **/  
   
   if(compute_predicted_forces_){
@@ -463,7 +519,7 @@ void ExponentialSimulator::checkFrictionCone(){
   
   i_active_ = 0;
   cone_flag_ = false; 
-  Vector3d f_tmp;
+
   for(unsigned int i=0; i<nc_; i++){
     if (!contacts_[i]->active) continue;
 
@@ -544,68 +600,68 @@ void ExponentialSimulator::checkFrictionCone(){
 
 
 
-void ExponentialSimulator::computeSlipping(){
+// void ExponentialSimulator::computeSlipping(){
   
   
-  if(slipping_method_==1){
-    // throw std::runtime_error("Slipping update method not implemented yet ");
-  }
-  else if(slipping_method_==2){
-    /**
-     * Populate the constraints then solve the qp 
-     * update x_start 
-     * compute the projected contact forces for integration 
-     **/  
+//   if(slipping_method_==1){
+//     // throw std::runtime_error("Slipping update method not implemented yet ");
+//   }
+//   else if(slipping_method_==2){
+//     /**
+//      * Populate the constraints then solve the qp 
+//      * update x_start 
+//      * compute the projected contact forces for integration 
+//      **/  
 
-    D_intExpA_integrator = D * inteAdt_ * contact_position_integrator_; 
+//     D_intExpA_integrator = D * inteAdt_ * contact_position_integrator_; 
 
-    // std::cout<<"A bar \n"<< D_intExpA_integrator << std::endl; 
+//     // std::cout<<"A bar \n"<< D_intExpA_integrator << std::endl; 
 
-    Cineq_cone.setZero();
-    Cineq_cone = - cone_constraints_* D_intExpA_integrator; 
-    cineq_cone.setZero();
-    cineq_cone = cone_constraints_ * f_avg;
-    // try to ensure normal force stays the same 
-    // Ceq_cone.setZero(); 
-    // Ceq_cone = -eq_cone_constraints_ * D_intExpA_integrator;
+//     Cineq_cone.setZero();
+//     Cineq_cone = - cone_constraints_* D_intExpA_integrator; 
+//     cineq_cone.setZero();
+//     cineq_cone = cone_constraints_ * f_avg;
+//     // try to ensure normal force stays the same 
+//     // Ceq_cone.setZero(); 
+//     // Ceq_cone = -eq_cone_constraints_ * D_intExpA_integrator;
 
-    // std::cout<<"A_ineq  \n"<< Cineq_cone << std::endl; 
-    // std::cout<<"b_ineq  \n"<< cineq_cone << std::endl; 
-    // std::cout<<"A_eq  \n"<< Ceq_cone << std::endl; 
+//     // std::cout<<"A_ineq  \n"<< Cineq_cone << std::endl; 
+//     // std::cout<<"b_ineq  \n"<< cineq_cone << std::endl; 
+//     // std::cout<<"A_eq  \n"<< Ceq_cone << std::endl; 
 
-    optdP_cone.setZero();
+//     optdP_cone.setZero();
 
-    status_qp = qp.solve_quadprog(Q_cone, q_cone, Ceq_cone, ceq_cone, Cineq_cone, cineq_cone, optdP_cone);
+//     status_qp = qp.solve_quadprog(Q_cone, q_cone, Ceq_cone, ceq_cone, Cineq_cone, cineq_cone, optdP_cone);
 
-    i_active_ = 0; 
-    for (unsigned int i = 0; i<nactive_; i++){
-      if (!contacts_[i]->active || !contacts_[i]->unilateral) continue;
-      contacts_[i]->predictedX0_ += .5 * sub_dt * optdP_cone.segment<3>(3*i_active_); 
-      contacts_[i]->predictedF_ = K.block<3,3>(3*i_active_, 3*i_active_)*(contacts_[i]->predictedX0_-contacts_[i]->predictedX_); 
-      contacts_[i]->predictedF_ -= B.block<3,3>(3*i_active_, 3*i_active_)*contacts_[i]->predictedV_; 
-      fpr_.segment<3>(3*i_active_) = contacts_[i]->predictedF_;
-      i_active_ += 1; 
-    }
-    // std::cout<<"optimizer status\n"<<status_qp<<std::endl; 
-    // if (status_qp == expected_qp){
-    //   i_active_ = 0; 
-    //   for (unsigned int i = 0; i<nactive_; i++){
-    //     if (!contacts_[i]->active || !contacts_[i]->unilateral) continue;
-    //     contacts_[i]->predictedX0_ += .5 * sub_dt * optdP_cone.segment<3>(3*i_active_); 
-    //     contacts_[i]->predictedF_ = K.block<3,3>(3*i_active_, 3*i_active_)*(contacts_[i]->predictedX0_-contacts_[i]->predictedX_); 
-    //     contacts_[i]->predictedF_ -= B.block<3,3>(3*i_active_, 3*i_active_)*contacts_[i]->predictedV_; 
-    //     fpr_.segment<3>(3*i_active_) = contacts_[i]->predictedF_;
-    //     i_active_ += 1; 
-    //   }
-    // } else{
-    //   throw std::runtime_error("solver did not converge ");
-    // }
-  } 
-  else{
-    throw std::runtime_error("Slipping update method not recongnized ");
-  }
+//     i_active_ = 0; 
+//     for (unsigned int i = 0; i<nactive_; i++){
+//       if (!contacts_[i]->active || !contacts_[i]->unilateral) continue;
+//       contacts_[i]->predictedX0_ += .5 * sub_dt * optdP_cone.segment<3>(3*i_active_); 
+//       contacts_[i]->predictedF_ = K.block<3,3>(3*i_active_, 3*i_active_)*(contacts_[i]->predictedX0_-contacts_[i]->predictedX_); 
+//       contacts_[i]->predictedF_ -= B.block<3,3>(3*i_active_, 3*i_active_)*contacts_[i]->predictedV_; 
+//       fpr_.segment<3>(3*i_active_) = contacts_[i]->predictedF_;
+//       i_active_ += 1; 
+//     }
+//     // std::cout<<"optimizer status\n"<<status_qp<<std::endl; 
+//     // if (status_qp == expected_qp){
+//     //   i_active_ = 0; 
+//     //   for (unsigned int i = 0; i<nactive_; i++){
+//     //     if (!contacts_[i]->active || !contacts_[i]->unilateral) continue;
+//     //     contacts_[i]->predictedX0_ += .5 * sub_dt * optdP_cone.segment<3>(3*i_active_); 
+//     //     contacts_[i]->predictedF_ = K.block<3,3>(3*i_active_, 3*i_active_)*(contacts_[i]->predictedX0_-contacts_[i]->predictedX_); 
+//     //     contacts_[i]->predictedF_ -= B.block<3,3>(3*i_active_, 3*i_active_)*contacts_[i]->predictedV_; 
+//     //     fpr_.segment<3>(3*i_active_) = contacts_[i]->predictedF_;
+//     //     i_active_ += 1; 
+//     //   }
+//     // } else{
+//     //   throw std::runtime_error("solver did not converge ");
+//     // }
+//   } 
+//   else{
+//     throw std::runtime_error("Slipping update method not recongnized ");
+//   }
 
-}
+// }
 
 
 
@@ -653,25 +709,25 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
     // constraints should account for both directions of friction 
     // and positive normal force, this implies 5 constraints per active contact
     // will be arranged as follows [+ve_basisA, -ve_BasisA, +ve_BasisB, -ve_BasisB]
-    cone_constraints_.resize(4*nactive_,3*nactive_); cone_constraints_.setZero(); 
-    eq_cone_constraints_.resize(nactive_,3*nactive_); eq_cone_constraints_.setZero(); 
-    contact_position_integrator_.resize(6*nactive_,3*nactive_); contact_position_integrator_.setZero(); 
-    // divide integrator matrix by sub_dt directly 
-    contact_position_integrator_.block(0,0, 3*nactive_, 3*nactive_) = .5 * Eigen::MatrixXd::Identity(3*nactive_, 3*nactive_);
-    contact_position_integrator_.block(3*nactive_,0, 3*nactive_, 3*nactive_) = Eigen::MatrixXd::Identity(3*nactive_, 3*nactive_)/sub_dt;
-    D_intExpA_integrator.resize(3*nactive_,3*nactive_); D_intExpA_integrator.setZero(); 
+    // cone_constraints_.resize(4*nactive_,3*nactive_); cone_constraints_.setZero(); 
+    // eq_cone_constraints_.resize(nactive_,3*nactive_); eq_cone_constraints_.setZero(); 
+    // contact_position_integrator_.resize(6*nactive_,3*nactive_); contact_position_integrator_.setZero(); 
+    // // divide integrator matrix by sub_dt directly 
+    // contact_position_integrator_.block(0,0, 3*nactive_, 3*nactive_) = .5 * Eigen::MatrixXd::Identity(3*nactive_, 3*nactive_);
+    // contact_position_integrator_.block(3*nactive_,0, 3*nactive_, 3*nactive_) = Eigen::MatrixXd::Identity(3*nactive_, 3*nactive_)/sub_dt;
+    // D_intExpA_integrator.resize(3*nactive_,3*nactive_); D_intExpA_integrator.setZero(); 
 
-    qp.reset(3*nactive_, 0., 4 * nactive_); 
-    Q_cone.resize(3 * nactive_, 3 * nactive_); Q_cone.setZero(); 
-    Q_cone.noalias() = 2 * Eigen::MatrixXd::Identity(3*nactive_, 3*nactive_);
-    q_cone.resize(3*nactive_); q_cone.setZero();
-    Cineq_cone.resize(4 * nactive_,3 * nactive_); Cineq_cone.setZero();
-    cineq_cone.resize(4 * nactive_);  cineq_cone.setZero();
-    // Ceq_cone.resize(nactive_,3 * nactive_); Ceq_cone.setZero();
-    // ceq_cone.resize(nactive_);  ceq_cone.setZero();
-    Ceq_cone.resize(0,3 * nactive_); Ceq_cone.setZero();
-    ceq_cone.resize(0);  ceq_cone.setZero();
-    optdP_cone.resize(3*nactive_), optdP_cone.setZero();
+    // qp.reset(3*nactive_, 0., 4 * nactive_); 
+    // Q_cone.resize(3 * nactive_, 3 * nactive_); Q_cone.setZero(); 
+    // Q_cone.noalias() = 2 * Eigen::MatrixXd::Identity(3*nactive_, 3*nactive_);
+    // q_cone.resize(3*nactive_); q_cone.setZero();
+    // Cineq_cone.resize(4 * nactive_,3 * nactive_); Cineq_cone.setZero();
+    // cineq_cone.resize(4 * nactive_);  cineq_cone.setZero();
+    // // Ceq_cone.resize(nactive_,3 * nactive_); Ceq_cone.setZero();
+    // // ceq_cone.resize(nactive_);  ceq_cone.setZero();
+    // Ceq_cone.resize(0,3 * nactive_); Ceq_cone.setZero();
+    // ceq_cone.resize(0);  ceq_cone.setZero();
+    // optdP_cone.resize(3*nactive_), optdP_cone.setZero();
 
 
     //
@@ -690,11 +746,11 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
       B(3*i_active_+2, 3*i_active_+2) = contacts_[i]->optr->contact_model_->damping_(2);
 
       // fill up contact normals and tangents for constraints 
-      cone_constraints_.block<1,3>(4*i_active_, 3*i_active_) = (1/sqrt(2)) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose() - contacts_[i]->contactTangentA_.transpose();
-      cone_constraints_.block<1,3>(4*i_active_+1, 3*i_active_) = (1/sqrt(2)) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose() + contacts_[i]->contactTangentA_.transpose();
-      cone_constraints_.block<1,3>(4*i_active_+2, 3*i_active_) = (1/sqrt(2)) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose() - contacts_[i]->contactTangentB_.transpose();
-      cone_constraints_.block<1,3>(4*i_active_+3, 3*i_active_) = (1/sqrt(2)) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose() + contacts_[i]->contactTangentB_.transpose();
-      eq_cone_constraints_.block<1,3>(i_active_, 3*i_active_) = contacts_[i]->contactNormal_.transpose();
+      // cone_constraints_.block<1,3>(4*i_active_, 3*i_active_) = (1/sqrt(2)) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose() - contacts_[i]->contactTangentA_.transpose();
+      // cone_constraints_.block<1,3>(4*i_active_+1, 3*i_active_) = (1/sqrt(2)) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose() + contacts_[i]->contactTangentA_.transpose();
+      // cone_constraints_.block<1,3>(4*i_active_+2, 3*i_active_) = (1/sqrt(2)) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose() - contacts_[i]->contactTangentB_.transpose();
+      // cone_constraints_.block<1,3>(4*i_active_+3, 3*i_active_) = (1/sqrt(2)) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose() + contacts_[i]->contactTangentB_.transpose();
+      // eq_cone_constraints_.block<1,3>(i_active_, 3*i_active_) = contacts_[i]->contactNormal_.transpose();
 
       i_active_ += 1; 
     }

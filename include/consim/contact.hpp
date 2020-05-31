@@ -27,15 +27,15 @@ class ContactPoint {
     void updatePosition(pinocchio::Data &data);  /*!< updates cartesian position */ 
     void firstOrderContactKinematics(pinocchio::Data &data);  /*!< computes c, world_J_ and relative penetration */ 
     void secondOrderContactKinematics(pinocchio::Data &data, Eigen::VectorXd &v); /*!< computes dJv_ */
-    void resetAnchorPoint(Eigen::VectorXd &x0);  /*!< resets the anchor point for the contact  */
+    void resetAnchorPoint(Eigen::Vector3d &p0);  /*!< resets the anchor point position and velocity */
     void projectForceInCone(Eigen::Vector3d &f);
     
     std::string name_;
     const pinocchio::Model *model_;
     unsigned int frame_id;
 
-    bool active;            // true if the point is in collision with the environment, false otherwise
-    bool slipping;          // true if the contact is slipping, false otherwise
+    bool active;            /*!< true if the point is in collision with the environment, false otherwise */
+    bool slipping;          /*!< true if the contact is slipping, false otherwise */
     bool unilateral;      /*!< true if the contact is unilateral, false if bilateral */
 
     ContactObject* optr;         /*!< pointer to current contact object, changes with each new contact switch */  

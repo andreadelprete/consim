@@ -30,9 +30,10 @@ if __name__=="__main__":
     print('RobotWrapper Object Created Successfully!')
 
     dt = 1.e-3
-    mu = 0.3        # friction coefficient
-    # isSparse = False 
-    # isInvertible = False
+    mu = 0.3        
+    #  friction coefficient
+    #  isSparse = False 
+    #  isInvertible = False
     anchor_slipping = 2
     unilateral_contacts = True  
     K = 1e5 * np.eye(3)

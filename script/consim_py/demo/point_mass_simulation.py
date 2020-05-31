@@ -20,7 +20,7 @@ if __name__=="__main__":
     dt = 1.e-3
     mu = 0.3        # friction coefficient
     anchor_slipping = 1
-    unilateral_contacts = True  
+    unilateral_contacts = False  
     K = 1e5 * np.ones([3,1])
     B = 3e2 * np.ones([3,1])
     N_SIMULATION = 200
@@ -31,9 +31,9 @@ if __name__=="__main__":
     contact_names = ['root_joint']
     
     simu_params = []
-    # simu_params += [{'name': 'exponential 100',
-    #                 'type': 'exponential', 
-    #                 'ndt': 100}]
+    simu_params += [{'name': 'exponential 100',
+                    'type': 'exponential', 
+                    'ndt': 100}]
     # simu_params += [{'name': 'exponential 500',
     #                 'type': 'exponential', 
     #                 'ndt': 500}]

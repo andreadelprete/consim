@@ -31,7 +31,7 @@ namespace consim {
 
   class AbstractSimulator {
     public:
-      AbstractSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps); 
+      AbstractSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD); 
       ~AbstractSimulator(){};
 
       /**
@@ -47,16 +47,25 @@ namespace consim {
       const ContactPoint &getContact(std::string name);
 
       /**
+       * checks if contact is active 
+       * if active it updates p0 for the specified contact 
+       * can update all contact forces
+       * can be called after sim.step to update contact forces for next simulation step 
+       **/ 
+      void resetContactAnchorPoint(std::string name, Eigen::Vector3d &p0, bool updateContactForces); 
+
+      /**
         * Adds an object to the simulator for contact interaction checking.
       */
       void addObject(ContactObject &obj);
 
+
       /**
        * Convenience method to perform a single dt timestep of the simulation. The
-       * q and dq after the step are available form the sim.q and sim.dq property.
-       * The acceloration during the last step is available from data.ddq;
+       * q and dq after the step are available form the sim.q and sim.v property.
+       * The acceloration during the last step is available from data.dv;
        * 
-       * The jacobian, frames etc. of data is update after the final q/dq values
+       * The jacobian, frames etc. of data is update after the final q/v values
        * are computed. This allows to use the data object after calling step
        * without the need to re-run the computeXXX methods etc.
        */
@@ -68,7 +77,7 @@ namespace consim {
       /**
        * Convenience method to perform a single dt timestep of the simulation. 
        * Computes q, dq, ddq, and contact forces for a single time step 
-       * results are stored in sim.q, sim.dq, sim.ddq, sim.f 
+       * results are stored in sim.q, sim.v, sim.dv, sim.f 
        */
 
       virtual void step(const Eigen::VectorXd &tau)=0;
@@ -106,6 +115,18 @@ namespace consim {
       Eigen::VectorXd joint_friction_;
       bool joint_friction_flag_ = 0;
   
+
+      /** which forward dynamics to use 
+       *  1: pinocchio::computeMinverse()
+       *  2: pinocchio::aba()
+       *  3: cholesky decompostion 
+       **/ 
+      const int whichFD_; 
+      Eigen::LLT<MatrixXd> lltM_; /*!< used for Cholesky FD */ 
+      Eigen::MatrixXd inverseM_;  /*!< used for pinocchio::computeMinverse() */ 
+      Eigen::VectorXd mDv_; 
+      Eigen::VectorXd fkDv_; // filled with zeros for second order kinematics  
+
   }; // class AbstractSimulator
 
 /*_______________________________________________________________________________*/
@@ -114,7 +135,7 @@ namespace consim {
   class EulerSimulator : public AbstractSimulator
   {
     public: 
-      EulerSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps); 
+      EulerSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD); 
       ~EulerSimulator(){};
 
     /**
@@ -125,9 +146,7 @@ namespace consim {
 
     protected:
       void computeContactForces() override;
-      Eigen::LLT<MatrixXd> lltM_;
-      Eigen::MatrixXd inverseM_; 
-      Eigen::VectorXd mDv_; 
+      
 
   }; // class EulerSimulator
 
@@ -141,8 +160,8 @@ namespace consim {
        * 1: compute average force over the integration step, project on the cone boundary then update p0 
        * 2: a QP method to update the anchor point velocity, then average force is computed 
        **/  
-      ExponentialSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, 
-                          int slipping_method=1, bool compute_predicted_forces=false); 
+      ExponentialSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps,
+              int whichFD, int slipping_method=1, bool compute_predicted_forces=false); 
 
       ~ExponentialSimulator(){};
       void step(const Eigen::VectorXd &tau) override;
@@ -200,9 +219,12 @@ namespace consim {
       expokit::MatExpIntegral<double>  util_int_eDtA_two = expokit::MatExpIntegral<double>(12);   // current implementation static 
       expokit::MatExpIntegral<double>  util_int_eDtA_three = expokit::MatExpIntegral<double>(18);   // current implementation static 
       expokit::MatExpIntegral<double>  util_int_eDtA_four = expokit::MatExpIntegral<double>(24);   // current implementation static 
+      /*!< terms to approximate integral of e^{\tau A} */ 
 
+      Eigen::MatrixXd expAdt_; 
+      Eigen::MatrixXd inteAdt_;
 
-      Eigen::VectorXd fkDv_; // filled with zeros for second order kinematics  
+      
       Eigen::VectorXd predictedForce_;
       Eigen::VectorXd predictedX0_;  
       Eigen::VectorXd predictedXf_; 
@@ -220,20 +242,22 @@ namespace consim {
       bool cone_flag_ = false; // cone violation status 
       double cone_direction_; // angle of tangential(to contact surface) force 
 
-      Eigen::Vector3d f_avg_i; 
-      Eigen::Vector3d normalFi_; // normal component of contact force Fi at contact Ci  
-      Eigen::Vector3d tangentFi_; // normal component of contact force Fi at contact Ci  
-      Eigen::Vector3d f_avg_i2; 
-      Eigen::Vector3d normalFi_2; // normal component of contact force Fi at contact Ci  
-      Eigen::Vector3d tangentFi_2; // normal component of contact force Fi at contact Ci  
+      // Eigen::Vector3d f_avg_i; 
+      // Eigen::Vector3d normalFi_; // normal component of contact force Fi at contact Ci  
+      // Eigen::Vector3d tangentFi_; // normal component of contact force Fi at contact Ci  
+      // Eigen::Vector3d f_avg_i2; 
+      // Eigen::Vector3d normalFi_2; // normal component of contact force Fi at contact Ci  
+      // Eigen::Vector3d tangentFi_2; // normal component of contact force Fi at contact Ci  
 
       Eigen::VectorXd dvMean2_; // used in method 1 of contact slipping 
       Eigen::VectorXd vMean2_; // used in method 1 of contact slipping 
 
-      double fnor_;   // norm of normalFi_  
-      double ftan_;   // norm of tangentFi_ 
-      double fnor2_;   // norm of normalFi_  
-      double ftan2_;   // norm of tangentFi_ 
+      Eigen::Vector3d  f_tmp;
+
+      // double fnor_;   // norm of normalFi_  
+      // double ftan_;   // norm of tangentFi_ 
+      // double fnor2_;   // norm of normalFi_  
+      // double ftan2_;   // norm of tangentFi_ 
       unsigned int i_active_; // index of the active contact      
 
       Eigen::MatrixXd invK_; 
@@ -242,31 +266,26 @@ namespace consim {
        * solves a QP to update anchor points of sliding contacts
        * min || dp0_avg || ^ 2 
        * st. Fc \in Firction Cone
-       **/  
-      void computeSlipping(); 
-      eiquadprog::solvers::EiquadprogFast qp;
-      Eigen::MatrixXd Q_cone; 
-      Eigen::VectorXd q_cone; 
-      Eigen::MatrixXd Cineq_cone; 
-      Eigen::VectorXd cineq_cone; 
-      Eigen::MatrixXd Ceq_cone; 
-      Eigen::VectorXd ceq_cone; 
-      Eigen::VectorXd optdP_cone; 
-      //
-      Eigen::Vector3d xstart_new; // invK*cone_force_offset_03
-      // terms to approximate integral of e^{\tau A}
+      //  **/  
+      // void computeSlipping(); 
+      // Eigen::MatrixXd Q_cone; 
+      // Eigen::VectorXd q_cone; 
+      // Eigen::MatrixXd Cineq_cone; 
+      // Eigen::VectorXd cineq_cone; 
+      // Eigen::MatrixXd Ceq_cone; 
+      // Eigen::VectorXd ceq_cone; 
+      // Eigen::VectorXd optdP_cone; 
+
       
-      Eigen::MatrixXd expAdt_; 
-      Eigen::MatrixXd inteAdt_;
 
-      Eigen::MatrixXd cone_constraints_;
-      Eigen::MatrixXd eq_cone_constraints_;
-      Eigen::MatrixXd contact_position_integrator_; 
-      Eigen::MatrixXd D_intExpA_integrator; 
+      // Eigen::MatrixXd cone_constraints_;
+      // Eigen::MatrixXd eq_cone_constraints_;
+      // Eigen::MatrixXd contact_position_integrator_; 
+      // Eigen::MatrixXd D_intExpA_integrator; 
 
-      eiquadprog::solvers::EiquadprogFast_status expected_qp = eiquadprog::solvers::EIQUADPROG_FAST_OPTIMAL;
+      // eiquadprog::solvers::EiquadprogFast_status expected_qp = eiquadprog::solvers::EIQUADPROG_FAST_OPTIMAL;
 
-      eiquadprog::solvers::EiquadprogFast_status status_qp;
+      // eiquadprog::solvers::EiquadprogFast_status status_qp;
 
   }; // class ExponentialSimulator
 
