@@ -25,7 +25,7 @@ print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
 i_min = 0
-i_max = 9
+i_max = 7
 i_ground_truth = i_max+2
 
 GROUND_TRUTH_SIMU_PARAMS = {
@@ -38,13 +38,13 @@ GROUND_TRUTH_SIMU_PARAMS = {
 SIMU_PARAMS = []
 
 # EXPONENTIAL INTEGRATOR WITH STANDARD SETTINGS
-for i in range(i_min, i_max):
-    SIMU_PARAMS += [{
-        'name': 'exp%4d'%(2**i),
-        'method_name': 'exp',
-        'use_exp_int': 1,
-        'ndt': 2**i,
-    }]
+#for i in range(i_min, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'exp%4d'%(2**i),
+#        'method_name': 'exp',
+#        'use_exp_int': 1,
+#        'ndt': 2**i,
+#    }]
     
 # EXPONENTIAL INTEGRATOR, UPDATE MATRIX EXPONENTIAL EVERY FEW ITERATIONS
 #for i in range(i_min, i_max):
@@ -79,23 +79,23 @@ for i in range(i_min, i_max):
 #        }]
 
 # EULER SIMULATOR with Cholesky
-#for i in range(5, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'euler%4d Chol'%(2**i),
-#        'method_name': 'euler Chol',
-#        'use_exp_int': 0,
-#        'ndt': 2**i,
-#    }]
-#    
-## EULER SIMULATOR with ABA
-#for i in range(5, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'euler%4d ABA'%(2**i),
-#        'method_name': 'euler ABA',
-#        'use_exp_int': 0,
-#        'ndt': 2**i,
-#        'fwd_dyn_method': 'aba'
-#    }]
+for i in range(5, i_max):
+    SIMU_PARAMS += [{
+        'name': 'euler%4d Chol'%(2**i),
+        'method_name': 'euler Chol',
+        'use_exp_int': 0,
+        'ndt': 2**i,
+    }]
+    
+# EULER SIMULATOR with ABA
+for i in range(5, i_max):
+    SIMU_PARAMS += [{
+        'name': 'euler%4d ABA'%(2**i),
+        'method_name': 'euler ABA',
+        'use_exp_int': 0,
+        'ndt': 2**i,
+        'fwd_dyn_method': 'aba'
+    }]
     
 ## EULER SIMULATOR with pinocchio::computeMinverse
 for i in range(5, i_max):
