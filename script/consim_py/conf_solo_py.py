@@ -15,7 +15,7 @@ LINE_WIDTH = 60
 # N_SIMULATION = 4000             # number of time steps simulated
 # dt = 0.002                      # controller time step
 
-mu = 0.3                            # friction coefficient
+mu = 1.0                              # friction coefficient
 fMin = 1.0                          # minimum normal force
 fMax = 1000.0                       # maximum normal force
 contact_frames = ['HL_FOOT', 'HR_FOOT', 'FL_FOOT', 'FR_FOOT']
@@ -48,15 +48,6 @@ q0 = 1e-6*np.array([0.605, -0.083, 223001.532, 0.187, 5.332, -0.000, 1000000.000
 #                     190000.000, 150050.000, 53.853, 190000.000, -150050.000, 53.853, ])
 p0 = None
 
-use_viewer = 1
+use_viewer = 0
 CAMERA_TRANSFORM = [1.0910934209823608, -1.4611519575119019, 0.9074661731719971,
                     0.5040678381919861, 0.17712827026844025, 0.24428671598434448, 0.8092374205589294]
-
-SPHERE_RADIUS = 0.03
-REF_SPHERE_RADIUS = 0.03
-COM_SPHERE_COLOR = (1, 0.5, 0, 1)
-COM_REF_SPHERE_COLOR = (1, 0, 0, 1)
-RF_SPHERE_COLOR = (0, 1, 0, 1)
-RF_REF_SPHERE_COLOR = (0, 1, 0.5, 1)
-LF_SPHERE_COLOR = (0, 0, 1, 1)
-LF_REF_SPHERE_COLOR = (0.5, 0, 1, 1)

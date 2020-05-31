@@ -25,7 +25,7 @@ print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
 i_min = 0
-i_max = 7
+i_max = 9
 i_ground_truth = i_max+2
 
 GROUND_TRUTH_SIMU_PARAMS = {
@@ -38,13 +38,13 @@ GROUND_TRUTH_SIMU_PARAMS = {
 SIMU_PARAMS = []
 
 # EXPONENTIAL INTEGRATOR WITH STANDARD SETTINGS
-#for i in range(i_min, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'exp%4d'%(2**i),
-#        'method_name': 'exp',
-#        'use_exp_int': 1,
-#        'ndt': 2**i,
-#    }]
+for i in range(i_min, i_max):
+    SIMU_PARAMS += [{
+        'name': 'exp%4d'%(2**i),
+        'method_name': 'exp',
+        'use_exp_int': 1,
+        'ndt': 2**i,
+    }]
     
 # EXPONENTIAL INTEGRATOR, UPDATE MATRIX EXPONENTIAL EVERY FEW ITERATIONS
 #for i in range(i_min, i_max):
@@ -79,23 +79,23 @@ SIMU_PARAMS = []
 #        }]
 
 # EULER SIMULATOR with Cholesky
-for i in range(5, i_max):
-    SIMU_PARAMS += [{
-        'name': 'euler%4d Chol'%(2**i),
-        'method_name': 'euler Chol',
-        'use_exp_int': 0,
-        'ndt': 2**i,
-    }]
-    
-# EULER SIMULATOR with ABA
-for i in range(5, i_max):
-    SIMU_PARAMS += [{
-        'name': 'euler%4d ABA'%(2**i),
-        'method_name': 'euler ABA',
-        'use_exp_int': 0,
-        'ndt': 2**i,
-        'fwd_dyn_method': 'aba'
-    }]
+#for i in range(5, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'euler%4d Chol'%(2**i),
+#        'method_name': 'euler Chol',
+#        'use_exp_int': 0,
+#        'ndt': 2**i,
+#    }]
+#    
+## EULER SIMULATOR with ABA
+#for i in range(5, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'euler%4d ABA'%(2**i),
+#        'method_name': 'euler ABA',
+#        'use_exp_int': 0,
+#        'ndt': 2**i,
+#        'fwd_dyn_method': 'aba'
+#    }]
     
 ## EULER SIMULATOR with pinocchio::computeMinverse
 for i in range(5, i_max):
@@ -112,14 +112,14 @@ PLOT_FORCES = 0
 PLOT_BASE_POS = 0
 PLOT_FORCE_PREDICTIONS = 0
 PLOT_INTEGRATION_ERRORS = 1
-PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
+PLOT_INTEGRATION_ERROR_TRAJECTORIES = 0
 PLOT_MAT_MULT_EXPM = 0
 PLOT_MAT_NORM_EXPM = 0
 
 ASSUME_A_INVERTIBLE = 0
 USE_CONTROLLER = 1
 dt = 0.01                      # controller time step
-T = 0.1
+T = 0.01
 
 offset = np.array([0.0, -0.0, 0.0])
 amp = np.array([0.0, 0.0, 0.05])
@@ -136,7 +136,7 @@ simu.assume_A_invertible = ASSUME_A_INVERTIBLE
 q0, v0 = np.copy(simu.q), np.copy(simu.v)
 
 for name in conf.contact_frames:
-    simu.add_contact(name, conf.contact_normal, conf.K, conf.B)
+    simu.add_contact(name, conf.contact_normal, conf.K, conf.B, conf.mu)
 
 invdyn = TsidQuadruped(conf, solo, q0, viewer=False)
 robot = invdyn.robot
@@ -157,7 +157,7 @@ sampleCom = invdyn.trajCom.computeNext()
 def run_simulation(q, v, simu_params):
     simu = RobotSimulator(conf, solo, se3.JointModelFreeFlyer())
     for name in conf.contact_frames:
-        simu.add_contact(name, conf.contact_normal, conf.K, conf.B)
+        simu.add_contact(name, conf.contact_normal, conf.K, conf.B, conf.mu)
     simu.init(q0, v0, p0=conf.p0)
     try:
         simu.max_mat_mult = simu_params['max_mat_mult']
@@ -299,7 +299,7 @@ mat_mult_expm, mat_norm_expm = {}, {}
 for name in sorted(data.keys()):
     if(name=='ground-truth'): continue
     d = data[name]
-    err = norm(d.q - data_ground_truth.q) + norm(d.v - data_ground_truth.v)
+    err = (norm(d.q - data_ground_truth.q) + norm(d.v - data_ground_truth.v)) / d.q.shape[0]
     err_per_time = np.array(norm(d.q - data_ground_truth.q, axis=0)) + \
                     np.array(norm(d.v - data_ground_truth.v, axis=0))
     print(name, 'Total error: %.2f'%np.log10(err))

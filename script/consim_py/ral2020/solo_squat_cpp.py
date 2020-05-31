@@ -21,13 +21,20 @@ print(" Test Sliding Mass ".center(conf.LINE_WIDTH, '#'))
 print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
-i_min = 0
-i_max = i_min+11
+i_min = 2
+i_max = i_min+4
 i_ground_truth = i_max+2
 
-GROUND_TRUTH_SIMU_PARAMS = {
+GROUND_TRUTH_EXP_SIMU_PARAMS = {
     'name': 'ground-truth %d'%(2**i_ground_truth),
-    'method_name': 'ground-truth',
+    'method_name': 'ground-truth-exp',
+    'use_exp_int': 1,
+    'ndt': 2**i_ground_truth,
+}
+
+GROUND_TRUTH_EULER_SIMU_PARAMS = {
+    'name': 'ground-truth %d'%(2**i_ground_truth),
+    'method_name': 'ground-truth-euler',
     'use_exp_int': 0,
     'ndt': 2**i_ground_truth,
 }
@@ -61,7 +68,7 @@ PLOT_INTEGRATION_ERROR_TRAJECTORIES = 0
 PLOT_CONTACT_POINT_PREDICTION = 0
 PLOT_ANCHOR_POINTS = 0
 
-dt = 0.010                      # controller time step
+dt = 0.01                      # controller time step
 T = 0.1
 unilateral_contacts = 1
 compute_predicted_forces = False
@@ -83,7 +90,6 @@ if conf.use_viewer:
     
     
 invdyn = TsidQuadruped(conf, robot, conf.q0, viewer=False)
-#robot = invdyn.robot
 offset += invdyn.robot.com(invdyn.formulation.data())
 two_pi_f_amp = two_pi_f * amp
 two_pi_f_squared_amp = two_pi_f * two_pi_f_amp
@@ -180,8 +186,10 @@ for simu_params in SIMU_PARAMS:
     data[name] = run_simulation(conf.q0, conf.v0, simu_params)
 
 print("\nStart simulation ground truth")
-data_ground_truth = run_simulation(conf.q0, conf.v0, GROUND_TRUTH_SIMU_PARAMS)
-data['ground-truth'] = data_ground_truth
+data_ground_truth_exp = run_simulation(conf.q0, conf.v0, GROUND_TRUTH_EXP_SIMU_PARAMS)
+data_ground_truth_euler = run_simulation(conf.q0, conf.v0, GROUND_TRUTH_EULER_SIMU_PARAMS)
+data['ground-truth-exp'] = data_ground_truth_exp
+data['ground-truth-euler'] = data_ground_truth_euler
 
 # COMPUTE INTEGRATION ERRORS:
 print('\n')
@@ -189,9 +197,12 @@ ndt = {}
 total_err, err_traj = {}, {}
 mat_mult_expm, mat_norm_expm = {}, {}
 for name in sorted(data.keys()):
-    if(name=='ground-truth'): continue
+    if('ground-truth' in name): continue
     d = data[name]
-    err = (norm(d.q - data_ground_truth.q) + norm(d.v - data_ground_truth.v)) #/ d.q.shape[0]
+    if(d.use_exp_int==0): data_ground_truth = data_ground_truth_euler
+    else:                 data_ground_truth = data_ground_truth_exp
+    
+    err = (norm(d.q - data_ground_truth.q) + norm(d.v - data_ground_truth.v)) / d.q.shape[0]
     err_per_time = np.array(norm(d.q - data_ground_truth.q, axis=0)) + \
                     np.array(norm(d.v - data_ground_truth.v, axis=0))
     print(name, 'Total error: %.2f'%np.log10(err))

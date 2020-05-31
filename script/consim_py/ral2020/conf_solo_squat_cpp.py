@@ -12,7 +12,7 @@ np.set_printoptions(precision=2, linewidth=200, suppress=True,
 LINE_WIDTH = 60
 
 
-mu = 0.3*1e3                            # friction coefficient
+mu = 1.0                            # friction coefficient
 fMin = 1.0                          # minimum normal force
 fMax = 1000.0                       # maximum normal force
 contact_frames = ['HL_FOOT', 'HR_FOOT', 'FL_FOOT', 'FR_FOOT']
