@@ -166,7 +166,7 @@ AbstractSimulator(model, data, dt, n_integration_steps, whichFD) {}
 void EulerSimulator::computeContactForces() 
 {
   CONSIM_START_PROFILER("pinocchio::computeAllTerms");
-  pinocchio::forwardKinematics(*model_, *data_, q_, v_, fkDv_);
+  pinocchio::forwardKinematics(*model_, *data_, q_, v_);
   pinocchio::computeJointJacobians(*model_, *data_);
   pinocchio::updateFramePlacements(*model_, *data_);
   pinocchio::nonLinearEffects(*model_, *data_, q_, v_);
