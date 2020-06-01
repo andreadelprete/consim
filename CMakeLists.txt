@@ -16,6 +16,11 @@
 
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 
+SET(PROJECT_NAME consim)
+SET(PROJECT_DESCRIPTION "Efficient Contact Dynamics Simulation based on Pinocchio")
+SET(PROJECT_URL "http://github.com/stack-of-tasks/consim")
+OPTION(INSTALL_DOCUMENTATION "Generate and install the documentation" OFF)
+
 INCLUDE(cmake/base.cmake)
 INCLUDE(cmake/boost.cmake)
 INCLUDE(cmake/eigen.cmake)
@@ -24,10 +29,7 @@ INCLUDE(cmake/ide.cmake)
 INCLUDE(cmake/apple.cmake)
 INCLUDE(cmake/test.cmake)
 
-SET(PROJECT_NAME consim)
-SET(PROJECT_DESCRIPTION "Efficient Contact Dynamics Simulation based on Pinocchio")
-SET(PROJECT_URL "http://github.com/stack-of-tasks/consim")
-OPTION(INSTALL_DOCUMENTATION "Generate and install the documentation" OFF)
+
 
 SET(DOXYGEN_USE_MATHJAX YES)
 
