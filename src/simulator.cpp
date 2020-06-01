@@ -6,6 +6,7 @@
 #include <pinocchio/algorithm/compute-all-terms.hpp>
 #include <pinocchio/algorithm/kinematics.hpp>
 #include <pinocchio/algorithm/rnea.hpp>
+#include <pinocchio/algorithm/cholesky.hpp>
 #include <pinocchio/algorithm/jacobian.hpp>
 
 #include "consim/object.hpp"
@@ -210,26 +211,30 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
        **/  
       switch (whichFD_)
       {
-      case 1:
-        mDv_ = tau_ - data_->nle; 
-        inverseM_ = pinocchio::computeMinverse(*model_, *data_, q_);
-        dv_ = inverseM_*mDv_; 
-        break;
-      
-      case 2:
-        pinocchio::aba(*model_, *data_, q_, v_, tau_);
-        dv_ = data_-> ddq; 
-        break;
-      
-      case 3:
-        pinocchio::crba(*model_, *data_, q_);
-        mDv_ = tau_ - data_->nle; 
-        lltM_.compute(data_->M);
-        dv_ = lltM_.solve(mDv_);
-        break;
-      
-      default:
-        throw std::runtime_error("Forward Dynamics Method not recognized");
+        case 1: // slower than ABA
+          mDv_ = tau_ - data_->nle;
+          inverseM_ = pinocchio::computeMinverse(*model_, *data_, q_);
+          inverseM_.triangularView<Eigen::StrictlyLower>()
+          = inverseM_.transpose().triangularView<Eigen::StrictlyLower>(); // need to fill the Lower part of the matrix
+          dv_.noalias() = inverseM_*mDv_;
+          break;
+          
+        case 2: // fast
+          pinocchio::aba(*model_, *data_, q_, v_, tau_);
+          dv_ = data_-> ddq;
+          break;
+          
+        case 3: // fast if some results are reused
+          pinocchio::crba(*model_, *data_, q_);
+          mDv_ = tau_ - data_->nle;
+          dv_ = mDv_;
+          // Sparse Cholesky factorization
+          pinocchio::cholesky::decompose(*model_, *data_);
+          pinocchio::cholesky::solve(*model_,*data_,dv_);
+          break;
+          
+        default:
+          throw std::runtime_error("Forward Dynamics Method not recognized");
       }
       
       /*!< integrate twice */  
@@ -333,8 +338,10 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       {
       case 1:
         mDv_ = tau_ - data_->nle; 
-        pinocchio::crba(*model_, *data_, q_);
+        // pinocchio::crba(*model_, *data_, q_); // not needed here.
         inverseM_ = pinocchio::computeMinverse(*model_, *data_, q_);
+        inverseM_.triangularView<Eigen::StrictlyLower>()
+        = inverseM_.transpose().triangularView<Eigen::StrictlyLower>(); // need to fill the Lower part of the matrix
         // dvMean_ = inverseM_*mDv_; 
         dvMean_.noalias() = data_->Minv*mDv_;
         break;
@@ -346,9 +353,11 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       
       case 3:
         pinocchio::crba(*model_, *data_, q_);
-        mDv_ = tau_ - data_->nle; 
-        lltM_.compute(data_->M);
-        dvMean_ = lltM_.solve(mDv_);
+        mDv_ = tau_ - data_->nle;
+        dv_ = mDv_;
+        // Sparse Cholesky factorization
+        pinocchio::cholesky::decompose(*model_, *data_);
+        pinocchio::cholesky::solve(*model_,*data_,dv_);
         break;
       
       default:
