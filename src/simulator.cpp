@@ -1,5 +1,4 @@
-#include <pinocchio/spatial/se3.hpp>
-#include <pinocchio/multibody/model.hpp>
+
 #include <pinocchio/algorithm/aba.hpp>
 #include <pinocchio/algorithm/joint-configuration.hpp> // se3.integrate
 #include <pinocchio/algorithm/frames.hpp>
@@ -7,6 +6,7 @@
 #include <pinocchio/algorithm/compute-all-terms.hpp>
 #include <pinocchio/algorithm/kinematics.hpp>
 #include <pinocchio/algorithm/rnea.hpp>
+#include <pinocchio/algorithm/cholesky.hpp>
 #include <pinocchio/algorithm/jacobian.hpp>
 
 #include "consim/object.hpp"
@@ -39,7 +39,7 @@ model_(&model), data_(&data), dt_(dt), n_integration_steps_(n_integration_steps)
 } 
 
 
-const ContactPoint &AbstractSimulator::addContactPoint(std::string name, int frame_id, bool unilateral)
+const ContactPoint &AbstractSimulator::addContactPoint(const std::string & name, int frame_id, bool unilateral)
 {
   ContactPoint *cptr = new ContactPoint(*model_, name, frame_id, model_->nv, unilateral);
 	contacts_.push_back(cptr);
@@ -49,7 +49,7 @@ const ContactPoint &AbstractSimulator::addContactPoint(std::string name, int fra
 }
 
 
-const ContactPoint &AbstractSimulator::getContact(std::string name)
+const ContactPoint &AbstractSimulator::getContact(const std::string & name)
 {
   for (auto &cptr : contacts_) {
     if (cptr->name_==name){
@@ -60,7 +60,7 @@ const ContactPoint &AbstractSimulator::getContact(std::string name)
 }
 
 
-bool AbstractSimulator::resetContactAnchorPoint(std::string name, const Eigen::Vector3d &p0, bool updateContactForces, bool slipping){
+bool AbstractSimulator::resetContactAnchorPoint(const std::string & name, const Eigen::Vector3d &p0, bool updateContactForces, bool slipping){
   bool active_contact_found = false;
   for (auto &cptr : contacts_) {
     if (cptr->name_==name){
@@ -141,7 +141,7 @@ void AbstractSimulator::detectContacts()
           nactive_ += 1; 
           cp->optr = optr;
           if(!cp->unilateral){
-            cout<<"Bilateral contact with object "<<optr->getName()<<" at point "<<cp->x.transpose()<<endl;
+            std::cout<<"Bilateral contact with object "<<optr->getName()<<" at point "<<cp->x.transpose()<<std::endl;
           }
           break;
         }
@@ -211,26 +211,30 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
        **/  
       switch (whichFD_)
       {
-      case 1:
-        mDv_ = tau_ - data_->nle; 
-        inverseM_ = pinocchio::computeMinverse(*model_, *data_, q_);
-        dv_ = inverseM_*mDv_; 
-        break;
-      
-      case 2:
-        pinocchio::aba(*model_, *data_, q_, v_, tau_);
-        dv_ = data_-> ddq; 
-        break;
-      
-      case 3:
-        pinocchio::crba(*model_, *data_, q_);
-        mDv_ = tau_ - data_->nle; 
-        lltM_.compute(data_->M);
-        dv_ = lltM_.solve(mDv_);
-        break;
-      
-      default:
-        throw std::runtime_error("Forward Dynamics Method not recognized");
+        case 1: // slower than ABA
+          mDv_ = tau_ - data_->nle;
+          inverseM_ = pinocchio::computeMinverse(*model_, *data_, q_);
+          inverseM_.triangularView<Eigen::StrictlyLower>()
+          = inverseM_.transpose().triangularView<Eigen::StrictlyLower>(); // need to fill the Lower part of the matrix
+          dv_.noalias() = inverseM_*mDv_;
+          break;
+          
+        case 2: // fast
+          pinocchio::aba(*model_, *data_, q_, v_, tau_);
+          dv_ = data_-> ddq;
+          break;
+          
+        case 3: // fast if some results are reused
+          pinocchio::crba(*model_, *data_, q_);
+          mDv_ = tau_ - data_->nle;
+          dv_ = mDv_;
+          // Sparse Cholesky factorization
+          pinocchio::cholesky::decompose(*model_, *data_);
+          pinocchio::cholesky::solve(*model_,*data_,dv_);
+          break;
+          
+        default:
+          throw std::runtime_error("Forward Dynamics Method not recognized");
       }
       
       /*!< integrate twice */  
@@ -339,10 +343,10 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       {
       case 1:
         mDv_ = tau_ - data_->nle; 
-        pinocchio::crba(*model_, *data_, q_);
         inverseM_ = pinocchio::computeMinverse(*model_, *data_, q_);
-        // dvMean_ = inverseM_*mDv_; 
-        dvMean_.noalias() = data_->Minv*mDv_;
+        inverseM_.triangularView<Eigen::StrictlyLower>()
+        = inverseM_.transpose().triangularView<Eigen::StrictlyLower>(); // need to fill the Lower part of the matrix
+        dvMean_.noalias() = inverseM_*mDv_; 
         break;
       
       case 2:
@@ -352,9 +356,11 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       
       case 3:
         pinocchio::crba(*model_, *data_, q_);
-        mDv_ = tau_ - data_->nle; 
-        lltM_.compute(data_->M);
-        dvMean_ = lltM_.solve(mDv_);
+        mDv_ = tau_ - data_->nle;
+        dv_ = mDv_;
+        // Sparse Cholesky factorization
+        pinocchio::cholesky::decompose(*model_, *data_);
+        pinocchio::cholesky::solve(*model_,*data_,dv_);
         break;
       
       default:
@@ -400,6 +406,8 @@ void ExponentialSimulator::computeIntegrationTerms(){
   }
   CONSIM_START_PROFILER("exponential_simulator::computeMinverse");
   Minv_ = pinocchio::computeMinverse(*model_, *data_, q_);
+  Minv_.triangularView<Eigen::StrictlyLower>()
+  = Minv_.transpose().triangularView<Eigen::StrictlyLower>(); // need to fill the Lower part of the matrix
   CONSIM_STOP_PROFILER("exponential_simulator::computeMinverse");
   JcT_.noalias() = Jc_.transpose(); 
   JMinv_.noalias() = Jc_ * Minv_;

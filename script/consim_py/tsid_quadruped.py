@@ -46,7 +46,7 @@ class TsidQuadruped:
         robot = self.robot
         self.model = robot.model()
 
-        assert [robot.model().existFrame(name) for name in conf.contact_frames]
+#        assert [robot.model().existFrame(name) for name in conf.contact_frames]
 
         formulation = tsid.InverseDynamicsFormulationAccForce(
             "tsid", robot, False)
