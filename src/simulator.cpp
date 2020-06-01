@@ -11,7 +11,7 @@
 #include "consim/object.hpp"
 #include "consim/contact.hpp"
 #include "consim/simulator.hpp"
-// #include "consim/utils/stop-watch.hpp"
+#include "consim/utils/stop-watch.hpp"
 
 #include <iostream>
 
