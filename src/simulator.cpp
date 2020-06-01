@@ -141,7 +141,7 @@ void AbstractSimulator::detectContacts()
           nactive_ += 1; 
           cp->optr = optr;
           if(!cp->unilateral){
-            cout<<"Bilateral contact with object "<<optr->getName()<<" at point "<<cp->x.transpose()<<endl;
+            std::cout<<"Bilateral contact with object "<<optr->getName()<<" at point "<<cp->x.transpose()<<std::endl;
           }
           break;
         }
