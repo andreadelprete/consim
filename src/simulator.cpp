@@ -357,10 +357,10 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       case 3:
         pinocchio::crba(*model_, *data_, q_);
         mDv_ = tau_ - data_->nle;
-        dv_ = mDv_;
+        dvMean_ = mDv_;
         // Sparse Cholesky factorization
         pinocchio::cholesky::decompose(*model_, *data_);
-        pinocchio::cholesky::solve(*model_,*data_,dv_);
+        pinocchio::cholesky::solve(*model_,*data_,dvMean_);
         break;
       
       default:

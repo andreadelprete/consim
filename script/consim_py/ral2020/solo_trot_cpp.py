@@ -123,7 +123,7 @@ unilateral_contacts = 1
 compute_predicted_forces = False
 PRINT_N = int(conf.PRINT_T/dt)
 
-exm_max_mul = 100 
+exp_max_mul = 100 
 int_max_mul = 100 
 
 robot = loadSolo(False)
@@ -164,7 +164,7 @@ def run_simulation(q0, v0, simu_params, ground_truth):
     if(simu_params['use_exp_int']):
         simu = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
                                     conf.K, conf.B, conf.mu, conf.anchor_slipping_method,
-                                    compute_predicted_forces, forward_dyn_method)
+                                    compute_predicted_forces, forward_dyn_method, exp_max_mul, int_max_mul)
     else:
         simu = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
                                         conf.K, conf.B, conf.mu, forward_dyn_method)
