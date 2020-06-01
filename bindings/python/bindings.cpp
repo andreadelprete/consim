@@ -120,7 +120,7 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
 
     bp::class_<ContactPoint>("Contact",
                              "Contact Point",
-                          bp::init<pinocchio::Model &, std::string, unsigned int, unsigned int, bool >())
+                          bp::init<pinocchio::Model &, const std::string &, unsigned int, unsigned int, bool >())
         .def("updatePosition", &ContactPoint::updatePosition, return_internal_reference<>())
         .def("firstOrderContactKinematics", &ContactPoint::firstOrderContactKinematics, return_internal_reference<>())
         .def("secondOrderContactKinematics", &ContactPoint::secondOrderContactKinematics, return_internal_reference<>())

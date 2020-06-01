@@ -39,7 +39,7 @@ model_(&model), data_(&data), dt_(dt), n_integration_steps_(n_integration_steps)
 } 
 
 
-const ContactPoint &AbstractSimulator::addContactPoint(std::string name, int frame_id, bool unilateral)
+const ContactPoint &AbstractSimulator::addContactPoint(const std::string & name, int frame_id, bool unilateral)
 {
   ContactPoint *cptr = new ContactPoint(*model_, name, frame_id, model_->nv, unilateral);
 	contacts_.push_back(cptr);
@@ -49,7 +49,7 @@ const ContactPoint &AbstractSimulator::addContactPoint(std::string name, int fra
 }
 
 
-const ContactPoint &AbstractSimulator::getContact(std::string name)
+const ContactPoint &AbstractSimulator::getContact(const std::string & name)
 {
   for (auto &cptr : contacts_) {
     if (cptr->name_==name){
@@ -60,7 +60,7 @@ const ContactPoint &AbstractSimulator::getContact(std::string name)
 }
 
 
-bool AbstractSimulator::resetContactAnchorPoint(std::string name, const Eigen::Vector3d &p0, bool updateContactForces, bool slipping){
+bool AbstractSimulator::resetContactAnchorPoint(const std::string & name, const Eigen::Vector3d &p0, bool updateContactForces, bool slipping){
   bool active_contact_found = false;
   for (auto &cptr : contacts_) {
     if (cptr->name_==name){

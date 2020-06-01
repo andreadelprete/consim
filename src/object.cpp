@@ -3,7 +3,7 @@
 
 namespace consim {
 
-ContactObject::ContactObject(std::string name, ContactModel& contact_model):
+ContactObject::ContactObject(const std::string & name, ContactModel& contact_model):
     name_(name), contact_model_(&contact_model) { }
 
 // -------------------------------------------------------------------------------

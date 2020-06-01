@@ -10,7 +10,7 @@ namespace consim {
 #define sqr(x) (x * x)
 
 
-ContactPoint::ContactPoint(const pinocchio::Model &model, std::string name, unsigned int frameId, unsigned int nv, bool isUnilateral): 
+ContactPoint::ContactPoint(const pinocchio::Model &model, const std::string & name, unsigned int frameId, unsigned int nv, bool isUnilateral):
         model_(&model), name_(name), frame_id(frameId), unilateral(isUnilateral) {
           active = false; 
           slipping = false;

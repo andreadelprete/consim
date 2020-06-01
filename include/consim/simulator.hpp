@@ -38,13 +38,13 @@ namespace consim {
         * Defines a pinocchio frame as a contact point for contact interaction checking.
         * A contact is a struct containing all the contact information 
       */
-      const ContactPoint &addContactPoint(std::string name, int frame_id, bool unilateral);
+      const ContactPoint &addContactPoint(const std::string & name, int frame_id, bool unilateral);
 
       /**
         * Returns the contact points reference 
       */
 
-      const ContactPoint &getContact(std::string name);
+      const ContactPoint &getContact(const std::string & name);
 
       /**
        * checks if contact is active 
@@ -52,7 +52,7 @@ namespace consim {
        * can update all contact forces
        * can be called after sim.step to update contact forces for next simulation step 
        **/ 
-      bool resetContactAnchorPoint(std::string name, const Eigen::Vector3d &p0, bool updateContactForces, bool slipping); 
+      bool resetContactAnchorPoint(const std::string & name, const Eigen::Vector3d &p0, bool updateContactForces, bool slipping);
 
       /**
         * Adds an object to the simulator for contact interaction checking.

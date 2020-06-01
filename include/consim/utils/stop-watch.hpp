@@ -47,7 +47,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 struct StopwatchException
 {
 public:
-  StopwatchException(std::string error) : error(error) { }
+  StopwatchException(const std::string & error) : error(error) { }
   std::string error;
 };
 
@@ -162,51 +162,51 @@ public:
   ~Stopwatch();
 
   /** Tells if a performance with a certain ID exists */
-  bool performance_exists(std::string perf_name);
+  bool performance_exists(const std::string & perf_name);
 
   /** Initialize stopwatch to use a certain time taking mode */
   void set_mode(StopwatchMode mode);
 
   /** Start the stopwatch related to a certain piece of code */
-  void start(std::string perf_name);
+  void start(const std::string & perf_name);
 
   /** Stops the stopwatch related to a certain piece of code */
-  void stop(std::string perf_name);
+  void stop(const std::string & perf_name);
 
   /** Stops the stopwatch related to a certain piece of code */
-  void pause(std::string perf_name);
+  void pause(const std::string & perf_name);
 
   /** Reset a certain performance record */
-  void reset(std::string perf_name);
+  void reset(const std::string & perf_name);
 
   /** Resets all the performance records */
   void reset_all();
 
   /** Dump the data of a certain performance record */
-  void report(std::string perf_name, int precision=2,
+  void report(const std::string & perf_name, int precision=2,
               std::ostream& output = std::cout);
 
   /** Dump the data of all the performance records */
   void report_all(int precision=2, std::ostream& output = std::cout);
 
   /** Returns total execution time of a certain performance */
-  long double get_total_time(std::string perf_name);
+  long double get_total_time(const std::string & perf_name);
 
   /** Returns average execution time of a certain performance */
-  long double get_average_time(std::string perf_name);
+  long double get_average_time(const std::string & perf_name);
 
   /** Returns minimum execution time of a certain performance */
-  long double get_min_time(std::string perf_name);
+  long double get_min_time(const std::string & perf_name);
 
   /** Returns maximum execution time of a certain performance */
-  long double get_max_time(std::string perf_name);
+  long double get_max_time(const std::string & perf_name);
 
   /** Return last measurement of a certain performance */
-  long double get_last_time(std::string perf_name);
+  long double get_last_time(const std::string & perf_name);
 
   /** Return the time since the start of the last measurement of a given
       performance. */
-  long double get_time_so_far(std::string perf_name);
+  long double get_time_so_far(const std::string & perf_name);
 
   /**	Turn off clock, all the Stopwatch::* methods return without doing
         anything after this method is called. */
