@@ -21,29 +21,29 @@ SET(PROJECT_DESCRIPTION "Efficient Contact Dynamics Simulation based on Pinocchi
 SET(PROJECT_URL "http://github.com/stack-of-tasks/consim")
 OPTION(INSTALL_DOCUMENTATION "Generate and install the documentation" OFF)
 
+SET(DOXYGEN_USE_MATHJAX YES)
+
+# Disable -Werror on Unix for now.
+SET(CXX_DISABLE_WERROR True)
+SET(CMAKE_VERBOSE_MAKEFILE True)
+
 INCLUDE(cmake/base.cmake)
+COMPUTE_PROJECT_ARGS(PROJECT_ARGS LANGUAGES CXX)
+PROJECT(${PROJECT_NAME} ${PROJECT_ARGS})
+
+SET(CMAKE_CXX_STANDARD 11)
+SET(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 INCLUDE(cmake/boost.cmake)
-INCLUDE(cmake/eigen.cmake)
 INCLUDE(cmake/python.cmake)
 INCLUDE(cmake/ide.cmake)
 INCLUDE(cmake/apple.cmake)
 INCLUDE(cmake/test.cmake)
 
-
-
-SET(DOXYGEN_USE_MATHJAX YES)
-
 # Handle APPLE Cmake policy
 IF(APPLE)
   APPLY_DEFAULT_APPLE_CONFIGURATION()
 ENDIF(APPLE)
-
-# Disable -Werror on Unix for now.
-SET(CXX_DISABLE_WERROR True)
-SET(CMAKE_VERBOSE_MAKEFILE True)
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-
-SETUP_PROJECT()
 
 IF(WIN32)
   SET(LINK copy_if_different)
