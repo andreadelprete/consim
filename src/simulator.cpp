@@ -403,6 +403,8 @@ void ExponentialSimulator::computeIntegrationTerms(){
   }
   CONSIM_START_PROFILER("exponential_simulator::computeMinverse");
   Minv_ = pinocchio::computeMinverse(*model_, *data_, q_);
+  Minv_.triangularView<Eigen::StrictlyLower>()
+  = Minv_.transpose().triangularView<Eigen::StrictlyLower>(); // need to fill the Lower part of the matrix
   CONSIM_STOP_PROFILER("exponential_simulator::computeMinverse");
   JcT_.noalias() = Jc_.transpose(); 
   JMinv_.noalias() = Jc_ * Minv_;
