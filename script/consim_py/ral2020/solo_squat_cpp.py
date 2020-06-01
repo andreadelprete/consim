@@ -107,12 +107,13 @@ PLOT_CONTACT_POINT_PREDICTION = 0
 PLOT_ANCHOR_POINTS = 0
 
 dt = 0.01                      # controller time step
-T = 0.1
+T = 0.01
 unilateral_contacts = 1
 compute_predicted_forces = False
 exm_max_mul = 100 
 int_max_mul = 100 
 
+conf.q0[2] += 1.0
 
 offset = np.array([0.0, -0.0, 0.0])
 amp = np.array([0.0, 0.0, 0.05])
@@ -175,16 +176,17 @@ def run_simulation(q0, v0, simu_params):
     
     try:
         for i in range(0, N_SIMULATION):
-            sampleCom.pos(offset + amp * np.sin(two_pi_f*t))
-            sampleCom.vel(two_pi_f_amp * np.cos(two_pi_f*t))
-            sampleCom.acc(-two_pi_f_squared_amp * np.sin(two_pi_f*t))
-            invdyn.comTask.setReference(sampleCom)
-            HQPData = invdyn.formulation.computeProblemData(t, q[:,i], v[:,i])
-            sol = invdyn.solver.solve(HQPData)
-            if(sol.status != 0):
-                print("[%d] QP problem could not be solved! Error code:" % (i), sol.status)
-                break
-            u[6:,i] = invdyn.formulation.getActuatorForces(sol)
+#            sampleCom.pos(offset + amp * np.sin(two_pi_f*t))
+#            sampleCom.vel(two_pi_f_amp * np.cos(two_pi_f*t))
+#            sampleCom.acc(-two_pi_f_squared_amp * np.sin(two_pi_f*t))
+#            invdyn.comTask.setReference(sampleCom)
+#            HQPData = invdyn.formulation.computeProblemData(t, q[:,i], v[:,i])
+#            sol = invdyn.solver.solve(HQPData)
+#            if(sol.status != 0):
+#                print("[%d] QP problem could not be solved! Error code:" % (i), sol.status)
+#                break
+#            u[6:,i] = invdyn.formulation.getActuatorForces(sol)
+#            
             
             simu.step(u[:,i])
             q[:,i+1] = simu.get_q()
@@ -194,6 +196,8 @@ def run_simulation(q0, v0, simu_params):
                 f[:,ci,i+1] = cp.f
                 p[:,ci,i+1] = cp.x
                 dp[:,ci,i+1] = cp.v
+                if(cp.active):
+                    print("Contact active", cp.name)
             
             if(np.any(np.isnan(v[:,i+1])) or norm(v[:,i+1]) > 1e3):
                 raise Exception("Time %.3f Velocities are too large: %.1f. Stop simulation."%(
