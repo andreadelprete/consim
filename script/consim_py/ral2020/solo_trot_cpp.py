@@ -34,8 +34,8 @@ print(" Test Solo Trot C++ ".center(conf.LINE_WIDTH, '#'))
 print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
-i_min = 2
-i_max = i_min+4
+i_min = 0
+i_max = i_min+2
 i_ground_truth = i_max+2
 
 GROUND_TRUTH_EXP_SIMU_PARAMS = {
@@ -57,19 +57,57 @@ SIMU_PARAMS = []
 # EXPONENTIAL INTEGRATOR WITH STANDARD SETTINGS
 for i in range(i_min, i_max):
     SIMU_PARAMS += [{
-        'name': 'exp%4d'%(2**i),
-        'method_name': 'exp',
+        'name': 'exp Minv%4d'%(2**i),
+        'method_name': 'exp Minv',
         'use_exp_int': 1,
         'ndt': 2**i,
+        'forward_dyn_method': 1
+    }]
+
+for i in range(i_min, i_max):
+    SIMU_PARAMS += [{
+        'name': 'exp ABA%4d'%(2**i),
+        'method_name': 'exp ABA',
+        'use_exp_int': 1,
+        'ndt': 2**i,
+        'forward_dyn_method': 2
+    }]
+
+for i in range(i_min, i_max):
+    SIMU_PARAMS += [{
+        'name': 'exp Chol%4d'%(2**i),
+        'method_name': 'exp Chol',
+        'use_exp_int': 1,
+        'ndt': 2**i,
+        'forward_dyn_method': 3
     }]
     
 # EULER INTEGRATOR WITH STANDARD SETTINGS
 for i in range(i_min, i_max):
     SIMU_PARAMS += [{
-        'name': 'euler%4d'%(2**i),
-        'method_name': 'euler',
+        'name': 'euler Minv%4d'%(2**i),
+        'method_name': 'euler Minv',
         'use_exp_int': 0,
         'ndt': 2**i,
+        'forward_dyn_method': 1
+    }]
+
+for i in range(i_min, i_max):
+    SIMU_PARAMS += [{
+        'name': 'euler ABA%4d'%(2**i),
+        'method_name': 'euler ABA',
+        'use_exp_int': 0,
+        'ndt': 2**i,
+        'forward_dyn_method': 2
+    }]
+
+for i in range(i_min, i_max):
+    SIMU_PARAMS += [{
+        'name': 'euler Chol%4d'%(2**i),
+        'method_name': 'euler Chol',
+        'use_exp_int': 0,
+        'ndt': 2**i,
+        'forward_dyn_method': 3
     }]
     
 PLOT_FORCES = 0
@@ -102,29 +140,28 @@ q0, v0 = refX[0,:nq], refX[0,nq:]
 N_SIMULATION = refU.shape[0]     
 
 # TEMPORARY DEBUG CODE
-N_SIMULATION = 20
+N_SIMULATION = 10
 q0[2] += 1.0         # make the robot fly
 #q0[2] -= 15.37e-3   # ensure contact points are inside the ground at t=0
 
-## Options 
+# forward_dyn_method Options 
 #  1: pinocchio.Minverse()
 #  2: pinocchio.aba()
 #  3: Cholesky factorization 
 
-whichFD = 2
-
-
-
-
 def run_simulation(q0, v0, simu_params):
     ndt = simu_params['ndt']
+    try:
+        forward_dyn_method = simu_params['forward_dyn_method']
+    except:
+        forward_dyn_method = 3
     if(simu_params['use_exp_int']):
         simu = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
                                     conf.K, conf.B, conf.mu, conf.anchor_slipping_method,
-                                    compute_predicted_forces, whichFD)
+                                    compute_predicted_forces, forward_dyn_method)
     else:
         simu = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
-                                        conf.K, conf.B, conf.mu, whichFD)
+                                        conf.K, conf.B, conf.mu, forward_dyn_method)
                                         
     cpts = []
     for cf in conf.contact_frames:

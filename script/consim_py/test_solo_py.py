@@ -135,6 +135,9 @@ simu = RobotSimulator(conf, solo, se3.JointModelFreeFlyer())
 simu.assume_A_invertible = ASSUME_A_INVERTIBLE
 q0, v0 = np.copy(simu.q), np.copy(simu.v)
 
+# DEBUG
+#q0[2] += 1.0
+
 for name in conf.contact_frames:
     simu.add_contact(name, conf.contact_normal, conf.K, conf.B, conf.mu)
 
@@ -181,10 +184,10 @@ def run_simulation(q, v, simu_params):
     time_start = time.time()
     q = np.zeros((nq, N_SIMULATION+1))*np.nan
     v = np.zeros((nv, N_SIMULATION+1))*np.nan
-    f = np.zeros((3*len(conf.contact_frames), N_SIMULATION+1))
-    f_pred_int = np.zeros((3*len(conf.contact_frames), N_SIMULATION+1))
-    f_inner = np.zeros((3*len(conf.contact_frames), N_SIMULATION*ndt))
-    f_pred = np.zeros((3*len(conf.contact_frames), N_SIMULATION*ndt))
+    f = np.zeros((simu.nk, N_SIMULATION+1))
+    f_pred_int = np.zeros((simu.nk, N_SIMULATION+1))
+    f_inner = np.zeros((simu.nk, N_SIMULATION*ndt))
+    f_pred = np.zeros((simu.nk, N_SIMULATION*ndt))
     dp = np.zeros((simu.nk, N_SIMULATION+1))
     dp_fd = np.zeros((simu.nk, N_SIMULATION+1))
     dJv = np.zeros((simu.nk, N_SIMULATION+1))
@@ -259,6 +262,7 @@ def run_simulation(q, v, simu_params):
     except Exception as e:
         print(e)
         print("ERROR WHILE RUNNING SIMULATION")
+#        raise e
 
     time_spent = time.time() - time_start
     print("Real-time factor:", t/time_spent)

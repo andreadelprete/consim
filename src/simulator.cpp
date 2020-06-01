@@ -331,9 +331,10 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       {
       case 1:
         mDv_ = tau_ - data_->nle; 
+        pinocchio::crba(*model_, *data_, q_);
         inverseM_ = pinocchio::computeMinverse(*model_, *data_, q_);
-        dvMean_ = inverseM_*mDv_; 
-        // dvMean_.noalias() = data_->Minv*mDv_;
+        // dvMean_ = inverseM_*mDv_; 
+        dvMean_.noalias() = data_->Minv*mDv_;
         break;
       
       case 2:

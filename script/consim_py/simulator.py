@@ -213,11 +213,15 @@ class RobotSimulator:
             self.p0 = np.copy(p0)
 
         self.compute_forces(compute_data=True)
+        self.resize_contacts()
 
     # Adds a contact, resets all quantities
     def add_contact(self, frame_name, normal, K, B, mu):
         c = Contact(self.model, self.data, frame_name, normal, K, B, mu)
         self.contacts += [c]
+        self.resize_contacts()
+        
+    def resize_contacts(self):
         self.nc = len(self.contacts)
         self.nk = 3*self.nc
         self.f = zero(self.nk)
