@@ -1,5 +1,4 @@
-#include <pinocchio/spatial/se3.hpp>
-#include <pinocchio/multibody/model.hpp>
+
 #include <pinocchio/algorithm/aba.hpp>
 #include <pinocchio/algorithm/joint-configuration.hpp> // se3.integrate
 #include <pinocchio/algorithm/frames.hpp>
