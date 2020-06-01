@@ -38,45 +38,45 @@ GROUND_TRUTH_SIMU_PARAMS = {
 SIMU_PARAMS = []
 
 # EXPONENTIAL INTEGRATOR WITH STANDARD SETTINGS
-#for i in range(i_min, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'exp%4d'%(2**i),
-#        'method_name': 'exp',
-#        'use_exp_int': 1,
-#        'ndt': 2**i,
-#    }]
+for i in range(i_min, i_max):
+   SIMU_PARAMS += [{
+       'name': 'exp%4d'%(2**i),
+       'method_name': 'exp',
+       'use_exp_int': 1,
+       'ndt': 2**i,
+   }]
     
 # EXPONENTIAL INTEGRATOR, UPDATE MATRIX EXPONENTIAL EVERY FEW ITERATIONS
-#for i in range(i_min, i_max):
-#    for j in range(1,min(i,5)):
-#        SIMU_PARAMS += [{
-#            'name': 'exp%4d update%3d'%(2**i, 2**j),
-#            'method_name': 'exp update%3d'%(2**j),
-#            'use_exp_int': 1,
-#            'ndt': 2**i,
-#            'update_expm_N': 2**j
-#        }]
+for i in range(i_min, i_max):
+   for j in range(1,min(i,5)):
+       SIMU_PARAMS += [{
+           'name': 'exp%4d update%3d'%(2**i, 2**j),
+           'method_name': 'exp update%3d'%(2**j),
+           'use_exp_int': 1,
+           'ndt': 2**i,
+           'update_expm_N': 2**j
+       }]
     
 # EXPONENTIAL INTEGRATOR, USE ONLY FIRST INTEGRAL
-#for i in range(i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'exp%4d n2i'%(2**i),
-#        'method_name': 'exp-no-2nd-int',
-#        'use_exp_int': 1,
-#        'ndt': 2**i,
-#        'use_second_integral': False
-#    }]
+for i in range(i_max):
+   SIMU_PARAMS += [{
+       'name': 'exp%4d n2i'%(2**i),
+       'method_name': 'exp-no-2nd-int',
+       'use_exp_int': 1,
+       'ndt': 2**i,
+       'use_second_integral': False
+   }]
 
 # EXPONENTIAL INTEGRATOR, REDUCE NUMBER OF MATRIX MULTIPLICATIONS
-#for i in range(2,3):
-#    for j in range(0,7):
-#        SIMU_PARAMS += [{
-#            'name': 'exp%4d mmm-%d'%(2**i,j),
-#            'method_name': 'exp mmm-%d'%j,
-#            'use_exp_int': 1,
-#            'ndt': 2**i,
-#            'max_mat_mult': j,
-#        }]
+for i in range(2,3):
+   for j in range(0,7):
+       SIMU_PARAMS += [{
+           'name': 'exp%4d mmm-%d'%(2**i,j),
+           'method_name': 'exp mmm-%d'%j,
+           'use_exp_int': 1,
+           'ndt': 2**i,
+           'max_mat_mult': j,
+       }]
 
 # EULER SIMULATOR with Cholesky
 for i in range(5, i_max):

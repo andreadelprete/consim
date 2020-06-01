@@ -254,10 +254,13 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
 
 ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, 
                                             int n_integration_steps, int whichFD,
-                                            int slipping_method, bool compute_predicted_forces) : 
+                                            int slipping_method, bool compute_predicted_forces, 
+                                            int exp_max_mat_mul, int lds_max_mat_mul) : 
                                             AbstractSimulator(model, data, dt, n_integration_steps, whichFD), 
                                             slipping_method_(slipping_method),
-                                            compute_predicted_forces_(compute_predicted_forces)
+                                            compute_predicted_forces_(compute_predicted_forces), 
+                                            expMaxMatMul_(exp_max_mat_mul),
+                                            ldsMaxMatMul_(lds_max_mat_mul)
 {
   dvMean_.resize(model_->nv);
   dvMean2_.resize(model_->nv);
@@ -265,7 +268,9 @@ ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocc
   dv_bar.resize(model_->nv); dv_bar.setZero();
   temp01_.resize(model_->nv); temp01_.setZero();
   temp02_.resize(model_->nv); temp02_.setZero();
-  
+
+  util_eDtA.setMaxMultiplications(expMaxMatMul_); 
+  utilDense_.setMaxMultiplications(ldsMaxMatMul_); 
 }
 
 

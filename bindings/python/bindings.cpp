@@ -67,7 +67,8 @@ EulerSimulator* build_euler_simulator(
 ExponentialSimulator* build_exponential_simulator(
     float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data,
     Eigen::Vector3d stifness, Eigen::Vector3d damping, double frictionCoefficient, int which_slipping,
-    bool compute_predicted_forces, int whichFD)
+    bool compute_predicted_forces, int whichFD, 
+    int exp_max_mat_mul, int lds_max_mat_mul)
 {
   LinearPenaltyContactModel *contact_model = new LinearPenaltyContactModel(
       stifness, damping, frictionCoefficient);
@@ -79,7 +80,8 @@ ExponentialSimulator* build_exponential_simulator(
     std::cout<<"[build_exponential_simulator] Data is not consistent with specified model\n";
     data = pinocchio::Data(model);
   }
-  ExponentialSimulator* sim = new ExponentialSimulator(model, data, dt, n_integration_steps, whichFD, which_slipping, compute_predicted_forces);
+  ExponentialSimulator* sim = new ExponentialSimulator(model, data, dt, n_integration_steps, whichFD, which_slipping, 
+                                  compute_predicted_forces, exp_max_mat_mul = 100, lds_max_mat_mul);
   sim->addObject(*obj);
 
   return sim;
@@ -175,7 +177,7 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
 
     bp::class_<ExponentialSimulator, bases<AbstractSimulatorWrapper>>("ExponentialSimulator",
                           "Exponential Simulator class",
-                          bp::init<pinocchio::Model &, pinocchio::Data &, float, int, int, int, bool>())
+                          bp::init<pinocchio::Model &, pinocchio::Data &, float, int, int, int, bool, int, int>())
         .def("add_contact_point", &ExponentialSimulator::addContactPoint, return_internal_reference<>())
         .def("get_contact", &ExponentialSimulator::getContact, return_internal_reference<>())
         .def("add_object", &ExponentialSimulator::addObject)

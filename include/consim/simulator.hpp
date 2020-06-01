@@ -161,7 +161,7 @@ namespace consim {
        * 2: a QP method to update the anchor point velocity, then average force is computed 
        **/  
       ExponentialSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps,
-              int whichFD, int slipping_method=1, bool compute_predicted_forces=false); 
+              int whichFD, int slipping_method=1, bool compute_predicted_forces=false, int exp_max_mat_mul=100, int lds_max_mat_mul=100); 
 
       ~ExponentialSimulator(){};
       void step(const Eigen::VectorXd &tau) override;
@@ -212,6 +212,8 @@ namespace consim {
       Eigen::MatrixXd JcT_; 
       // expokit 
       expokit::LDSUtility<double, Dynamic> utilDense_;
+      const int expMaxMatMul_;
+      const int ldsMaxMatMul_; 
       // 
       void computePredictedXandF();  // predicts xf at end of integration step 
       expokit::MatrixExponential<double, Dynamic> util_eDtA;

@@ -123,6 +123,9 @@ unilateral_contacts = 1
 compute_predicted_forces = False
 PRINT_N = int(conf.PRINT_T/dt)
 
+exm_max_mul = 100 
+int_max_mul = 100 
+
 robot = loadSolo(False)
 nq, nv = robot.nq, robot.nv
 
