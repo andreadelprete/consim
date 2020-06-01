@@ -16,7 +16,7 @@ class ContactObject {
   public:
   // initialize with a specific contact model, could be viscoElastic, rigid .. etc 
   // all model specific parameters will be stored in the model itself 
-    ContactObject(std::string name, ContactModel& contact_model);
+    ContactObject(const std::string & name, ContactModel& contact_model);
     ~ContactObject(){};
     
     /** CheckCollision()
@@ -37,7 +37,9 @@ class ContactObject {
 class FloorObject: public ContactObject
 {
   public:
-  FloorObject(std::string name, ContactModel& contact_model): ContactObject(name, contact_model) { };
+  FloorObject(const std::string & name, ContactModel& contact_model)
+  : ContactObject(name, contact_model)
+  { };
   ~FloorObject(){};
 
   bool checkCollision(ContactPoint &cp) override; 

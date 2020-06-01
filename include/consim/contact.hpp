@@ -20,7 +20,7 @@ class ContactPoint {
   // \brief for now will keep everything public instead of get/set methods 
 
   public:
-    ContactPoint(const pinocchio::Model &model, std::string name, 
+    ContactPoint(const pinocchio::Model &model, const std::string & name, 
     unsigned int frameId, unsigned int nv, bool isUnilateral=true); 
     ~ContactPoint() {};
 
