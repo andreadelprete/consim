@@ -48,11 +48,11 @@ namespace consim {
 
       /**
        * checks if contact is active 
-       * if active it updates p0 for the specified contact 
+       * if active it updates p0 for the specified contact and returns true
        * can update all contact forces
        * can be called after sim.step to update contact forces for next simulation step 
        **/ 
-      void resetContactAnchorPoint(std::string name, Eigen::Vector3d &p0, bool updateContactForces); 
+      bool resetContactAnchorPoint(std::string name, const Eigen::Vector3d &p0, bool updateContactForces, bool slipping); 
 
       /**
         * Adds an object to the simulator for contact interaction checking.

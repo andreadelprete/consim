@@ -43,10 +43,10 @@ void ContactPoint::secondOrderContactKinematics(pinocchio::Data &data, Eigen::Ve
 }
 
 
-void ContactPoint::resetAnchorPoint(Eigen::Vector3d &p0){
+void ContactPoint::resetAnchorPoint(const Eigen::Vector3d &p0, bool slipping){
   x_anchor = p0; 
   v_anchor.setZero();
-  slipping = false;
+  slipping = slipping;
   predictedX0_ = p0;  
 }
 

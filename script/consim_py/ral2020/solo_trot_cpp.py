@@ -111,10 +111,12 @@ for i in range(i_min, i_max):
 #    }]
     
 PLOT_FORCES = 0
+PLOT_SLIPPING = 0
 PLOT_BASE_POS = 0
 PLOT_INTEGRATION_ERRORS = 1
 PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
 
+RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
 dt     = 0.002                      # controller and simulator time step
 dt_ref = 0.010                      # time step of reference motion
 unilateral_contacts = 1
@@ -141,11 +143,11 @@ q0, v0 = refX[0,:nq], refX[0,nq:]
 N_SIMULATION = refU.shape[0]     
 
 # TEMPORARY DEBUG CODE
-#N_SIMULATION = 30
+#N_SIMULATION = 10
 #q0[2] += 1.0         # make the robot fly
 
 
-def run_simulation(q0, v0, simu_params):
+def run_simulation(q0, v0, simu_params, ground_truth):
     ndt = simu_params['ndt']
     try:
         forward_dyn_method = simu_params['forward_dyn_method']
@@ -174,88 +176,99 @@ def run_simulation(q0, v0, simu_params):
     simu.reset_state(q0, v0, True)
             
     t = 0.0    
-    q = np.zeros((nq, N_SIMULATION+1))*np.nan
-    v = np.zeros((nv, N_SIMULATION+1))*np.nan
-    u = np.zeros((nv, N_SIMULATION+1))
-    f = np.zeros((3, len(conf.contact_frames), N_SIMULATION+1))
-    p = np.zeros((3, len(conf.contact_frames), N_SIMULATION+1))
-    dp = np.zeros((3, len(conf.contact_frames), N_SIMULATION+1))
+    nc = len(conf.contact_frames)
+    results = Empty()
+    results.q = np.zeros((nq, N_SIMULATION+1))*np.nan
+    results.v = np.zeros((nv, N_SIMULATION+1))*np.nan
+    results.u = np.zeros((nv, N_SIMULATION+1))
+    results.f = np.zeros((3, nc, N_SIMULATION+1))
+    results.p = np.zeros((3, nc, N_SIMULATION+1))
+    results.dp = np.zeros((3, nc, N_SIMULATION+1))
+    results.p0 = np.zeros((3, nc, N_SIMULATION+1))
+    results.slipping = np.zeros((nc, N_SIMULATION+1))
+    results.active = np.zeros((nc, N_SIMULATION+1))
     
-    q[:,0] = np.copy(q0)
-    v[:,0] = np.copy(v0)
+    results.q[:,0] = np.copy(q0)
+    results.v[:,0] = np.copy(v0)
     for ci, cp in enumerate(cpts):
-        f[:,ci,0] = cp.f
-        p[:,ci,0] = cp.x
-        dp[:,ci,0] = cp.v
-    print('K*p', conf.K[2]*p[2,:,0].squeeze())
+        results.f[:,ci,0] = cp.f
+        results.p[:,ci,0] = cp.x
+        results.p0[:,ci,0] = cp.x_anchor
+        results.dp[:,ci,0] = cp.v
+        results.slipping[ci,0] = cp.slipping
+        results.active[ci,0] = cp.active
+#    print('K*p', conf.K[2]*results.p[2,:,0].squeeze())
     
     try:
         time_start = time.time()
         for i in range(0, N_SIMULATION):
-#            if(RESET_STATE_ON_GROUND_TRUTH):
-#                for ci, cp in enumerate(cpts):
-#                    simu.resetContactAnchorPoint(name, p0, updateContactForces)
+            if(RESET_STATE_ON_GROUND_TRUTH and ground_truth):
+                for ci, cp in enumerate(cpts):
+#                    cp.resetAnchorPoint(results.p0[:,ci,i], bool(results.slipping[ci,i]))
+                    cp.resetAnchorPoint(ground_truth.p0[:,ci,i], bool(ground_truth.slipping[ci,i]))
+                updateContactForces = 1
+#                simu.reset_state(results.q[:,i], results.v[:,i], updateContactForces)
+                simu.reset_state(ground_truth.q[:,i], ground_truth.v[:,i], updateContactForces)
                     
             for d in range(int(dt_ref/dt)):
                 xref = interpolate_state(robot, refX[i], refX[i+1], dt*d/dt_ref)
                 xact = np.concatenate([simu.get_q(), simu.get_v()])
                 diff = state_diff(robot, xact, xref)
-                u[6:,i] = refU[i] + feedBack[i].dot(diff)                 
+                results.u[6:,i] = refU[i] + feedBack[i].dot(diff)                 
 #                u[:,i] *= 0.0
-                simu.step(u[:,i])
+                simu.step(results.u[:,i])
                 
-            q[:,i+1] = simu.get_q()
-            v[:,i+1] = simu.get_v()
+            results.q[:,i+1] = simu.get_q()
+            results.v[:,i+1] = simu.get_v()
             
             for ci, cp in enumerate(cpts):
-                f[:,ci,i+1] = cp.f
-                p[:,ci,i+1] = cp.x
-                dp[:,ci,i+1] = cp.v
+                results.f[:,ci,i+1] = cp.f
+                results.p[:,ci,i+1] = cp.x
+                results.p0[:,ci,i+1] = cp.x_anchor
+                results.dp[:,ci,i+1] = cp.v
+                results.slipping[ci,i+1] = cp.slipping
+                results.active[ci,i+1] = cp.active
             
-            if(np.any(np.isnan(v[:,i+1])) or norm(v[:,i+1]) > 1e3):
+            if(np.any(np.isnan(results.v[:,i+1])) or norm(results.v[:,i+1]) > 1e3):
                 raise Exception("Time %.3f Velocities are too large: %.1f. Stop simulation."%(
-                                t, norm(v[:,i+1])))
+                                t, norm(results.v[:,i+1])))
     
             if i % PRINT_N == 0:
                 print("Time %.3f" % (t))                            
-            t += dt
+            t += dt_ref
         print("Real-time factor:", t/(time.time() - time_start))
     except Exception as e:
         print(e)
 
     if conf.use_viewer:
         for i in range(0, N_SIMULATION):
-            if(np.any(np.isnan(q[:,i]))):
+            if(np.any(np.isnan(results.q[:,i]))):
                 break
             time_start_viewer = time.time()
-            robot.display(q[:,i])
+            robot.display(results.q[:,i])
             time_passed = time.time()-time_start_viewer
             if(time_passed<dt):
                 time.sleep(dt-time_passed)
-                
-    results = Empty()
+                    
     for key in simu_params.keys():
         results.__dict__[key] = simu_params[key]
-    results.q = q
-    results.v = v
-    results.u = u
-    results.f = f
-    results.p = p
-    results.dp = dp
+
     return results
 
- 
 data = {}
+print("\nStart simulation ground truth")
+data_ground_truth_exp = run_simulation(q0, v0, GROUND_TRUTH_EXP_SIMU_PARAMS, None)
+data_ground_truth_euler = run_simulation(q0, v0, GROUND_TRUTH_EULER_SIMU_PARAMS, None)
+data['ground-truth-exp'] = data_ground_truth_exp
+data['ground-truth-euler'] = data_ground_truth_euler
+ 
 for simu_params in SIMU_PARAMS:
     name = simu_params['name']
     print("\nStart simulation", name)
-    data[name] = run_simulation(q0, v0, simu_params)
-
-print("\nStart simulation ground truth")
-data_ground_truth_exp = run_simulation(q0, v0, GROUND_TRUTH_EXP_SIMU_PARAMS)
-data_ground_truth_euler = run_simulation(q0, v0, GROUND_TRUTH_EULER_SIMU_PARAMS)
-data['ground-truth-exp'] = data_ground_truth_exp
-data['ground-truth-euler'] = data_ground_truth_euler
+    if(simu_params['use_exp_int']):
+        data[name] = run_simulation(q0, v0, simu_params, data_ground_truth_exp)
+    else:
+        data[name] = run_simulation(q0, v0, simu_params, data_ground_truth_euler)
 
 # COMPUTE INTEGRATION ERRORS:
 print('\n')
@@ -283,7 +296,7 @@ for name in sorted(data.keys()):
 
 # PLOT STUFF
 line_styles = 10*['-o', '--o', '-.o', ':o']
-tt = np.arange(0.0, (N_SIMULATION+1)*dt, dt)[:N_SIMULATION+1]
+tt = np.arange(0.0, (N_SIMULATION+1)*dt_ref, dt_ref)[:N_SIMULATION+1]
 
 
 # PLOT INTEGRATION ERRORS
@@ -339,6 +352,27 @@ if(PLOT_FORCES):
             ax[i].set_ylabel('Force X/Z [N]')
             leg = ax[i].legend()
             if(leg): leg.get_frame().set_alpha(0.5)
+            
+# PLOT THE SLIPPING FLAG OF ALL INTEGRATION METHODS ON THE SAME PLOT
+if(PLOT_SLIPPING):
+    nc = len(conf.contact_frames)
+    (ff, ax) = plut.create_empty_figure(nc, 1)
+    for (name, d) in data.items():        
+        for i in range(nc):
+            ax[i].plot(tt, d.slipping[i,:], alpha=0.7, label=name)
+            ax[i].set_xlabel('Time [s]')
+    ax[0].set_ylabel('Contact Slipping Flag')
+    leg = ax[0].legend()
+    if(leg): leg.get_frame().set_alpha(0.5)
+
+    (ff, ax) = plut.create_empty_figure(nc, 1)
+    for (name, d) in data.items():
+        for i in range(nc):
+            ax[i].plot(tt, d.active[i,:], alpha=0.7, label=name)
+            ax[i].set_xlabel('Time [s]')
+    ax[0].set_ylabel('Contact Active Flag')
+    leg = ax[0].legend()
+    if(leg): leg.get_frame().set_alpha(0.5)
 
        
 # PLOT THE JOINT ANGLES OF ALL INTEGRATION METHODS ON THE SAME PLOT

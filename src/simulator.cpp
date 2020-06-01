@@ -60,18 +60,21 @@ const ContactPoint &AbstractSimulator::getContact(std::string name)
 }
 
 
-void AbstractSimulator::resetContactAnchorPoint(std::string name, Eigen::Vector3d &p0, bool updateContactForces){
+bool AbstractSimulator::resetContactAnchorPoint(std::string name, const Eigen::Vector3d &p0, bool updateContactForces, bool slipping){
+  bool active_contact_found = false;
   for (auto &cptr : contacts_) {
     if (cptr->name_==name){
       if (cptr->active){
-        cptr->resetAnchorPoint(p0); 
+        active_contact_found = true;
+        cptr->resetAnchorPoint(p0, slipping); 
       }
       break; 
     }
   }
-  if (updateContactForces){
+  if (active_contact_found && updateContactForces){
     computeContactForces();
   }
+  return active_contact_found;
 }
 
 void AbstractSimulator::addObject(ContactObject& obj) {
@@ -86,7 +89,7 @@ void AbstractSimulator::resetState(const Eigen::VectorXd& q, const Eigen::Vector
   tau_.fill(0);
   if (reset_contact_state) {
     for (auto &cptr : contacts_) {
-      cptr->active = false;
+      // cptr->active = false; // this seems to affect results inconsistently even though it shouldn't
       cptr->f.fill(0);
     }
   }

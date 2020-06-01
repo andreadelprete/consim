@@ -27,7 +27,7 @@ class ContactPoint {
     void updatePosition(pinocchio::Data &data);  /*!< updates cartesian position */ 
     void firstOrderContactKinematics(pinocchio::Data &data);  /*!< computes c, world_J_ and relative penetration */ 
     void secondOrderContactKinematics(pinocchio::Data &data, Eigen::VectorXd &v); /*!< computes dJv_ */
-    void resetAnchorPoint(Eigen::Vector3d &p0);  /*!< resets the anchor point position and velocity */
+    void resetAnchorPoint(const Eigen::Vector3d &p0, bool slipping);  /*!< resets the anchor point position and velocity */
     void projectForceInCone(Eigen::Vector3d &f);
     
     std::string name_;
