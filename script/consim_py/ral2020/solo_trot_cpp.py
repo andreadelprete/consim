@@ -175,7 +175,7 @@ def run_simulation(q0, v0, simu_params, ground_truth):
             print(("ERROR: Frame", cf, "does not exist"))
         cpts += [simu.add_contact_point(cf, robot.model.getFrameId(cf), unilateral_contacts)]
 
-    robot.forwardKinematics(q0)
+#    robot.forwardKinematics(q0)
     simu.reset_state(q0, v0, True)
             
     t = 0.0    
@@ -205,13 +205,17 @@ def run_simulation(q0, v0, simu_params, ground_truth):
     try:
         time_start = time.time()
         for i in range(0, N_SIMULATION):
-            if(RESET_STATE_ON_GROUND_TRUTH and ground_truth):
+            if(RESET_STATE_ON_GROUND_TRUTH and ground_truth):                
+                # first reset to ensure active contact points are correctly marked because otherwise the second
+                # time I reset the state the anchor points could be overwritten
+                reset_anchor_points = True
+                simu.reset_state(ground_truth.q[:,i], ground_truth.v[:,i], reset_anchor_points)
+                # then reset anchor points
                 for ci, cp in enumerate(cpts):
-#                    cp.resetAnchorPoint(results.p0[:,ci,i], bool(results.slipping[ci,i]))
                     cp.resetAnchorPoint(ground_truth.p0[:,ci,i], bool(ground_truth.slipping[ci,i]))
-                updateContactForces = 1
-#                simu.reset_state(results.q[:,i], results.v[:,i], updateContactForces)
-                simu.reset_state(ground_truth.q[:,i], ground_truth.v[:,i], updateContactForces)
+                # then reset once againt to compute updated contact forces, but without touching anchor points
+                reset_anchor_points = False
+                simu.reset_state(ground_truth.q[:,i], ground_truth.v[:,i], reset_anchor_points)
                     
             for d in range(int(dt_ref/dt)):
                 xref = interpolate_state(robot, refX[i], refX[i+1], dt*d/dt_ref)

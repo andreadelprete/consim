@@ -89,7 +89,7 @@ void AbstractSimulator::resetState(const Eigen::VectorXd& q, const Eigen::Vector
   tau_.fill(0);
   if (reset_contact_state) {
     for (auto &cptr : contacts_) {
-      // cptr->active = false; // this seems to affect results inconsistently even though it shouldn't
+      cptr->active = false;
       cptr->f.fill(0);
     }
   }
