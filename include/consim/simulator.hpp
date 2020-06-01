@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Eigen/Eigen>
-#include<Eigen/Cholesky>
+#include <Eigen/Cholesky>
 #include <pinocchio/spatial/se3.hpp>
 #include <pinocchio/multibody/model.hpp>
 #include <pinocchio/multibody/data.hpp>
