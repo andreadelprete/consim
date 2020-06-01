@@ -35,7 +35,7 @@ print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
 i_min = 0
-i_max = i_min+2
+i_max = i_min+6
 i_ground_truth = i_max+2
 
 GROUND_TRUTH_EXP_SIMU_PARAMS = {
@@ -64,23 +64,23 @@ for i in range(i_min, i_max):
         'forward_dyn_method': 1
     }]
 
-for i in range(i_min, i_max):
-    SIMU_PARAMS += [{
-        'name': 'exp ABA%4d'%(2**i),
-        'method_name': 'exp ABA',
-        'use_exp_int': 1,
-        'ndt': 2**i,
-        'forward_dyn_method': 2
-    }]
-
-for i in range(i_min, i_max):
-    SIMU_PARAMS += [{
-        'name': 'exp Chol%4d'%(2**i),
-        'method_name': 'exp Chol',
-        'use_exp_int': 1,
-        'ndt': 2**i,
-        'forward_dyn_method': 3
-    }]
+#for i in range(i_min, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'exp ABA%4d'%(2**i),
+#        'method_name': 'exp ABA',
+#        'use_exp_int': 1,
+#        'ndt': 2**i,
+#        'forward_dyn_method': 2
+#    }]
+#
+#for i in range(i_min, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'exp Chol%4d'%(2**i),
+#        'method_name': 'exp Chol',
+#        'use_exp_int': 1,
+#        'ndt': 2**i,
+#        'forward_dyn_method': 3
+#    }]
     
 # EULER INTEGRATOR WITH STANDARD SETTINGS
 for i in range(i_min, i_max):
@@ -92,23 +92,23 @@ for i in range(i_min, i_max):
         'forward_dyn_method': 1
     }]
 
-for i in range(i_min, i_max):
-    SIMU_PARAMS += [{
-        'name': 'euler ABA%4d'%(2**i),
-        'method_name': 'euler ABA',
-        'use_exp_int': 0,
-        'ndt': 2**i,
-        'forward_dyn_method': 2
-    }]
-
-for i in range(i_min, i_max):
-    SIMU_PARAMS += [{
-        'name': 'euler Chol%4d'%(2**i),
-        'method_name': 'euler Chol',
-        'use_exp_int': 0,
-        'ndt': 2**i,
-        'forward_dyn_method': 3
-    }]
+#for i in range(i_min, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'euler ABA%4d'%(2**i),
+#        'method_name': 'euler ABA',
+#        'use_exp_int': 0,
+#        'ndt': 2**i,
+#        'forward_dyn_method': 2
+#    }]
+#
+#for i in range(i_min, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'euler Chol%4d'%(2**i),
+#        'method_name': 'euler Chol',
+#        'use_exp_int': 0,
+#        'ndt': 2**i,
+#        'forward_dyn_method': 3
+#    }]
     
 PLOT_FORCES = 0
 PLOT_BASE_POS = 0
@@ -136,25 +136,26 @@ whichMotion = 'trot'
 refX = np.load('../demo/references/'+whichMotion+'_reference_states.npy').squeeze()
 refU = np.load('../demo/references/'+whichMotion+'_reference_controls.npy').squeeze() 
 feedBack = np.load('../demo/references/'+whichMotion+'_feedback.npy').squeeze() 
+refX[:,2] -= 15.37e-3   # ensure contact points are inside the ground at t=0
 q0, v0 = refX[0,:nq], refX[0,nq:]
 N_SIMULATION = refU.shape[0]     
 
 # TEMPORARY DEBUG CODE
-N_SIMULATION = 10
-q0[2] += 1.0         # make the robot fly
-#q0[2] -= 15.37e-3   # ensure contact points are inside the ground at t=0
+#N_SIMULATION = 30
+#q0[2] += 1.0         # make the robot fly
 
-# forward_dyn_method Options 
-#  1: pinocchio.Minverse()
-#  2: pinocchio.aba()
-#  3: Cholesky factorization 
 
 def run_simulation(q0, v0, simu_params):
     ndt = simu_params['ndt']
     try:
         forward_dyn_method = simu_params['forward_dyn_method']
     except:
-        forward_dyn_method = 3
+        # forward_dyn_method Options 
+        #  1: pinocchio.Minverse()
+        #  2: pinocchio.aba()
+        #  3: Cholesky factorization 
+        forward_dyn_method = 1
+        
     if(simu_params['use_exp_int']):
         simu = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
                                     conf.K, conf.B, conf.mu, conf.anchor_slipping_method,
@@ -186,17 +187,21 @@ def run_simulation(q0, v0, simu_params):
         f[:,ci,0] = cp.f
         p[:,ci,0] = cp.x
         dp[:,ci,0] = cp.v
-    print('p\n', 1e5*p[2,:,0].squeeze())
+    print('K*p', conf.K[2]*p[2,:,0].squeeze())
     
     try:
         time_start = time.time()
         for i in range(0, N_SIMULATION):
+#            if(RESET_STATE_ON_GROUND_TRUTH):
+#                for ci, cp in enumerate(cpts):
+#                    simu.resetContactAnchorPoint(name, p0, updateContactForces)
+                    
             for d in range(int(dt_ref/dt)):
                 xref = interpolate_state(robot, refX[i], refX[i+1], dt*d/dt_ref)
                 xact = np.concatenate([simu.get_q(), simu.get_v()])
                 diff = state_diff(robot, xact, xref)
                 u[6:,i] = refU[i] + feedBack[i].dot(diff)                 
-                u[:,i] *= 0.0
+#                u[:,i] *= 0.0
                 simu.step(u[:,i])
                 
             q[:,i+1] = simu.get_q()

@@ -376,8 +376,8 @@ void ExponentialSimulator::computeIntegrationTerms(){
    * fills J, dJv, p0, p, dp, Kp0, and x0 
    * computes A and b 
    **/   
-  // No need to compute M because we just need M inverse
-  //pinocchio::crba(*model_, *data_, q_);
+  // Do we need to compute M before computing M inverse?
+  pinocchio::crba(*model_, *data_, q_);
   pinocchio::nonLinearEffects(*model_, *data_, q_, v_);
   i_active_ = 0; 
   for(unsigned int i=0; i<nc_; i++){
