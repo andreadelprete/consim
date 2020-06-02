@@ -25,6 +25,7 @@ class Contact:
         self.B = B
         self.frame_id = model.getFrameId(frame_name)
         self.mu = mu
+        self.f = zero(3)
         self.reset_contact_position()
         
         self.t1 = np.cross(normal, np.array([1., 0., 0.]))
@@ -82,11 +83,11 @@ class Contact:
             self.dp0 = zero(3)
             # check whether point is in contact
             if(self.f.dot(self.normal) <= 0.0):
+#                print("\nINFO: Negative normal force %s!"%(self.frame_name), delta_p.T, self.f.T)
                 self.f = zero(3)
                 # do not reset v and dJv because they could be used by ExponentialSimulator
 #                self.v = zero(3)
-#                self.dJv = zero(3)
-                print("\nINFO: Negative normal force %s!"%(self.frame_name), delta_p.T, self.normal.T)
+#                self.dJv = zero(3)                
             else:
 #                if(not self.active):
 #                    self.active = True
@@ -283,10 +284,15 @@ class RobotSimulator:
             se3.computeJointJacobians(self.model, self.data)
             se3.updateFramePlacements(self.model, self.data)
 
+        # check collisions only if unilateral contacts are enables
+        # or if the contact is not active yet
         for c in self.contacts:
-            c.check_collision()
+            if(self.unilateral_contacts or not c.active):
+                c.check_collision()
 
+        contact_changed = False
         if(self.nc != np.sum([c.active for c in self.contacts])):
+            contact_changed = True
             print("%.3f Number of active contacts changed from %d to %d."%(
                 self.t, self.nc, np.sum([c.active for c in self.contacts])))
             self.resize_contacts()
@@ -300,6 +306,8 @@ class RobotSimulator:
                 self.p0[  3*i:3*i+3] = c.p0
                 self.dp0[ 3*i:3*i+3] = c.dp0
                 i += 1
+                if(contact_changed):
+                    print(c.frame_name, 'p', c.p.T, 'v', c.v.T, 'f', c.f.T)
 
         return self.f
         
@@ -345,7 +353,7 @@ class RobotSimulator:
         return x0, dv_bar, JMinv
         
         
-    def step(self, u, dt=None, use_exponential_integrator=True, dt_force_pred=None, ndt_force_pred=None,
+    def step(self, inner_step, u, dt=None, use_exponential_integrator=True, dt_force_pred=None, ndt_force_pred=None,
              update_expm=True):
         if dt is None:
             dt = self.dt
@@ -364,11 +372,16 @@ class RobotSimulator:
         for c in self.contacts:
             if(c.active):
                 self.Jc[3*i:3*i+3, :] = c.getJacobianWorldFrame()
+                c.f_inner[:,inner_step] = self.f[3*i:3*i+3]
                 i += 1
 
         # array containing the forces predicting during the time step (meaningful only for exponential integrator)
         if(dt_force_pred is not None):
             f_pred = np.empty((self.nk,ndt_force_pred))*nan
+            for c in self.contacts:
+                c.f_pred = zero((3,ndt_force_pred))
+                c.f_avg  = zero((3,ndt_force_pred))
+                c.f_avg2 = zero((3,ndt_force_pred))
         else:
             f_pred = None
         f_pred_int = None
@@ -402,14 +415,15 @@ class RobotSimulator:
             # compute average force
             self.f_avg = self.D @ int_x / dt
             
-            if(self.unilateral_contacts=='projection'):
-                # project average forces in friction cones
-                self.f_avg_pre_projection = np.copy(self.f_avg)
-                i = 0
-                for c in self.contacts:
-                    if(c.active):
+            # project average forces in friction cones
+            self.f_avg_pre_projection = np.copy(self.f_avg)
+            i = 0
+            for c in self.contacts:
+                if(c.active):
+                    if(self.unilateral_contacts=='projection'):
                         self.f_avg[3*i:3*i+3] = c.project_force_in_cone(self.f_avg[3*i:3*i+3]) 
-                        i += 1
+                    c.f_avg[:,inner_step] = self.f_avg[3*i:3*i+3]
+                    i += 1
             dv_mean = dv_bar + JMinv.T @ self.f_avg
             
             if(self.use_second_integral):
@@ -421,14 +435,18 @@ class RobotSimulator:
                     self.int_x_prev += int_x
                 self.f_avg2 = self.D @ int2_x / (0.5*dt*dt)
                 
-                if(self.unilateral_contacts=='projection'):
-                    # project average forces in friction cones
-                    self.f_avg2_pre_projection = np.copy(self.f_avg2)
-                    i = 0
-                    for c in self.contacts:
-                        if(c.active):
+                
+                # project average forces in friction cones
+                self.f_avg2_pre_projection = np.copy(self.f_avg2)
+                i = 0
+                for c in self.contacts:
+                    if(c.active):
+                        if(self.unilateral_contacts=='projection'):
                             self.f_avg2[3*i:3*i+3] = c.project_force_in_cone(self.f_avg2[3*i:3*i+3])
-                            i += 1
+                        c.f_avg2[:,inner_step] = self.f_avg2[3*i:3*i+3]
+                        i += 1
+                            
+                
                 v_mean = self.v + 0.5*dt*(dv_bar + JMinv.T @ self.f_avg2)
             else:
                 v_mean  = self.v + 0.5*dt*dv_mean
@@ -444,6 +462,12 @@ class RobotSimulator:
                 for i in range(ndt_force_pred):
                     f_pred[:, i] = self.D @ z[:n]
                     z = e_TC @ z
+
+                i = 0
+                for c in self.contacts:
+                    if(c.active):
+                        c.f_pred = f_pred[3*i:3*i+3,:]
+                        i += 1
                     
                 # predict also what forces we would get by integrating with the force prediction
                 int_x = self.expMatHelper.compute_integral_x_T(self.A, self.a, x0, dt_force_pred, self.max_mat_mult, store=False)
@@ -561,7 +585,9 @@ class RobotSimulator:
         # Predict all forces during first inner simulation step
         
         # forces computed in the inner simulation steps (ndt)
-        self.f_inner = np.zeros((self.nk, ndt))
+        for c in self.contacts:
+            c.f_inner = np.zeros((3,ndt))
+#        self.f_inner = np.zeros((self.nk, ndt))
         self.F_avg  = np.zeros((self.nk, ndt))
         self.F_avg2 = np.zeros((self.nk, ndt))
         self.F_avg_pre_projection  = np.zeros((self.nk, ndt))
@@ -579,17 +605,18 @@ class RobotSimulator:
                 update_expm = False
                 
             if(i==0):
-                self.q, self.v, self.f_pred, self.f_pred_int = self.step(u, dt/ndt, 
+                self.q, self.v, self.f_pred, self.f_pred_int = self.step(i, u, dt/ndt, 
                                                     use_exponential_integrator, dt, ndt, update_expm=True)
-                self.f_inner[:,0] = self.f_pred[:,0]
+#                self.f_inner[:,0] = self.f_pred[:,0]
             else:
-                self.q, self.v, tmp1, tmp2 = self.step(u, dt/ndt, use_exponential_integrator, update_expm=update_expm)
-                self.f_inner[:,i] = np.copy(self.f)
+                self.q, self.v, tmp1, tmp2 = self.step(i, u, dt/ndt, use_exponential_integrator, update_expm=update_expm)
+                
+#                self.f_inner[:,i] = np.copy(self.f)
             
-            self.F_avg[:,i]  = np.copy(self.f_avg)
-            self.F_avg2[:,i] = np.copy(self.f_avg2)
-            self.F_avg_pre_projection[:,i]  = np.copy(self.f_avg_pre_projection)
-            self.F_avg2_pre_projection[:,i] = np.copy(self.f_avg2_pre_projection)
+#            self.F_avg[:,i]  = np.copy(self.f_avg)
+#            self.F_avg2[:,i] = np.copy(self.f_avg2)
+#            self.F_avg_pre_projection[:,i]  = np.copy(self.f_avg_pre_projection)
+#            self.F_avg2_pre_projection[:,i] = np.copy(self.f_avg2_pre_projection)
 
             self.display(self.q, dt/ndt)
 
