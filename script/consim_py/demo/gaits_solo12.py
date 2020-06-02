@@ -88,6 +88,9 @@ if __name__ == "__main__":
     dt = 2.e-3 
     dt_ref = 1e-2 # time step of reference motion
 
+    exp_max_mul = 100 
+    int_max_mul = 100 
+
     PRINT_N = int(conf.PRINT_T/dt)
     DISPLAY_N = int(conf.DISPLAY_T/dt)
 
@@ -114,7 +117,8 @@ if __name__ == "__main__":
         # build the simulator 
         if(simu_type=='exponential'):
             sim = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
-                                        K, B , mu, anchor_slipping, predicted_forces)
+                                        K, B , mu, anchor_slipping, predicted_forces,
+                                        exp_max_mul, int_max_mul)
         else:
             sim = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
                                             K, B , mu)

@@ -168,12 +168,14 @@ AbstractSimulator(model, data, dt, n_integration_steps, whichFD) {}
 
 void EulerSimulator::computeContactForces() 
 {
+  
   CONSIM_START_PROFILER("pinocchio::computeAllTerms");
   pinocchio::forwardKinematics(*model_, *data_, q_, v_);
   pinocchio::computeJointJacobians(*model_, *data_);
   pinocchio::updateFramePlacements(*model_, *data_);
   pinocchio::nonLinearEffects(*model_, *data_, q_, v_);
-  /*!< loops over all contacts and objects to detect contacts and update contact positions*/ 
+  /*!< loops over all contacts and objects to detect contacts and update contact positions*/
+  
   detectContacts();
   CONSIM_START_PROFILER("compute_contact_forces");
   for (auto &cp : contacts_) {
@@ -181,7 +183,7 @@ void EulerSimulator::computeContactForces()
     cp->firstOrderContactKinematics(*data_); /*!<  must be called before computePenetration() it updates cp.v and jacobian*/   
     cp->optr->computePenetration(*cp); 
     cp->optr->contact_model_->computeForce(*cp);
-    tau_ += cp->world_J_.transpose() * cp->f; 
+    tau_.noalias() += cp->world_J_.transpose() * cp->f; 
   }
   CONSIM_STOP_PROFILER("compute_contact_forces");
 }
@@ -189,6 +191,7 @@ void EulerSimulator::computeContactForces()
 
 void EulerSimulator::step(const Eigen::VectorXd &tau) 
 {
+  
   if(!resetflag_){
     throw std::runtime_error("resetState() must be called first !");
   }
@@ -196,6 +199,7 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
   assert(tau.size() == model_->nv);
   for (int i = 0; i < n_integration_steps_; i++)
     {
+      Eigen::internal::set_is_malloc_allowed(false);
       CONSIM_START_PROFILER("euler_simulator::substep");
       // \brief add input control 
       tau_ += tau;
@@ -226,8 +230,7 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
           
         case 3: // fast if some results are reused
           pinocchio::crba(*model_, *data_, q_);
-          mDv_ = tau_ - data_->nle;
-          dv_ = mDv_;
+          dv_ = tau_ - data_->nle;
           // Sparse Cholesky factorization
           pinocchio::cholesky::decompose(*model_, *data_);
           pinocchio::cholesky::solve(*model_,*data_,dv_);
@@ -245,7 +248,9 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
       
       tau_.fill(0);
       // \brief adds contact forces to tau_
+      
       computeContactForces(); 
+      Eigen::internal::set_is_malloc_allowed(true);
       CONSIM_STOP_PROFILER("euler_simulator::substep");
     }
   CONSIM_STOP_PROFILER("euler_simulator::step");

@@ -24,6 +24,8 @@ if __name__=="__main__":
     K = 1e5 * np.ones([3,1])
     B = 3e2 * np.ones([3,1])
     N_SIMULATION = 200
+    exp_max_mul = 100 
+    int_max_mul = 100 
     
     q0 = np.array([0., 0., -1e-10, 0., 0., 0., 1.]) [:,None]
     dq0 = np.array([0., 0., -1., 0., 0., 0.]) [:,None]
@@ -70,10 +72,11 @@ if __name__=="__main__":
         simu_type = simu_param['type']
         if(simu_type=='exponential'):
             sim = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
-                                        K, B , mu, anchor_slipping, True)
+                                        K, B , mu, anchor_slipping, True, 
+                                        exp_max_mul, int_max_mul)
         else:
             sim = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
-                                            K, B, mu)
+                                            K, B, mu, forward_dyn_method)
         
         cpts = []
         for cf in contact_names:

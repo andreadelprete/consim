@@ -20,6 +20,10 @@ from numpy.linalg import norm as norm
 
 #pin.setNumpyType(np.array)
 
+
+exp_max_mul = 100 
+int_max_mul = 100 
+
 USE_CONTROLLER = True 
 # parameters used for CoM Sinusoid 
 amp = np.array([0.0, 0.0, 0.05]).T
@@ -112,7 +116,8 @@ for simu_param in simu_params:
     # build the simulator 
     if(simu_type=='exponential'):
         sim = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
-                                    K, B , mu, anchor_slipping, predicted_forces)
+                                    K, B , mu, anchor_slipping, predicted_forces,
+                                    exp_max_mul, int_max_mul)
     else:
         sim = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
                                         K, B , mu)
