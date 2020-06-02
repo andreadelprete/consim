@@ -24,8 +24,8 @@ print(" Test Solo ".center(conf.LINE_WIDTH, '#'))
 print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
-i_min = 0
-i_max = 7
+i_min = 3
+i_max = i_min+3
 i_ground_truth = i_max+2
 
 GROUND_TRUTH_SIMU_PARAMS = {
@@ -47,36 +47,36 @@ for i in range(i_min, i_max):
    }]
     
 # EXPONENTIAL INTEGRATOR, UPDATE MATRIX EXPONENTIAL EVERY FEW ITERATIONS
-for i in range(i_min, i_max):
-   for j in range(1,min(i,5)):
-       SIMU_PARAMS += [{
-           'name': 'exp%4d update%3d'%(2**i, 2**j),
-           'method_name': 'exp update%3d'%(2**j),
-           'use_exp_int': 1,
-           'ndt': 2**i,
-           'update_expm_N': 2**j
-       }]
+#for i in range(i_min, i_max):
+#   for j in range(1,min(i,5)):
+#       SIMU_PARAMS += [{
+#           'name': 'exp%4d update%3d'%(2**i, 2**j),
+#           'method_name': 'exp update%3d'%(2**j),
+#           'use_exp_int': 1,
+#           'ndt': 2**i,
+#           'update_expm_N': 2**j
+#       }]
     
 # EXPONENTIAL INTEGRATOR, USE ONLY FIRST INTEGRAL
-for i in range(i_max):
-   SIMU_PARAMS += [{
-       'name': 'exp%4d n2i'%(2**i),
-       'method_name': 'exp-no-2nd-int',
-       'use_exp_int': 1,
-       'ndt': 2**i,
-       'use_second_integral': False
-   }]
+#for i in range(i_max):
+#   SIMU_PARAMS += [{
+#       'name': 'exp%4d n2i'%(2**i),
+#       'method_name': 'exp-no-2nd-int',
+#       'use_exp_int': 1,
+#       'ndt': 2**i,
+#       'use_second_integral': False
+#   }]
 
 # EXPONENTIAL INTEGRATOR, REDUCE NUMBER OF MATRIX MULTIPLICATIONS
-for i in range(2,3):
-   for j in range(0,7):
-       SIMU_PARAMS += [{
-           'name': 'exp%4d mmm-%d'%(2**i,j),
-           'method_name': 'exp mmm-%d'%j,
-           'use_exp_int': 1,
-           'ndt': 2**i,
-           'max_mat_mult': j,
-       }]
+#for i in range(2,3):
+#   for j in range(0,7):
+#       SIMU_PARAMS += [{
+#           'name': 'exp%4d mmm-%d'%(2**i,j),
+#           'method_name': 'exp mmm-%d'%j,
+#           'use_exp_int': 1,
+#           'ndt': 2**i,
+#           'max_mat_mult': j,
+#       }]
 
 # EULER SIMULATOR with Cholesky
 for i in range(5, i_max):
@@ -87,39 +87,39 @@ for i in range(5, i_max):
         'ndt': 2**i,
     }]
     
-# EULER SIMULATOR with ABA
-for i in range(5, i_max):
-    SIMU_PARAMS += [{
-        'name': 'euler%4d ABA'%(2**i),
-        'method_name': 'euler ABA',
-        'use_exp_int': 0,
-        'ndt': 2**i,
-        'fwd_dyn_method': 'aba'
-    }]
-    
-## EULER SIMULATOR with pinocchio::computeMinverse
-for i in range(5, i_max):
-    SIMU_PARAMS += [{
-        'name': 'euler%4d pinMinv'%(2**i),
-        'method_name': 'euler pinMinv',
-        'use_exp_int': 0,
-        'ndt': 2**i,
-        'fwd_dyn_method': 'pinMinv'
-    }]
+## EULER SIMULATOR with ABA
+#for i in range(5, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'euler%4d ABA'%(2**i),
+#        'method_name': 'euler ABA',
+#        'use_exp_int': 0,
+#        'ndt': 2**i,
+#        'fwd_dyn_method': 'aba'
+#    }]
+#    
+### EULER SIMULATOR with pinocchio::computeMinverse
+#for i in range(5, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'euler%4d pinMinv'%(2**i),
+#        'method_name': 'euler pinMinv',
+#        'use_exp_int': 0,
+#        'ndt': 2**i,
+#        'fwd_dyn_method': 'pinMinv'
+#    }]
 
 PLOT_UPSILON = 0
 PLOT_FORCES = 0
 PLOT_BASE_POS = 0
 PLOT_FORCE_PREDICTIONS = 0
 PLOT_INTEGRATION_ERRORS = 1
-PLOT_INTEGRATION_ERROR_TRAJECTORIES = 0
+PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
 PLOT_MAT_MULT_EXPM = 0
 PLOT_MAT_NORM_EXPM = 0
 
 ASSUME_A_INVERTIBLE = 0
 USE_CONTROLLER = 1
 dt = 0.01                      # controller time step
-T = 0.01
+T = 0.1
 
 offset = np.array([0.0, -0.0, 0.0])
 amp = np.array([0.0, 0.0, 0.05])
@@ -137,9 +137,13 @@ q0, v0 = np.copy(simu.q), np.copy(simu.v)
 
 # DEBUG
 #q0[2] += 1.0
+#q0[2] += 1e-2
+q0[2] -= 6e-6
+v0[2] -= 10e-2
 
 for name in conf.contact_frames:
     simu.add_contact(name, conf.contact_normal, conf.K, conf.B, conf.mu)
+simu.init(q0, v0)
 
 invdyn = TsidQuadruped(conf, solo, q0, viewer=False)
 robot = invdyn.robot
@@ -199,6 +203,9 @@ def run_simulation(q, v, simu_params):
     v[:,0] = np.copy(simu.v)
 #    f[:,0] = np.copy(simu.f)
     
+    for c in simu.contacts:
+        print(c.frame_name, 1e5*c.p)
+    
     try:
         for i in range(0, N_SIMULATION):
     
@@ -222,10 +229,10 @@ def run_simulation(q, v, simu_params):
     
             q[:,i+1], v[:,i+1], f_i = simu.simulate(u, dt, ndt,
                                       simu_params['use_exp_int'])
-            f[:, i+1] = f_i
-            f_pred_int[:,i+1] = simu.f_pred_int        
-            f_inner[:, i*ndt:(i+1)*ndt] = simu.f_inner
-            f_pred[:, i*ndt:(i+1)*ndt] = simu.f_pred        
+#            f[:, i+1] = f_i
+#            f_pred_int[:,i+1] = simu.f_pred_int        
+#            f_inner[:, i*ndt:(i+1)*ndt] = simu.f_inner
+#            f_pred[:, i*ndt:(i+1)*ndt] = simu.f_pred        
             dv = simu.dv
     
             com_pos[:, i] = invdyn.robot.com(invdyn.formulation.data())
@@ -236,10 +243,10 @@ def run_simulation(q, v, simu_params):
             com_acc_ref[:, i] = sampleCom.acc()
             com_acc_des[:, i] = invdyn.comTask.getDesiredAcceleration
             
-            dp[:,i] = simu.debug_dp
-            dp_fd[:,i] = simu.debug_dp_fd
-            dJv[:,i] = simu.debug_dJv
-            dJv_fd[:,i] = simu.debug_dJv_fd
+#            dp[:,i] = simu.debug_dp
+#            dp_fd[:,i] = simu.debug_dp_fd
+#            dJv[:,i] = simu.debug_dJv
+#            dJv_fd[:,i] = simu.debug_dJv_fd
             
             mat_mult_expm[i] = simu.expMatHelper.mat_mult
             mat_norm_expm[i] = simu.expMatHelper.mat_norm
@@ -262,7 +269,7 @@ def run_simulation(q, v, simu_params):
     except Exception as e:
         print(e)
         print("ERROR WHILE RUNNING SIMULATION")
-#        raise e
+        raise e
 
     time_spent = time.time() - time_start
     print("Real-time factor:", t/time_spent)

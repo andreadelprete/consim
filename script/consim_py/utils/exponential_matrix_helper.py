@@ -266,14 +266,32 @@ if __name__ == '__main__':
 #    A = np.block([[np.zeros((n2, n2)), np.eye(n2)],
 #                      [-Upsilon@K,      -Upsilon@B]])
     A  = rand((n, n))
-    
     helper = ExponentialMatrixHelper()
-
+    
     # print("x(0) is:", x0.T)
     # print("a is:   ", a.T)
     print("State size n:", n)
     print("Eigenvalues of A:", np.sort_complex(eigvals(A)).T)
     print("")
+    
+    T = 1
+    x_T = helper.compute_x_T(A, a, x0, T)
+    int_x = helper.compute_integral_x_T(A, a, x0, T)
+
+    #compute_double_integral_x_T(self, A, a, x0, T, max_mat_mult=100, balance=False, store=True):
+    C = np.zeros((n+3, n+3))
+    C[0:n,     0:n] = A
+    C[0:n,     n] = a
+    C[0:n,     n+1] = x0
+    C[n:n+2, n+1:] = np.eye(2)
+    e_TC = helper.expm(T*C)
+    e_TA = helper.expm(T*A)
+    x_T_guess = e_TA@x0 + e_TC[:n,-3]    
+    print('e_TC\n', e_TC)
+    print('x_T        ', x_T)
+    print('x_T_guess  ', x_T_guess)
+    print('int_x', int_x)
+    print('e_TA\n', e_TA)
     
     # update_expm
 #    dt = 1.0
@@ -295,34 +313,34 @@ if __name__ == '__main__':
 #    print("int2_x - int2_x_from_x_pred", np.max(np.abs(int2_x - int2_x_from_x_pred))) #this should be zero but it's not!
 
 
-    T = 1
-    x_pred = helper.compute_x_T(A, a, x0, T)
-    int_x_T     = helper.compute_integral_x_T(A, a, x0, T)
-    int_x_T_2T  = helper.compute_next_integral()
-    int_x_T_2T  = helper.compute_integral_x_T(A, a, x_pred, T)
-    int_x_2T_3T = helper.compute_next_integral()
-    int_x_2T    = helper.compute_integral_x_T(A, a, x0, 2*T)
-    int_x_3T    = helper.compute_integral_x_T(A, a, x0, 3*T)
-    print("int_x_T + int_x_T_2T", int_x_T+int_x_T_2T)
-    print("int_x_2T            ", int_x_2T)
-    print_error(int_x_2T, int_x_T+int_x_T_2T)
-    print("int_x_2T + int_x_2T_3T", int_x_2T+int_x_2T_3T)
-    print("int_x_3T              ", int_x_3T)
-    print_error(int_x_3T, int_x_2T+int_x_2T_3T)
-
-    x_pred = helper.compute_x_T(A, a, x0, T)
-    int2_x_T     = helper.compute_double_integral_x_T(A, a, x0, T)    
-    int2_x_T_2T  = helper.compute_next_double_integral()
-    int2_x_T_2T  = int_x_T*T + helper.compute_double_integral_x_T(A, a, x_pred, T, store=False)
-    int2_x_2T_3T = helper.compute_next_double_integral()
-    int2_x_2T    = helper.compute_double_integral_x_T(A, a, x0, 2*T)
-    int2_x_3T    = helper.compute_double_integral_x_T(A, a, x0, 3*T)
-    print("int2_x_T + int_x_T_2T", int2_x_T+int2_x_T_2T)
-    print("int2_x_2T            ", int2_x_2T)
-    print_error(int2_x_2T, int2_x_T+int2_x_T_2T)
-    print("int2_x_2T + int_x_2T_3T", int2_x_2T+int2_x_2T_3T)
-    print("int2_x_3T              ", int2_x_3T)
-    print_error(int2_x_3T, int2_x_2T+int2_x_2T_3T)
+#    T = 1
+#    x_pred = helper.compute_x_T(A, a, x0, T)
+#    int_x_T     = helper.compute_integral_x_T(A, a, x0, T)
+#    int_x_T_2T  = helper.compute_next_integral()
+#    int_x_T_2T  = helper.compute_integral_x_T(A, a, x_pred, T)
+#    int_x_2T_3T = helper.compute_next_integral()
+#    int_x_2T    = helper.compute_integral_x_T(A, a, x0, 2*T)
+#    int_x_3T    = helper.compute_integral_x_T(A, a, x0, 3*T)
+#    print("int_x_T + int_x_T_2T", int_x_T+int_x_T_2T)
+#    print("int_x_2T            ", int_x_2T)
+#    print_error(int_x_2T, int_x_T+int_x_T_2T)
+#    print("int_x_2T + int_x_2T_3T", int_x_2T+int_x_2T_3T)
+#    print("int_x_3T              ", int_x_3T)
+#    print_error(int_x_3T, int_x_2T+int_x_2T_3T)
+#
+#    x_pred = helper.compute_x_T(A, a, x0, T)
+#    int2_x_T     = helper.compute_double_integral_x_T(A, a, x0, T)    
+#    int2_x_T_2T  = helper.compute_next_double_integral()
+#    int2_x_T_2T  = int_x_T*T + helper.compute_double_integral_x_T(A, a, x_pred, T, store=False)
+#    int2_x_2T_3T = helper.compute_next_double_integral()
+#    int2_x_2T    = helper.compute_double_integral_x_T(A, a, x0, 2*T)
+#    int2_x_3T    = helper.compute_double_integral_x_T(A, a, x0, 3*T)
+#    print("int2_x_T + int_x_T_2T", int2_x_T+int2_x_T_2T)
+#    print("int2_x_2T            ", int2_x_2T)
+#    print_error(int2_x_2T, int2_x_T+int2_x_T_2T)
+#    print("int2_x_2T + int_x_2T_3T", int2_x_2T+int2_x_2T_3T)
+#    print("int2_x_3T              ", int2_x_3T)
+#    print_error(int2_x_3T, int2_x_2T+int2_x_2T_3T)
     
 #    MAX_MAT_MULT = 0
 #

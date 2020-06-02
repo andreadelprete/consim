@@ -21,8 +21,8 @@ print(" Test Sliding Mass ".center(conf.LINE_WIDTH, '#'))
 print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
-i_min = 2
-i_max = i_min+4
+i_min = 0
+i_max = i_min+8
 i_ground_truth = i_max+2
 
 GROUND_TRUTH_EXP_SIMU_PARAMS = {
@@ -51,33 +51,33 @@ for i in range(i_min, i_max):
         'forward_dyn_method': 1
     }]
 
-for i in range(i_min, i_max):
-    SIMU_PARAMS += [{
-        'name': 'exp ABA%4d'%(2**i),
-        'method_name': 'exp ABA',
-        'use_exp_int': 1,
-        'ndt': 2**i,
-        'forward_dyn_method': 2
-    }]
-
-for i in range(i_min, i_max):
-    SIMU_PARAMS += [{
-        'name': 'exp Chol%4d'%(2**i),
-        'method_name': 'exp Chol',
-        'use_exp_int': 1,
-        'ndt': 2**i,
-        'forward_dyn_method': 3
-    }]
+#for i in range(i_min, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'exp ABA%4d'%(2**i),
+#        'method_name': 'exp ABA',
+#        'use_exp_int': 1,
+#        'ndt': 2**i,
+#        'forward_dyn_method': 2
+#    }]
+#
+#for i in range(i_min, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'exp Chol%4d'%(2**i),
+#        'method_name': 'exp Chol',
+#        'use_exp_int': 1,
+#        'ndt': 2**i,
+#        'forward_dyn_method': 3
+#    }]
     
 # EULER INTEGRATOR WITH STANDARD SETTINGS
-for i in range(i_min, i_max):
-    SIMU_PARAMS += [{
-        'name': 'euler Minv%4d'%(2**i),
-        'method_name': 'euler Minv',
-        'use_exp_int': 0,
-        'ndt': 2**i,
-        'forward_dyn_method': 1
-    }]
+#for i in range(i_min, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'euler Minv%4d'%(2**i),
+#        'method_name': 'euler Minv',
+#        'use_exp_int': 0,
+#        'ndt': 2**i,
+#        'forward_dyn_method': 1
+#    }]
 
 for i in range(i_min, i_max):
     SIMU_PARAMS += [{
@@ -88,32 +88,32 @@ for i in range(i_min, i_max):
         'forward_dyn_method': 2
     }]
 
-for i in range(i_min, i_max):
-    SIMU_PARAMS += [{
-        'name': 'euler Chol%4d'%(2**i),
-        'method_name': 'euler Chol',
-        'use_exp_int': 0,
-        'ndt': 2**i,
-        'forward_dyn_method': 3
-    }]
+#for i in range(i_min, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'euler Chol%4d'%(2**i),
+#        'method_name': 'euler Chol',
+#        'use_exp_int': 0,
+#        'ndt': 2**i,
+#        'forward_dyn_method': 3
+#    }]
     
 PLOT_FORCES = 0
 PLOT_BASE_POS = 0
 PLOT_FORCE_PREDICTIONS = 0
 PLOT_FORCE_INTEGRALS = 0
 PLOT_INTEGRATION_ERRORS = 1
-PLOT_INTEGRATION_ERROR_TRAJECTORIES = 0
+PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
 PLOT_CONTACT_POINT_PREDICTION = 0
 PLOT_ANCHOR_POINTS = 0
 
 dt = 0.01                      # controller time step
-T = 0.01
+T = 0.5
 unilateral_contacts = 1
 compute_predicted_forces = False
 exm_max_mul = 100 
 int_max_mul = 100 
 
-conf.q0[2] += 1.0
+#conf.q0[2] += 1.0
 
 offset = np.array([0.0, -0.0, 0.0])
 amp = np.array([0.0, 0.0, 0.05])
@@ -176,17 +176,16 @@ def run_simulation(q0, v0, simu_params):
     
     try:
         for i in range(0, N_SIMULATION):
-#            sampleCom.pos(offset + amp * np.sin(two_pi_f*t))
-#            sampleCom.vel(two_pi_f_amp * np.cos(two_pi_f*t))
-#            sampleCom.acc(-two_pi_f_squared_amp * np.sin(two_pi_f*t))
-#            invdyn.comTask.setReference(sampleCom)
-#            HQPData = invdyn.formulation.computeProblemData(t, q[:,i], v[:,i])
-#            sol = invdyn.solver.solve(HQPData)
-#            if(sol.status != 0):
-#                print("[%d] QP problem could not be solved! Error code:" % (i), sol.status)
-#                break
-#            u[6:,i] = invdyn.formulation.getActuatorForces(sol)
-#            
+            sampleCom.pos(offset + amp * np.sin(two_pi_f*t))
+            sampleCom.vel(two_pi_f_amp * np.cos(two_pi_f*t))
+            sampleCom.acc(-two_pi_f_squared_amp * np.sin(two_pi_f*t))
+            invdyn.comTask.setReference(sampleCom)
+            HQPData = invdyn.formulation.computeProblemData(t, q[:,i], v[:,i])
+            sol = invdyn.solver.solve(HQPData)
+            if(sol.status != 0):
+                print("[%d] QP problem could not be solved! Error code:" % (i), sol.status)
+                break
+            u[6:,i] = invdyn.formulation.getActuatorForces(sol)      
             
             simu.step(u[:,i])
             q[:,i+1] = simu.get_q()
@@ -196,8 +195,6 @@ def run_simulation(q0, v0, simu_params):
                 f[:,ci,i+1] = cp.f
                 p[:,ci,i+1] = cp.x
                 dp[:,ci,i+1] = cp.v
-                if(cp.active):
-                    print("Contact active", cp.name)
             
             if(np.any(np.isnan(v[:,i+1])) or norm(v[:,i+1]) > 1e3):
                 raise Exception("Time %.3f Velocities are too large: %.1f. Stop simulation."%(
@@ -267,7 +264,7 @@ for name in sorted(data.keys()):
     ndt[d.method_name] += [d.ndt]
 
 # PLOT STUFF
-line_styles = 10*['-o', '--o', '-.o', ':o']
+line_styles = 100*['-o', '--o', '-.o', ':o']
 tt = np.arange(0.0, (N_SIMULATION+1)*dt, dt)[:N_SIMULATION+1]
 
 

@@ -40,8 +40,23 @@ class Contact:
         else:
             self.p0 = np.copy(p0)
         self.dp0 = np.zeros(3)
-        self.in_contact = False
+        self.active = False
         self.slipping = False
+        
+    def check_collision(self):
+        M = self.data.oMf[self.frame_id]
+        self.p = M.translation
+        if(self.p[2]<=0.0):
+            if(not self.active):
+#                print("INFO: Contact %s made!"%(self.frame_name))
+                self.p0 = np.copy(self.p)
+                self.dp0 = zero(3)
+            self.active=True
+        else:
+#            print("INFO: Contact %s broken!"%(self.frame_name))
+            self.active = False
+            self.slipping = False
+        return self.active
 
     def compute_force(self, project_in_friction_cone):
         M = self.data.oMf[self.frame_id]
@@ -63,21 +78,19 @@ class Contact:
             
         self.f = self.K@delta_p + self.B@(self.dp0-v_world)
         
-        
         if(project_in_friction_cone):
             self.dp0 = zero(3)
             # check whether point is in contact
-            if(delta_p.T @ self.normal <= 0.0):
+            if(self.f.dot(self.normal) <= 0.0):
                 self.f = zero(3)
-                self.v = zero(3)
-                self.dJv = zero(3)
-                if(self.in_contact):
-                    self.in_contact = False
-                    print("\nINFO: contact %s broken!"%(self.frame_name), delta_p.T, self.normal.T)
+                # do not reset v and dJv because they could be used by ExponentialSimulator
+#                self.v = zero(3)
+#                self.dJv = zero(3)
+                print("\nINFO: Negative normal force %s!"%(self.frame_name), delta_p.T, self.normal.T)
             else:
-                if(not self.in_contact):
-                    self.in_contact = True
-                    print("\nINFO: contact %s made!"%(self.frame_name))
+#                if(not self.active):
+#                    self.active = True
+#                    print("\nINFO: contact %s made!"%(self.frame_name))
                 # check whether contact force is outside friction cone
                 f_N = self.f.dot(self.normal)   # norm of normal force
                 f_T = self.f - f_N*self.normal  # tangential force (3d)
@@ -100,6 +113,7 @@ class Contact:
                 elif(self.slipping==True):
                     self.slipping = False
                     print('INFO: contact %s stopped slipping'%(self.frame_name), f_T_norm-self.mu*f_N)
+                    
         return self.f
         
             
@@ -147,7 +161,7 @@ class RobotSimulator:
         self.max_mat_mult = 100
         self.use_second_integral = True
         self.update_expm_N = 1 # update the expm every self.update_expm_N inner simulation steps
-        self.fwd_dyn_method = 'Cholseky' # can be either Cholesky, aba, or pinMinv
+        self.fwd_dyn_method = 'aba' # can be either Cholesky, aba, or pinMinv
         self.unilateral_contacts = 'projection' # None, 'QP', 'projection'
         
         # se3.RobotWrapper.BuildFromURDF(conf.urdf, [conf.path, ], se3.JointModelFreeFlyer())
@@ -156,6 +170,8 @@ class RobotSimulator:
         self.data = self.robot.data
         self.t = 0.0
         self.f = zero(0)
+        self.nc = 0
+        self.nk = 0
         nv = self.model.nv  # Dimension of joint velocities vector
         if root_joint is None:  # Basically if we have a floating base
             na = nv
@@ -167,6 +183,7 @@ class RobotSimulator:
         self.DISPLAY_T = conf.DISPLAY_T
         self.display_counter = conf.DISPLAY_T
         self.init(conf.q0, None, True)
+        self.resize_contacts()
         
         # for gepetto viewer
         if(conf.use_viewer):
@@ -212,17 +229,17 @@ class RobotSimulator:
                 c.reset_contact_position(p0[3*i:3*i+3])
             self.p0 = np.copy(p0)
 
-        self.compute_forces(compute_data=True)
-        self.resize_contacts()
+        self.compute_forces()
 
     # Adds a contact, resets all quantities
     def add_contact(self, frame_name, normal, K, B, mu):
         c = Contact(self.model, self.data, frame_name, normal, K, B, mu)
         self.contacts += [c]
-        self.resize_contacts()
+#        self.resize_contacts()
         
     def resize_contacts(self):
-        self.nc = len(self.contacts)
+#        self.nc = len(self.contacts)
+        self.nc = int(np.sum([c.active for c in self.contacts]))
         self.nk = 3*self.nc
         self.f = zero(self.nk)
         self.f_avg = zero(self.nk)
@@ -241,10 +258,13 @@ class RobotSimulator:
         self.a = zero(2*self.nk)
         self.A = np.zeros((2*self.nk, 2*self.nk))
         self.A[:self.nk, self.nk:] = np.eye(self.nk)
-        for (i,c) in enumerate(self.contacts):
-            self.K[3*i:3*i+3, 3*i:3*i+3] = c.K
-            self.B[3*i:3*i+3, 3*i:3*i+3] = c.B
-            self.p0[3*i:3*i+3]           = c.p0
+        i = 0
+        for c in self.contacts:
+            if(c.active):
+                self.K[3*i:3*i+3, 3*i:3*i+3] = c.K
+                self.B[3*i:3*i+3, 3*i:3*i+3] = c.B
+                self.p0[3*i:3*i+3]           = c.p0
+                i += 1
         self.D = np.hstack((-self.K, -self.B))
         
         self.debug_dp = zero(self.nk)
@@ -259,15 +279,27 @@ class RobotSimulator:
     def compute_forces(self, compute_data=True):
         '''Compute the contact forces from q, v and elastic model'''
         if compute_data:            
-            se3.forwardKinematics(self.model, self.data, self.q, self.v)
+            se3.forwardKinematics(self.model, self.data, self.q, self.v, zero(self.model.nv))
             se3.computeJointJacobians(self.model, self.data)
             se3.updateFramePlacements(self.model, self.data)
 
-        for (i,c) in enumerate(self.contacts):
-            self.f[3*i:3*i+3] = c.compute_force(self.unilateral_contacts)
-            self.p[  3*i:3*i+3] = c.p
-            self.p0[ 3*i:3*i+3] = c.p0
-            self.dp0[ 3*i:3*i+3] = c.dp0
+        for c in self.contacts:
+            c.check_collision()
+
+        if(self.nc != np.sum([c.active for c in self.contacts])):
+            print("%.3f Number of active contacts changed from %d to %d."%(
+                self.t, self.nc, np.sum([c.active for c in self.contacts])))
+            self.resize_contacts()
+            
+        i = 0
+        for c in self.contacts:
+            if(c.active):
+                self.f[   3*i:3*i+3] = c.compute_force(self.unilateral_contacts)
+                self.p[   3*i:3*i+3] = c.p
+                self.dp[  3*i:3*i+3] = c.v
+                self.p0[  3*i:3*i+3] = c.p0
+                self.dp0[ 3*i:3*i+3] = c.dp0
+                i += 1
 
         return self.f
         
@@ -291,11 +323,14 @@ class RobotSimulator:
         '''
         M = self.data.M
         dv_bar = self.forward_dyn(self.S.T@u)
-        for (i,c) in enumerate(self.contacts):
-            self.p[  3*i:3*i+3] = c.p
-            self.p0[ 3*i:3*i+3] = c.p0
-            self.dp[ 3*i:3*i+3] = c.v
-            self.dJv[3*i:3*i+3] = c.dJv
+        i = 0
+        for c in self.contacts:
+            if(c.active):
+                self.p[  3*i:3*i+3] = c.p
+                self.p0[ 3*i:3*i+3] = c.p0
+                self.dp[ 3*i:3*i+3] = c.v
+                self.dJv[3*i:3*i+3] = c.dJv
+                i += 1
         # always assume anchor point is not slipping because the spring-damper
         # force is computed based on that assumption and then projected if necessary
         x0 = np.concatenate((self.p-self.p0, self.dp))
@@ -319,14 +354,17 @@ class RobotSimulator:
             self.compute_forces()
             self.first_iter = False
 
-        se3.forwardKinematics(self.model, self.data, self.q, self.v, np.zeros(self.model.nv))
-        se3.computeJointJacobians(self.model, self.data)
-        se3.updateFramePlacements(self.model, self.data)
+#        se3.forwardKinematics(self.model, self.data, self.q, self.v, zero(self.model.nv))
+#        se3.computeJointJacobians(self.model, self.data)
+#        se3.updateFramePlacements(self.model, self.data)
         se3.crba(self.model, self.data, self.q)
         se3.nonLinearEffects(self.model, self.data, self.q, self.v)
         
-        for (i,c) in enumerate(self.contacts):
-            self.Jc[3*i:3*i+3, :] = c.getJacobianWorldFrame()
+        i = 0
+        for c in self.contacts:
+            if(c.active):
+                self.Jc[3*i:3*i+3, :] = c.getJacobianWorldFrame()
+                i += 1
 
         # array containing the forces predicting during the time step (meaningful only for exponential integrator)
         if(dt_force_pred is not None):
@@ -367,8 +405,11 @@ class RobotSimulator:
             if(self.unilateral_contacts=='projection'):
                 # project average forces in friction cones
                 self.f_avg_pre_projection = np.copy(self.f_avg)
-                for (i, c) in enumerate(self.contacts):
-                    self.f_avg[3*i:3*i+3] = c.project_force_in_cone(self.f_avg[3*i:3*i+3]) 
+                i = 0
+                for c in self.contacts:
+                    if(c.active):
+                        self.f_avg[3*i:3*i+3] = c.project_force_in_cone(self.f_avg[3*i:3*i+3]) 
+                        i += 1
             dv_mean = dv_bar + JMinv.T @ self.f_avg
             
             if(self.use_second_integral):
@@ -383,8 +424,11 @@ class RobotSimulator:
                 if(self.unilateral_contacts=='projection'):
                     # project average forces in friction cones
                     self.f_avg2_pre_projection = np.copy(self.f_avg2)
-                    for (i, c) in enumerate(self.contacts):
-                        self.f_avg2[3*i:3*i+3] = c.project_force_in_cone(self.f_avg2[3*i:3*i+3])
+                    i = 0
+                    for c in self.contacts:
+                        if(c.active):
+                            self.f_avg2[3*i:3*i+3] = c.project_force_in_cone(self.f_avg2[3*i:3*i+3])
+                            i += 1
                 v_mean = self.v + 0.5*dt*(dv_bar + JMinv.T @ self.f_avg2)
             else:
                 v_mean  = self.v + 0.5*dt*dv_mean

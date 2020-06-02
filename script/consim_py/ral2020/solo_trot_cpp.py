@@ -35,7 +35,7 @@ print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
 i_min = 0
-i_max = i_min+6
+i_max = i_min+5
 i_ground_truth = i_max+2
 
 GROUND_TRUTH_EXP_SIMU_PARAMS = {
@@ -114,9 +114,9 @@ PLOT_FORCES = 0
 PLOT_SLIPPING = 0
 PLOT_BASE_POS = 0
 PLOT_INTEGRATION_ERRORS = 1
-PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
+PLOT_INTEGRATION_ERROR_TRAJECTORIES = 0
 
-RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
+RESET_STATE_ON_GROUND_TRUTH = 0  # reset the state of the system on the ground truth
 dt     = 0.002                      # controller and simulator time step
 dt_ref = 0.010                      # time step of reference motion
 unilateral_contacts = 1

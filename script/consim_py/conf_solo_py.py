@@ -15,7 +15,7 @@ LINE_WIDTH = 60
 # N_SIMULATION = 4000             # number of time steps simulated
 # dt = 0.002                      # controller time step
 
-mu = 1.0                              # friction coefficient
+mu = 1.0*1e3                              # friction coefficient
 fMin = 1.0                          # minimum normal force
 fMax = 1000.0                       # maximum normal force
 contact_frames = ['HL_FOOT', 'HR_FOOT', 'FL_FOOT', 'FR_FOOT']
