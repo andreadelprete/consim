@@ -273,6 +273,7 @@ ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocc
 {
   dvMean_.resize(model_->nv);
   dvMean2_.resize(model_->nv);
+  vMean2_.resize(model_->nv);
   Minv_.resize(model_->nv, model_->nv); Minv_.setZero();
   dv_bar.resize(model_->nv); dv_bar.setZero();
   temp01_.resize(model_->nv); temp01_.setZero();
@@ -320,11 +321,11 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
         temp01_.noalias() = JcT_*fpr_; 
         temp02_ = tau_ - data_->nle + temp01_;
         dvMean_.noalias() = Minv_*temp02_; 
-
+        
         temp01_.noalias() = JcT_*fpr2_; 
         temp02_ = tau_ - data_->nle + temp01_;
         dvMean2_.noalias() = Minv_*temp02_; 
-        vMean2_.noalias() = v_ + .5 * sub_dt * dvMean2_; 
+        vMean2_.noalias() = v_ +  .5 * sub_dt * dvMean2_; 
         pinocchio::integrate(*model_, q_, vMean2_ * sub_dt, qnext_);
         CONSIM_STOP_PROFILER("exponential_simulator::subIntegration"); 
         /* PSEUDO-CODE
@@ -343,7 +344,6 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       }
     } /*!< active contacts */
     else{
-      pinocchio::nonLinearEffects(*model_, *data_, q_, v_);
       switch (whichFD_)
       {
       case 1:
@@ -360,9 +360,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
         break;
       
       case 3:
-        pinocchio::crba(*model_, *data_, q_);
-        mDv_ = tau_ - data_->nle;
-        dvMean_ = mDv_;
+        dvMean_ = tau_ - data_->nle;
         // Sparse Cholesky factorization
         pinocchio::cholesky::decompose(*model_, *data_);
         pinocchio::cholesky::solve(*model_,*data_,dvMean_);
@@ -375,7 +373,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       vMean_ = v_ + .5 * sub_dt*dvMean_;
       pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
     } /*!< no active contacts */
-
+ 
     q_ = qnext_;
     v_ += sub_dt*dvMean_;
     dv_ = dvMean_; 
@@ -396,8 +394,7 @@ void ExponentialSimulator::computeIntegrationTerms(){
    * computes A and b 
    **/   
   // Do we need to compute M before computing M inverse?
-  pinocchio::crba(*model_, *data_, q_);
-  pinocchio::nonLinearEffects(*model_, *data_, q_, v_);
+  
   i_active_ = 0; 
   for(unsigned int i=0; i<nc_; i++){
     if (!contacts_[i]->active) continue;
@@ -449,6 +446,8 @@ void ExponentialSimulator::computeIntegrationTerms(){
   pinocchio::forwardKinematics(*model_, *data_, q_, v_, fkDv_);
   pinocchio::computeJointJacobians(*model_, *data_);
   pinocchio::updateFramePlacements(*model_, *data_);
+  pinocchio::crba(*model_, *data_, q_);
+  pinocchio::nonLinearEffects(*model_, *data_, q_, v_); 
   CONSIM_STOP_PROFILER("pinocchio::computeKinematics");
   detectContacts(); /*!<inactive contacts get automatically filled with zero here */
 
@@ -480,9 +479,9 @@ void ExponentialSimulator::computePredictedXandF(){
    * computes \int{e^{dt*A}}
    * computes predictedXf = edtA x0 + int_edtA_ * b 
    **/  
-  
+  Eigen::internal::set_is_malloc_allowed(true);
   if(compute_predicted_forces_){
-    util_eDtA.compute(sub_dt*A,expAdt_);   
+    util_eDtA.compute(sub_dt*A,expAdt_);   // TODO: there is memory allocation here 
     inteAdt_.fill(0);
     switch (nactive_)
     {
@@ -505,14 +504,18 @@ void ExponentialSimulator::computePredictedXandF(){
     default:
       break;
     }
+    //  prdiction terms also have memory allocation 
+    
+    
     predictedXf_ = expAdt_*x0_ + inteAdt_*a_; 
     predictedForce_ = kp0_ + D*predictedXf_;
+    
   }
   else{
     predictedXf_ = x0_;
-    predictedForce_ = kp0_;
+    predictedForce_ = kp0_; // this doesnt seem correct ?
   }
-  
+  Eigen::internal::set_is_malloc_allowed(false);
 }
 
 
@@ -533,12 +536,13 @@ void ExponentialSimulator::checkFrictionCone(){
       f_avg = D @ int_x / dt
       f_avg2 = D @ int2_x / (0.5*dt*dt)
   */
+
   temp03_.noalias() = D*intxt_;
-  f_avg  = kp0_ + temp03_/sub_dt; 
+  f_avg  = kp0_ + temp03_/sub_dt;
 
   temp03_.noalias() = D*int2xt_;
   temp03_.noalias() = temp03_/(0.5*sub_dt*sub_dt);
-  f_avg2 = kp0_ +  temp03_; 
+  f_avg2 = kp0_ +  temp03_;
   
   i_active_ = 0;
   cone_flag_ = false; 

@@ -88,6 +88,7 @@ namespace consim {
 
     protected:
       const double sub_dt;
+      double half_sub_dt; 
       Eigen::VectorXd q_;  
       Eigen::VectorXd qnext_;
       Eigen::VectorXd v_;
