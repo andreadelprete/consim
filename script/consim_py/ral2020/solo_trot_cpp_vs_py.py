@@ -2,6 +2,7 @@
 '''
 import time
 import consim 
+from consim_py.simulator import RobotSimulator
 import numpy as np
 from numpy.linalg import norm as norm
 
@@ -9,7 +10,7 @@ from example_robot_data.robots_loader import loadSolo
 
 import matplotlib.pyplot as plt 
 import consim_py.utils.plot_utils as plut
-import conf_solo_trot_cpp as conf
+import conf_solo_trot_cpp_vs_py as conf
 import pinocchio as pin 
 
 class Empty:
@@ -30,11 +31,11 @@ def state_diff(robot, x1, x2):
     return xdiff
 
 print("".center(conf.LINE_WIDTH, '#'))
-print(" Test Solo Trot C++ ".center(conf.LINE_WIDTH, '#'))
+print(" Test Solo Trot C++ VS Python".center(conf.LINE_WIDTH, '#'))
 print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
-i_min = 3
+i_min = 0
 i_max = i_min+1
 i_ground_truth = i_max+2
 
@@ -42,14 +43,7 @@ GROUND_TRUTH_EXP_SIMU_PARAMS = {
     'name': 'ground-truth %d'%(2**i_ground_truth),
     'method_name': 'ground-truth-exp',
     'use_exp_int': 1,
-    'ndt': 2**i_ground_truth,
-}
-
-GROUND_TRUTH_EULER_SIMU_PARAMS = {
-    'name': 'ground-truth %d'%(2**i_ground_truth),
-    'method_name': 'ground-truth-euler',
-    'use_exp_int': 0,
-    'ndt': 2**i_ground_truth,
+    'ndt': 2**i_ground_truth
 }
 
 SIMU_PARAMS = []
@@ -57,60 +51,15 @@ SIMU_PARAMS = []
 # EXPONENTIAL INTEGRATOR WITH STANDARD SETTINGS
 for i in range(i_min, i_max):
     SIMU_PARAMS += [{
-        'name': 'exp Minv%4d'%(2**i),
-        'method_name': 'exp Minv',
+        'name': 'exp%4d'%(2**i),
+        'method_name': 'exp',
         'use_exp_int': 1,
         'ndt': 2**i,
         'forward_dyn_method': 1
     }]
 
-#for i in range(i_min, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'exp ABA%4d'%(2**i),
-#        'method_name': 'exp ABA',
-#        'use_exp_int': 1,
-#        'ndt': 2**i,
-#        'forward_dyn_method': 2
-#    }]
-#
-#for i in range(i_min, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'exp Chol%4d'%(2**i),
-#        'method_name': 'exp Chol',
-#        'use_exp_int': 1,
-#        'ndt': 2**i,
-#        'forward_dyn_method': 3
-#    }]
     
-# EULER INTEGRATOR WITH STANDARD SETTINGS
-for i in range(i_min, i_max):
-    SIMU_PARAMS += [{
-        'name': 'euler Minv%4d'%(2**i),
-        'method_name': 'euler Minv',
-        'use_exp_int': 0,
-        'ndt': 2**i,
-        'forward_dyn_method': 1
-    }]
-
-#for i in range(i_min, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'euler ABA%4d'%(2**i),
-#        'method_name': 'euler ABA',
-#        'use_exp_int': 0,
-#        'ndt': 2**i,
-#        'forward_dyn_method': 2
-#    }]
-#
-#for i in range(i_min, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'euler Chol%4d'%(2**i),
-#        'method_name': 'euler Chol',
-#        'use_exp_int': 0,
-#        'ndt': 2**i,
-#        'forward_dyn_method': 3
-#    }]
-    
-PLOT_FORCES = 0
+PLOT_FORCES = 1
 PLOT_SLIPPING = 0
 PLOT_BASE_POS = 0
 PLOT_INTEGRATION_ERRORS = 0
@@ -146,37 +95,35 @@ q0, v0 = refX[0,:nq], refX[0,nq:]
 N_SIMULATION = refU.shape[0]     
 
 # TEMPORARY DEBUG CODE
-N_SIMULATION = 50
-#q0[2] += 1.0         # make the robot fly
+N_SIMULATION = 30
 
 
-def run_simulation(q0, v0, simu_params, ground_truth):
+def run_simulation_cpp(q0, v0, simu_params, ground_truth):
     ndt = simu_params['ndt']
+    
     try:
         forward_dyn_method = simu_params['forward_dyn_method']
     except:
-        # forward_dyn_method Options 
         #  1: pinocchio.Minverse()
         #  2: pinocchio.aba()
         #  3: Cholesky factorization 
         forward_dyn_method = 1
         
     if(simu_params['use_exp_int']):
-        simu = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
+        simu_cpp = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
                                     conf.K, conf.B, conf.mu, conf.anchor_slipping_method,
                                     compute_predicted_forces, forward_dyn_method, exp_max_mul, int_max_mul)
     else:
-        simu = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
+        simu_cpp = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
                                         conf.K, conf.B, conf.mu, forward_dyn_method)
                                         
     cpts = []
     for cf in conf.contact_frames:
         if not robot.model.existFrame(cf):
             print(("ERROR: Frame", cf, "does not exist"))
-        cpts += [simu.add_contact_point(cf, robot.model.getFrameId(cf), unilateral_contacts)]
+        cpts += [simu_cpp.add_contact_point(cf, robot.model.getFrameId(cf), unilateral_contacts)]
 
-#    robot.forwardKinematics(q0)
-    simu.reset_state(q0, v0, True)
+    simu_cpp.reset_state(q0, v0, True)
             
     t = 0.0    
     nc = len(conf.contact_frames)
@@ -200,36 +147,22 @@ def run_simulation(q0, v0, simu_params, ground_truth):
         results.dp[:,ci,0] = cp.v
         results.slipping[ci,0] = cp.slipping
         results.active[ci,0] = cp.active
-#    print('K*p', conf.K[2]*results.p[2,:,0].squeeze())
     
     try:
         time_start = time.time()
-        for i in range(0, N_SIMULATION):
-            if(RESET_STATE_ON_GROUND_TRUTH and ground_truth):                
-                # first reset to ensure active contact points are correctly marked because otherwise the second
-                # time I reset the state the anchor points could be overwritten
-                reset_anchor_points = True
-                simu.reset_state(ground_truth.q[:,i], ground_truth.v[:,i], reset_anchor_points)
-                # then reset anchor points
-                for ci, cp in enumerate(cpts):
-                    cp.resetAnchorPoint(ground_truth.p0[:,ci,i], bool(ground_truth.slipping[ci,i]))
-                # then reset once againt to compute updated contact forces, but without touching anchor points
-                reset_anchor_points = False
-                simu.reset_state(ground_truth.q[:,i], ground_truth.v[:,i], reset_anchor_points)
-                    
+        for i in range(0, N_SIMULATION):                    
             for d in range(int(dt_ref/dt)):
                 xref = interpolate_state(robot, refX[i], refX[i+1], dt*d/dt_ref)
-                xact = np.concatenate([simu.get_q(), simu.get_v()])
+                xact = np.concatenate([simu_cpp.get_q(), simu_cpp.get_v()])
                 diff = state_diff(robot, xact, xref)
                 results.u[6:,i] = refU[i] + feedBack[i].dot(diff)                 
-#                u[:,i] *= 0.0
-                simu.step(results.u[:,i])
+                simu_cpp.step(results.u[:,i])
                 for ci, cp in enumerate(cpts):
                     if(cp.active and not results.active[ci,i]):
                         print(cp.name, 'impact v', cp.v)
                 
-            results.q[:,i+1] = simu.get_q()
-            results.v[:,i+1] = simu.get_v()
+            results.q[:,i+1] = simu_cpp.get_q()
+            results.v[:,i+1] = simu_cpp.get_v()
             
             for ci, cp in enumerate(cpts):
                 results.f[:,ci,i+1] = cp.f
@@ -266,21 +199,83 @@ def run_simulation(q0, v0, simu_params, ground_truth):
         results.__dict__[key] = simu_params[key]
 
     return results
+    
+def run_simulation_py(q0, v0, simu_params, ground_truth):
+    ndt = simu_params['ndt']
+        
+    simu_py = RobotSimulator(conf, robot, pin.JointModelFreeFlyer())
+    for name in conf.contact_frames:
+        simu_py.add_contact(name, conf.contact_normal, conf.K, conf.B, conf.mu)
+    simu_py.init(q0, v0, p0=conf.p0)
+            
+    t = 0.0    
+    nc = len(conf.contact_frames)
+    results = Empty()
+    results.q = np.zeros((nq, N_SIMULATION+1))*np.nan
+    results.v = np.zeros((nv, N_SIMULATION+1))*np.nan
+    results.u = np.zeros((nv, N_SIMULATION+1))
+    results.f = np.zeros((3, nc, N_SIMULATION+1))
+    results.p = np.zeros((3, nc, N_SIMULATION+1))
+    results.dp = np.zeros((3, nc, N_SIMULATION+1))
+    results.p0 = np.zeros((3, nc, N_SIMULATION+1))
+    results.slipping = np.zeros((nc, N_SIMULATION+1))
+    results.active = np.zeros((nc, N_SIMULATION+1))
+    
+    results.q[:,0] = np.copy(q0)
+    results.v[:,0] = np.copy(v0)
+    
+    try:
+        time_start = time.time()
+        for i in range(0, N_SIMULATION):
+            for d in range(int(dt_ref/dt)):
+                xref = interpolate_state(robot, refX[i], refX[i+1], dt*d/dt_ref)
+                xact = np.concatenate([simu_py.q, simu_py.v])
+                diff = state_diff(robot, xact, xref)
+                results.u[6:,i] = refU[i] + feedBack[i].dot(diff)                 
+
+                simu_py.simulate(results.u[6:,i], dt, ndt, simu_params['use_exp_int'])
+                
+            results.q[:,i+1] = simu_py.q
+            results.v[:,i+1] = simu_py.v
+            
+            if(np.any(np.isnan(results.v[:,i+1])) or norm(results.v[:,i+1]) > 1e3):
+                raise Exception("Time %.3f Velocities are too large: %.1f. Stop simulation."%(
+                                t, norm(results.v[:,i+1])))
+    
+            if i % PRINT_N == 0:
+                print("Time %.3f" % (t))                            
+            t += dt_ref
+        print("Real-time factor:", t/(time.time() - time_start))
+    except Exception as e:
+        print(e)
+#        raise e
+
+    if conf.use_viewer:
+        for i in range(0, N_SIMULATION):
+            if(np.any(np.isnan(results.q[:,i]))):
+                break
+            time_start_viewer = time.time()
+            robot.display(results.q[:,i])
+            time_passed = time.time()-time_start_viewer
+            if(time_passed<dt):
+                time.sleep(dt-time_passed)
+                    
+    for key in simu_params.keys():
+        results.__dict__[key] = simu_params[key]
+
+    return results
 
 data = {}
 print("\nStart simulation ground truth")
-data_ground_truth_exp = run_simulation(q0, v0, GROUND_TRUTH_EXP_SIMU_PARAMS, None)
-data_ground_truth_euler = run_simulation(q0, v0, GROUND_TRUTH_EULER_SIMU_PARAMS, None)
+data_ground_truth_exp = run_simulation_py(q0, v0, GROUND_TRUTH_EXP_SIMU_PARAMS, None)
 data['ground-truth-exp'] = data_ground_truth_exp
-data['ground-truth-euler'] = data_ground_truth_euler
  
 for simu_params in SIMU_PARAMS:
     name = simu_params['name']
-    print("\nStart simulation", name)
-    if(simu_params['use_exp_int']):
-        data[name] = run_simulation(q0, v0, simu_params, data_ground_truth_exp)
-    else:
-        data[name] = run_simulation(q0, v0, simu_params, data_ground_truth_euler)
+    print("\nStart simulation python", name)
+    data[name+' py'] = run_simulation_py(q0, v0, simu_params, data_ground_truth_exp)
+    print("\nStart simulation c++", name)
+    data[name+' cpp'] = run_simulation_cpp(q0, v0, simu_params, data_ground_truth_exp)
 
 # COMPUTE INTEGRATION ERRORS:
 print('\n')
@@ -289,8 +284,7 @@ total_err, err_max, err_traj = {}, {}, {}
 for name in sorted(data.keys()):
     if('ground-truth' in name): continue
     d = data[name]
-    if(d.use_exp_int==0): data_ground_truth = data_ground_truth_euler
-    else:                 data_ground_truth = data_ground_truth_exp
+    data_ground_truth = data_ground_truth_exp
     
     err = (norm(d.q - data_ground_truth.q) + norm(d.v - data_ground_truth.v)) / d.q.shape[0]
     err_per_time = np.array(norm(d.q - data_ground_truth.q, axis=0)) + \

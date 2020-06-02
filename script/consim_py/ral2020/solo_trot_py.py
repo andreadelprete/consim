@@ -31,7 +31,7 @@ def state_diff(robot, x1, x2):
     return xdiff
 
 print("".center(conf.LINE_WIDTH, '#'))
-print(" Test Solo Trot C++ ".center(conf.LINE_WIDTH, '#'))
+print(" Test Solo Trot Python ".center(conf.LINE_WIDTH, '#'))
 print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested

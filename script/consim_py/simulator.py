@@ -20,9 +20,13 @@ class Contact:
         self.data = data
         self.frame_name = frame_name
         self.normal = normal
-        self.K = K
+        if(len(K.shape)==1):
+            self.K = np.diag(K)
+            self.B = np.diag(B)
+        else:
+            self.K = K
+            self.B = B
         self.Kinv = np.linalg.inv(self.K)
-        self.B = B
         self.frame_id = model.getFrameId(frame_name)
         self.mu = mu
         self.f = zero(3)
