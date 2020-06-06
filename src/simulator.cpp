@@ -173,6 +173,7 @@ void EulerSimulator::computeContactForces()
   pinocchio::forwardKinematics(*model_, *data_, q_, v_);
   pinocchio::computeJointJacobians(*model_, *data_);
   pinocchio::updateFramePlacements(*model_, *data_);
+  
   pinocchio::nonLinearEffects(*model_, *data_, q_, v_);
   /*!< loops over all contacts and objects to detect contacts and update contact positions*/
   
@@ -229,7 +230,6 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
           break;
           
         case 3: // fast if some results are reused
-          pinocchio::crba(*model_, *data_, q_);
           dv_ = tau_ - data_->nle;
           // Sparse Cholesky factorization
           pinocchio::cholesky::decompose(*model_, *data_);

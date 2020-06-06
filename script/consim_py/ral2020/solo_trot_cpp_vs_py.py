@@ -58,11 +58,20 @@ for i in range(i_min, i_max):
         'forward_dyn_method': 1
     }]
 
+# for i in range(i_min, i_max):
+SIMU_PARAMS += [{
+    'name': 'euler%4d'%20,
+    'method_name': 'euler',
+    'use_exp_int': 0,
+    'ndt': 20,
+    'forward_dyn_method': 1
+}]
+
     
-PLOT_FORCES = 1
+PLOT_FORCES = 0
 PLOT_SLIPPING = 0
 PLOT_BASE_POS = 0
-PLOT_INTEGRATION_ERRORS = 0
+PLOT_INTEGRATION_ERRORS = 1
 PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
 
 RESET_STATE_ON_GROUND_TRUTH = 0  # reset the state of the system on the ground truth
@@ -96,6 +105,7 @@ N_SIMULATION = refU.shape[0]
 
 # TEMPORARY DEBUG CODE
 N_SIMULATION = 30
+N_SIMULATION = refX.shape[0]
 
 
 def run_simulation_cpp(q0, v0, simu_params, ground_truth):
