@@ -48,7 +48,6 @@ class ContactPoint {
 
     Eigen::MatrixXd     world_J_; 
     Eigen::MatrixXd     full_J_;  
-    Eigen::MatrixXd     dJdt_;  
 
     // velocity transformation from local to world 
     pinocchio::Motion vlocal_ = pinocchio::Motion::Zero();

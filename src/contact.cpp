@@ -19,8 +19,6 @@ ContactPoint::ContactPoint(const pinocchio::Model &model, const std::string & na
           predictedX_.fill(0);
           world_J_.resize(3, nv); world_J_.setZero();
           full_J_.resize(6, nv); full_J_.setZero();
-          dJdt_.resize(6, nv); dJdt_.setZero();
-           
         }
 
 void ContactPoint::updatePosition(pinocchio::Data &data){

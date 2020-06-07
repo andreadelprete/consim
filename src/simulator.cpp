@@ -173,7 +173,7 @@ void EulerSimulator::computeContactForces()
   pinocchio::forwardKinematics(*model_, *data_, q_, v_);
   pinocchio::computeJointJacobians(*model_, *data_);
   pinocchio::updateFramePlacements(*model_, *data_);
-  
+  pinocchio::crba(*model_, *data_, q_);
   pinocchio::nonLinearEffects(*model_, *data_, q_, v_);
   /*!< loops over all contacts and objects to detect contacts and update contact positions*/
   
@@ -420,18 +420,14 @@ void ExponentialSimulator::computeIntegrationTerms(){
   JMinv_.noalias() = Jc_ * Minv_;
   MinvJcT_.noalias() = Minv_*JcT_; 
   Upsilon_.noalias() =  Jc_*MinvJcT_;
-  // temp01_.noalias() = JcT_ * kp0_;
-  temp02_ = tau_ - data_->nle; // + temp01_;
+  temp02_ = tau_ - data_->nle; 
   dv_bar.noalias() = Minv_ * temp02_; 
   tempStepMat_.noalias() =  Upsilon_ * K;
   A.block(3*nactive_, 0, 3*nactive_, 3*nactive_).noalias() = -tempStepMat_;  
   tempStepMat_.noalias() = Upsilon_ * B; 
   A.block(3*nactive_, 3*nactive_, 3*nactive_, 3*nactive_).noalias() = -tempStepMat_; 
-  // temp01_ = tau_ - data_->nle; 
-  // temp04_.noalias() = JMinv_*temp01_;
   temp04_.noalias() = Jc_* dv_bar;  
-  // temp03_.noalias() =  Upsilon_*kp0_;
-  b_.noalias() = temp04_ + dJv_; // + temp03_; 
+  b_.noalias() = temp04_ + dJv_; 
   a_.tail(3*nactive_) = b_;
   x0_.head(3*nactive_) = p_-p0_; 
   x0_.tail(3*nactive_) = dp_; 
