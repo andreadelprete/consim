@@ -262,8 +262,6 @@ namespace consim {
       // double ftan2_;   // norm of tangentFi_ 
       unsigned int i_active_; // index of the active contact      
 
-      Eigen::MatrixXd invK_; 
-
       /**
        * solves a QP to update anchor points of sliding contacts
        * min || dp0_avg || ^ 2 

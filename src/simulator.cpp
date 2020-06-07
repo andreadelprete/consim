@@ -318,15 +318,20 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       if (!cone_flag_ || slipping_method_==1){
         /*!< f projection is computed then anchor point is updated */ 
         CONSIM_START_PROFILER("exponential_simulator::subIntegration");
-        temp01_.noalias() = JcT_*fpr_; 
-        temp02_ = tau_ - data_->nle + temp01_;
-        dvMean_.noalias() = Minv_*temp02_; 
+        // temp01_.noalias() = JcT_*fpr_; 
+        // temp02_ = tau_ - data_->nle + temp01_;
+        // dvMean_.noalias() = Minv_*temp02_; 
+
+        dvMean_ = dv_bar + MinvJcT_*fpr_; 
+
+        dvMean2_.noalias() =  dv_bar + MinvJcT_*fpr2_;  
+        vMean_ =  v_ +  .5 * sub_dt * dvMean2_; 
         
-        temp01_.noalias() = JcT_*fpr2_; 
-        temp02_ = tau_ - data_->nle + temp01_;
-        dvMean2_.noalias() = Minv_*temp02_; 
-        vMean2_.noalias() = v_ +  .5 * sub_dt * dvMean2_; 
-        pinocchio::integrate(*model_, q_, vMean2_ * sub_dt, qnext_);
+        // temp01_.noalias() = JcT_*fpr2_; 
+        // temp02_ = tau_ - data_->nle + temp01_;
+        // dvMean2_.noalias() = Minv_*temp02_; 
+        // vMean2_.noalias() = v_ +  .5 * sub_dt * dvMean2_; 
+        pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
         CONSIM_STOP_PROFILER("exponential_simulator::subIntegration"); 
         /* PSEUDO-CODE
         dv_mean = dv_bar + JMinv.T @ f_pr
@@ -415,19 +420,20 @@ void ExponentialSimulator::computeIntegrationTerms(){
   JMinv_.noalias() = Jc_ * Minv_;
   MinvJcT_.noalias() = Minv_*JcT_; 
   Upsilon_.noalias() =  Jc_*MinvJcT_;
-  temp01_.noalias() = JcT_ * kp0_;
-  temp02_ = tau_ - data_->nle + temp01_;
+  // temp01_.noalias() = JcT_ * kp0_;
+  temp02_ = tau_ - data_->nle; // + temp01_;
   dv_bar.noalias() = Minv_ * temp02_; 
   tempStepMat_.noalias() =  Upsilon_ * K;
   A.block(3*nactive_, 0, 3*nactive_, 3*nactive_).noalias() = -tempStepMat_;  
   tempStepMat_.noalias() = Upsilon_ * B; 
   A.block(3*nactive_, 3*nactive_, 3*nactive_, 3*nactive_).noalias() = -tempStepMat_; 
-  temp01_ = tau_ - data_->nle; 
-  temp04_.noalias() = JMinv_*temp01_;  
-  temp03_.noalias() =  Upsilon_*kp0_;
-  b_.noalias() = temp04_ + dJv_ + temp03_; 
+  // temp01_ = tau_ - data_->nle; 
+  // temp04_.noalias() = JMinv_*temp01_;
+  temp04_.noalias() = Jc_* dv_bar;  
+  // temp03_.noalias() =  Upsilon_*kp0_;
+  b_.noalias() = temp04_ + dJv_; // + temp03_; 
   a_.tail(3*nactive_) = b_;
-  x0_.head(3*nactive_) = p_; 
+  x0_.head(3*nactive_) = p_-p0_; 
   x0_.tail(3*nactive_) = dp_; 
 }
 
@@ -462,7 +468,7 @@ void ExponentialSimulator::computeIntegrationTerms(){
       if (!contacts_[i]->active) continue;
       contacts_[i]->firstOrderContactKinematics(*data_);
       contacts_[i]->optr->computePenetration(*contacts_[i]);
-      contacts_[i]->secondOrderContactKinematics(*data_, v_);
+      contacts_[i]->secondOrderContactKinematics(*data_);
       /*!< computeForce updates the anchor point */ 
       contacts_[i]->optr->contact_model_->computeForce(*contacts_[i]);
       f_.segment<3>(3*i_active_) = contacts_[i]->f; 
@@ -538,11 +544,12 @@ void ExponentialSimulator::checkFrictionCone(){
   */
 
   temp03_.noalias() = D*intxt_;
-  f_avg  = kp0_ + temp03_/sub_dt;
+  // f_avg  = kp0_ + temp03_/sub_dt;
+  f_avg  = temp03_/sub_dt;
 
   temp03_.noalias() = D*int2xt_;
-  temp03_.noalias() = temp03_/(0.5*sub_dt*sub_dt);
-  f_avg2 = kp0_ +  temp03_;
+  f_avg2.noalias() = temp03_/(0.5*sub_dt*sub_dt);
+  // f_avg2 = kp0_ +  temp03_;
   
   i_active_ = 0;
   cone_flag_ = false; 
@@ -572,54 +579,6 @@ void ExponentialSimulator::checkFrictionCone(){
 
     cone_flag_ = true; 
 
-    // f_avg_i = f_avg.segment<3>(3*i_active_);
-    // f_avg_i2 = f_avg2.segment<3>(3*i_active_);
-    // fnor_ = contacts_[i]->contactNormal_.dot(f_avg_i);
-    // fnor2_= contacts_[i]->contactNormal_.dot(f_avg_i2);
-    // if (fnor_<0.){
-    //   /*!< check for pulling force at contact i */  
-    //   fpr_.segment<3>(3*i_active_).fill(0); 
-    //   contacts_[i]->predictedF_.fill(0);
-    //   cone_flag_ = true; 
-    // } else{
-    //   /*!< check for friction bounds on average force   */  
-    //   normalFi_ = fnor_* contacts_[i]->contactNormal_; 
-    //   tangentFi_ = f_avg_i - normalFi_; 
-    //   ftan_ = sqrt(tangentFi_.dot(tangentFi_));
-    //   double mu = contacts_[i]->optr->contact_model_->friction_coeff_;
-    //   if(ftan_ > mu * fnor_){
-    //     /*!< cone violated */  
-    //     fpr_.segment<3>(3*i_active_) = normalFi_ + (mu*fnor_/ftan_)*tangentFi_; 
-    //     contacts_[i]->predictedF_ = fpr_.segment<3>(3*i_active_);
-    //     /*!< move predicted x0 if update method is 1  */
-    //     if(slipping_method_==1){
-    //       contacts_[i]->predictedX0_ = invK_.block<3,3>(3*i_active_,3*i_active_)*(fpr_.segment<3>(3*i_active_) + K.block<3,3>(3*i_active_,3*i_active_) * contacts_[i]->predictedX_ + B.block<3,3>(3*i_active_,3*i_active_) * contacts_[i]->predictedV_);
-    //     }
-    //     cone_flag_ = true;
-    //     // break; 
-    //   } 
-    //   else {
-    //     fpr_.segment<3>(3*i_active_) = f_avg_i;
-    //   }
-    // }
-
-    // if (fnor2_<0.){
-    //   fpr2_.segment<3>(3*i_active_).fill(0);
-    //   cone_flag_ = true; 
-    // } else{
-    //   /*!< check for friction bounds on average of average force */ 
-    //   normalFi_2 = fnor2_* contacts_[i]->contactNormal_; 
-    //   tangentFi_2 = f_avg_i2 - normalFi_2; 
-    //   ftan2_ = sqrt(tangentFi_2.dot(tangentFi_2));
-    //   double mu = contacts_[i]->optr->contact_model_->friction_coeff_;
-    //   if(ftan2_ > mu * fnor2_){
-    //     fpr2_.segment<3>(3*i_active_) = normalFi_2 + (mu*fnor2_/ftan2_)*tangentFi_2; 
-    //     cone_flag_ = true;
-    //   } 
-    //   else {
-    //     fpr2_.segment<3>(3*i_active_) = f_avg_i2;
-    //   }
-    // }
     i_active_ += 1; 
   }
 } // ExponentialSimulator::checkFrictionCone
@@ -711,7 +670,6 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
     int2xt_.resize(6 * nactive_); int2xt_.setZero();
     kp0_.resize(3 * nactive_); kp0_.setZero();
     K.resize(3 * nactive_, 3 * nactive_); K.setZero();
-    invK_.resize(3 * nactive_, 3 * nactive_); invK_.setZero();
     B.resize(3 * nactive_, 3 * nactive_); B.setZero();
     D.resize(3 * nactive_, 6 * nactive_); D.setZero();
     A.resize(6 * nactive_, 6 * nactive_); A.setZero();
@@ -784,8 +742,6 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
     // fillout D 
     D.block(0,0, 3*nactive_, 3*nactive_).noalias() = -K;
     D.block(0,3*nactive_, 3*nactive_, 3*nactive_).noalias() = -B; 
-
-    invK_ = K.inverse();
 
     // std::cout<<"resize vectors and matrices"<<std::endl;
     

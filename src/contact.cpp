@@ -36,7 +36,7 @@ void ContactPoint::firstOrderContactKinematics(pinocchio::Data &data){
 }
 
 
-void ContactPoint::secondOrderContactKinematics(pinocchio::Data &data, Eigen::VectorXd &v){
+void ContactPoint::secondOrderContactKinematics(pinocchio::Data &data){
   dJvlocal_ = pinocchio::getFrameAcceleration(*model_, data, frame_id); 
   dJvlocal_.linear() += vlocal_.angular().cross(vlocal_.linear());
   dJv_ = frameSE3_.act(dJvlocal_).linear();
