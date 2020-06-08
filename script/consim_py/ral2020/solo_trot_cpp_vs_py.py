@@ -59,13 +59,13 @@ for i in range(i_min, i_max):
     }]
 
 # for i in range(i_min, i_max):
-# SIMU_PARAMS += [{
-#     'name': 'euler%4d'%20,
-#     'method_name': 'euler',
-#     'use_exp_int': 0,
-#     'ndt': 20,
-#     'forward_dyn_method': 1
-# }]
+#     SIMU_PARAMS += [{
+#         'name': 'euler%4d'%20,
+#         'method_name': 'euler',
+#         'use_exp_int': 0,
+#         'ndt': 20,
+#         'forward_dyn_method': 1
+#     }]
 
     
 PLOT_FORCES = 0

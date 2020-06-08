@@ -192,6 +192,9 @@ void EulerSimulator::computeContactForces()
     cp->optr->computePenetration(*cp); 
     cp->optr->contact_model_->computeForce(*cp);
     tau_.noalias() += cp->world_J_.transpose() * cp->f; 
+    if (contactChange_){
+        std::cout<<cp->name_<<" p ["<< cp->x.transpose() << "] v ["<< cp->v.transpose() << "] f ["<<  cp->f.transpose() <<"]"<<std::endl; 
+      }
   }
   CONSIM_STOP_PROFILER("compute_contact_forces");
 }
