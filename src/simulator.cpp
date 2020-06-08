@@ -86,7 +86,6 @@ void AbstractSimulator::resetState(const Eigen::VectorXd& q, const Eigen::Vector
   q_ = q;
   v_ = dq;
   vMean_ = dq;
-  tau_.fill(0);
   if (reset_contact_state) {
     for (auto &cptr : contacts_) {
       cptr->active = false;
@@ -97,12 +96,14 @@ void AbstractSimulator::resetState(const Eigen::VectorXd& q, const Eigen::Vector
   for (unsigned int i=0; i<nc_; ++i){
     contacts_[i]->predictedX_ = data_->oMf[contacts_[i]->frame_id].translation(); 
   }
+  elapsedTime_ = 0.;  
   resetflag_ = true;
 }
 
 void AbstractSimulator::detectContacts()
 {
-  nactive_ = 0; 
+  newActive_ = 0;
+  contactChange_ = false;  
   // Loop over all the contact points, over all the objects.
   for (auto &cp : contacts_) {
     cp->updatePosition(*data_);
@@ -118,7 +119,7 @@ void AbstractSimulator::detectContacts()
           cp->f.fill(0);
           // cp->friction_flag = false;
         } else {
-          nactive_ += 1;
+          newActive_ += 1;
           // If the contact point is still active, then no need to search for
           // other contacting object (we assume there is only one object acting
           // on a contact point at each timestep).
@@ -127,7 +128,7 @@ void AbstractSimulator::detectContacts()
       }
       else {
         // bilateral contacts never break
-        nactive_ += 1;
+        newActive_ += 1;
         continue;
       }
     }
@@ -138,7 +139,7 @@ void AbstractSimulator::detectContacts()
         if (optr->checkCollision(*cp))
         {
           cp->active = true;
-          nactive_ += 1; 
+          newActive_ += 1; 
           cp->optr = optr;
           if(!cp->unilateral){
             std::cout<<"Bilateral contact with object "<<optr->getName()<<" at point "<<cp->x.transpose()<<std::endl;
@@ -148,6 +149,12 @@ void AbstractSimulator::detectContacts()
       }
     }
   }
+
+  if(newActive_!= nactive_){
+    contactChange_ = true; 
+    std::cout <<elapsedTime_  <<" Number of active contacts changed from "<<nactive_<<" to "<<newActive_<<std::endl; 
+  }
+  nactive_ = newActive_;
 }
 
 void AbstractSimulator::setJointFriction(const Eigen::VectorXd& joint_friction)
@@ -252,6 +259,7 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
       computeContactForces(); 
       Eigen::internal::set_is_malloc_allowed(true);
       CONSIM_STOP_PROFILER("euler_simulator::substep");
+      elapsedTime_ += sub_dt; 
     }
   CONSIM_STOP_PROFILER("euler_simulator::step");
 }
@@ -318,12 +326,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       if (!cone_flag_ || slipping_method_==1){
         /*!< f projection is computed then anchor point is updated */ 
         CONSIM_START_PROFILER("exponential_simulator::subIntegration");
-        // temp01_.noalias() = JcT_*fpr_; 
-        // temp02_ = tau_ - data_->nle + temp01_;
-        // dvMean_.noalias() = Minv_*temp02_; 
-
         dvMean_ = dv_bar + MinvJcT_*fpr_; 
-
         dvMean2_.noalias() =  dv_bar + MinvJcT_*fpr2_;  
         vMean_ =  v_ +  .5 * sub_dt * dvMean2_; 
         
@@ -387,6 +390,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     computeContactForces();
     CONSIM_STOP_PROFILER("exponential_simulator::substep");
     Eigen::internal::set_is_malloc_allowed(true);
+    elapsedTime_ += sub_dt; 
   }  // sub_dt loop
   CONSIM_STOP_PROFILER("exponential_simulator::step");
 } // ExponentialSimulator::step
@@ -469,6 +473,10 @@ void ExponentialSimulator::computeIntegrationTerms(){
       contacts_[i]->optr->contact_model_->computeForce(*contacts_[i]);
       f_.segment<3>(3*i_active_) = contacts_[i]->f; 
       i_active_ += 1;  
+      if (contactChange_){
+        std::cout<<contacts_[i]->name_<<" p ["<< contacts_[i]->x.transpose() << "] v ["<< contacts_[i]->v.transpose() << "] f ["<<  contacts_[i]->f.transpose() <<"]"<<std::endl; 
+      }
+
     }
   }
 } // ExponentialSimulator::computeContactForces
@@ -540,12 +548,10 @@ void ExponentialSimulator::checkFrictionCone(){
   */
 
   temp03_.noalias() = D*intxt_;
-  // f_avg  = kp0_ + temp03_/sub_dt;
   f_avg  = temp03_/sub_dt;
 
   temp03_.noalias() = D*int2xt_;
   f_avg2.noalias() = temp03_/(0.5*sub_dt*sub_dt);
-  // f_avg2 = kp0_ +  temp03_;
   
   i_active_ = 0;
   cone_flag_ = false; 
@@ -678,7 +684,7 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
     dJv_.resize(3 * nactive_); dJv_.setZero();
     utilDense_.resize(6 * nactive_);
     f_avg.resize(3 * nactive_); f_avg.setZero();
-    f_avg2.resize(3 * nactive_); f_avg.setZero();
+    f_avg2.resize(3 * nactive_); f_avg2.setZero();
     fpr_.resize(3 * nactive_); fpr_.setZero();
     fpr2_.resize(3 * nactive_); fpr2_.setZero();
     tempStepMat_.resize(3 * nactive_, 3 * nactive_); tempStepMat_.setZero();

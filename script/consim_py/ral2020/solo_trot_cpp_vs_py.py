@@ -35,8 +35,8 @@ print(" Test Solo Trot C++ VS Python".center(conf.LINE_WIDTH, '#'))
 print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
-i_min = 0
-i_max = i_min+2
+i_min = 1
+i_max = i_min+1
 i_ground_truth = i_max+2
 
 GROUND_TRUTH_EXP_SIMU_PARAMS = {
@@ -59,13 +59,13 @@ for i in range(i_min, i_max):
     }]
 
 # for i in range(i_min, i_max):
-SIMU_PARAMS += [{
-    'name': 'euler%4d'%20,
-    'method_name': 'euler',
-    'use_exp_int': 0,
-    'ndt': 20,
-    'forward_dyn_method': 1
-}]
+# SIMU_PARAMS += [{
+#     'name': 'euler%4d'%20,
+#     'method_name': 'euler',
+#     'use_exp_int': 0,
+#     'ndt': 20,
+#     'forward_dyn_method': 1
+# }]
 
     
 PLOT_FORCES = 0
@@ -167,9 +167,9 @@ def run_simulation_cpp(q0, v0, simu_params, ground_truth):
                 diff = state_diff(robot, xact, xref)
                 results.u[6:,i] = refU[i] + feedBack[i].dot(diff)                 
                 simu_cpp.step(results.u[:,i])
-                for ci, cp in enumerate(cpts):
-                    if(cp.active and not results.active[ci,i]):
-                        print(cp.name, 'impact v', cp.v)
+                # for ci, cp in enumerate(cpts):
+                #     if(cp.active and not results.active[ci,i]):
+                #         print(cp.name, 'impact v', cp.v)
                 
             results.q[:,i+1] = simu_cpp.get_q()
             results.v[:,i+1] = simu_cpp.get_v()
@@ -181,8 +181,8 @@ def run_simulation_cpp(q0, v0, simu_params, ground_truth):
                 results.dp[:,ci,i+1] = cp.v
                 results.slipping[ci,i+1] = cp.slipping
                 results.active[ci,i+1] = cp.active
-                if(cp.active and not results.active[ci,i]):
-                    print(cp.name, 'impact v', cp.v)
+                # if(cp.active and not results.active[ci,i]):
+                #     print(cp.name, 'impact v', cp.v)
             
             if(np.any(np.isnan(results.v[:,i+1])) or norm(results.v[:,i+1]) > 1e3):
                 raise Exception("Time %.3f Velocities are too large: %.1f. Stop simulation."%(

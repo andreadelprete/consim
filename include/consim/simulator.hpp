@@ -96,7 +96,10 @@ namespace consim {
       Eigen::VectorXd tau_;
       unsigned int nc_=0;
       int nactive_; 
+      int newActive_;
+      double elapsedTime_;  
       bool resetflag_ = false;
+      bool contactChange_; 
       /**
         * loops over contact points, checks active contacts and sets reference contact positions 
       */
