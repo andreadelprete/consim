@@ -72,7 +72,7 @@ void LinearPenaltyContactModel::computeForce(ContactPoint& cp)
   /*!< unilateral force, no pulling into contact object */ 
   if (cp.unilateral && normalF_.dot(cp.contactNormal_)<0){
     cp.f.fill(0);
-    cp.active = false; // not so sure here I should set active=false because that should be done based on the collision checking only
+    // cp.active = false; // not so sure here I should set active=false because that should be done based on the collision checking only
     cp.slipping = false;
     return;
   } 
