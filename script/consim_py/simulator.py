@@ -169,8 +169,6 @@ class RobotSimulator:
         self.fwd_dyn_method = 'aba' # can be either Cholesky, aba, or pinMinv
         self.unilateral_contacts = 'projection' # None, 'QP', 'projection'
 
-        self.contact_switch = False 
-        
         # se3.RobotWrapper.BuildFromURDF(conf.urdf, [conf.path, ], se3.JointModelFreeFlyer())
         self.robot = robot
         self.model = self.robot.model
@@ -287,7 +285,6 @@ class RobotSimulator:
 
     def compute_forces(self, compute_data=True):
         '''Compute the contact forces from q, v and elastic model'''
-        self.contact_switch = False 
         if compute_data:            
             se3.forwardKinematics(self.model, self.data, self.q, self.v, zero(self.model.nv))
             se3.computeJointJacobians(self.model, self.data)
@@ -304,7 +301,6 @@ class RobotSimulator:
             contact_changed = True
             print("%.3f Number of active contacts changed from %d to %d."%(
                 self.t, self.nc, np.sum([c.active for c in self.contacts])))
-            self.contact_switch = True
             self.resize_contacts()
             
         i = 0
@@ -353,11 +349,6 @@ class RobotSimulator:
         # force is computed based on that assumption and then projected if necessary
         x0 = np.concatenate((self.p-self.p0, self.dp))
         # x0 = np.concatenate((self.p-self.p0, self.dp-self.dp0)) # this works really BAD!
-
-        if self.contact_switch:
-            print("jacobain\n", self.Jc)
-            se3.computeMinverse(self.model, self.data, self.q)
-            print("Minv\n", self.data.Minv)
         
         JMinv = np.linalg.solve(M, self.Jc.T).T
         if(update_expm):
@@ -376,7 +367,6 @@ class RobotSimulator:
         if self.first_iter:
             self.compute_forces()
             self.first_iter = False
-            self.contact_switch = True 
 
 #        se3.forwardKinematics(self.model, self.data, self.q, self.v, zero(self.model.nv))
 #        se3.computeJointJacobians(self.model, self.data)

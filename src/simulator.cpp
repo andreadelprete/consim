@@ -430,10 +430,6 @@ void ExponentialSimulator::computeIntegrationTerms(){
     dp_.segment<3>(3*i_active_)  = cp->v;  
     kp0_.segment<3>(3*i_active_).noalias() = cp->optr->contact_model_->stiffness_.cwiseProduct(p0_.segment<3>(3*i_active_));
     i_active_ += 1;  
-    if(contactChange_){
-      std::cout<<"jacobian of contact "<<cp->name_<<std::endl;
-      std::cout<<cp->world_J_<<std::endl; 
-    }
   }
 
 
@@ -442,11 +438,6 @@ void ExponentialSimulator::computeIntegrationTerms(){
   Minv_.triangularView<Eigen::StrictlyLower>()
   = Minv_.transpose().triangularView<Eigen::StrictlyLower>(); // need to fill the Lower part of the matrix
   CONSIM_STOP_PROFILER("exponential_simulator::computeMinverse");
-
-  // if(contactChange_){
-  //   std::cout<<"jacobian \n"<<Jc_<<std::endl; 
-  //   std::cout<<"Minv \n"<<Minv_<<std::endl; 
-  // }
   JcT_.noalias() = Jc_.transpose(); 
   JMinv_.noalias() = Jc_ * Minv_;
   MinvJcT_.noalias() = Minv_*JcT_; 
