@@ -301,10 +301,9 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     throw std::runtime_error("resetState() must be called first !");
   }
 
-  for (int i = 0; i < n_integration_steps_; i++){
+  for (unsigned int i = 0; i < n_integration_steps_; i++){
     CONSIM_START_PROFILER("exponential_simulator::substep");
     // \brief add input control 
-    tau_.fill(0);
     tau_ += tau;
     // \brief joint damping 
     if (joint_friction_flag_){
@@ -316,6 +315,12 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       CONSIM_START_PROFILER("exponential_simulator::computeIntegrationTerms");
       computeIntegrationTerms();
       CONSIM_STOP_PROFILER("exponential_simulator::computeIntegrationTerms");
+
+      // if(contactChange_){
+      //   std::cout<<"x0 ["<<x0_.transpose()<<"]"<<std::endl;
+      //   std::cout<<"dv_bar ["<<dv_bar.transpose()<<"]"<<std::endl;
+      //   std::cout<<"JMinv \n"<< JMinv_ <<std::endl; 
+      // }
       
       CONSIM_START_PROFILER("exponential_simulator::computeIntegralsXt");
       utilDense_.ComputeIntegralXt(A, a_, x0_, sub_dt, intxt_);
@@ -325,34 +330,41 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       CONSIM_START_PROFILER("exponential_simulator::checkFrictionCone");
       checkFrictionCone();
       CONSIM_STOP_PROFILER("exponential_simulator::checkFrictionCone");
-      
-      if (!cone_flag_ || slipping_method_==1){
-        /*!< f projection is computed then anchor point is updated */ 
-        CONSIM_START_PROFILER("exponential_simulator::subIntegration");
-        dvMean_ = dv_bar + MinvJcT_*fpr_; 
-        dvMean2_.noalias() =  dv_bar + MinvJcT_*fpr2_;  
-        vMean_ =  v_ +  .5 * sub_dt * dvMean2_; 
+
+      /*!< f projection is computed then anchor point is updated */ 
+      CONSIM_START_PROFILER("exponential_simulator::subIntegration");
+      dvMean_ = dv_bar + MinvJcT_*fpr_; 
+      dvMean2_.noalias() =  dv_bar + MinvJcT_*fpr2_;  
+      vMean_ =  v_ +  .5 * sub_dt * dvMean2_; 
+      pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
+      CONSIM_STOP_PROFILER("exponential_simulator::subIntegration"); 
+      // if (!cone_flag_ || slipping_method_==1){
+      //   /*!< f projection is computed then anchor point is updated */ 
+      //   CONSIM_START_PROFILER("exponential_simulator::subIntegration");
+      //   dvMean_ = dv_bar + MinvJcT_*fpr_; 
+      //   dvMean2_.noalias() =  dv_bar + MinvJcT_*fpr2_;  
+      //   vMean_ =  v_ +  .5 * sub_dt * dvMean2_; 
         
-        // temp01_.noalias() = JcT_*fpr2_; 
-        // temp02_ = tau_ - data_->nle + temp01_;
-        // dvMean2_.noalias() = Minv_*temp02_; 
-        // vMean2_.noalias() = v_ +  .5 * sub_dt * dvMean2_; 
-        pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
-        CONSIM_STOP_PROFILER("exponential_simulator::subIntegration"); 
-        /* PSEUDO-CODE
-        dv_mean = dv_bar + JMinv.T @ f_pr
-        v_mean = v + 0.5*dt*(dv_bar + JMinv.T @ f_pr2)
-        */
-      }
-      else{
-        /*!< anchor point is optimized, then one f projection is computed and itegrated */ 
-        // computeSlipping(); // slipping qp not implemented 
-        temp01_.noalias() = JcT_*fpr_; 
-        temp02_ = tau_ - data_->nle + temp01_;
-        dvMean_.noalias() = Minv_*temp02_; 
-        vMean_ = v_ + .5 * sub_dt* dvMean_; 
-        pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
-      }
+      //   // temp01_.noalias() = JcT_*fpr2_; 
+      //   // temp02_ = tau_ - data_->nle + temp01_;
+      //   // dvMean2_.noalias() = Minv_*temp02_; 
+      //   // vMean2_.noalias() = v_ +  .5 * sub_dt * dvMean2_; 
+      //   pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
+      //   CONSIM_STOP_PROFILER("exponential_simulator::subIntegration"); 
+      //   /* PSEUDO-CODE
+      //   dv_mean = dv_bar + JMinv.T @ f_pr
+      //   v_mean = v + 0.5*dt*(dv_bar + JMinv.T @ f_pr2)
+      //   */
+      // }
+      // else{
+      //   /*!< anchor point is optimized, then one f projection is computed and itegrated */ 
+      //   // computeSlipping(); // slipping qp not implemented 
+      //   temp01_.noalias() = JcT_*fpr_; 
+      //   temp02_ = tau_ - data_->nle + temp01_;
+      //   dvMean_.noalias() = Minv_*temp02_; 
+      //   vMean_ = v_ + .5 * sub_dt* dvMean_; 
+      //   pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
+      // }
     } /*!< active contacts */
     else{
       switch (whichFD_)
@@ -390,6 +402,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     dv_ = dvMean_; 
     
     //
+    tau_.fill(0);
     computeContactForces();
     CONSIM_STOP_PROFILER("exponential_simulator::substep");
     Eigen::internal::set_is_malloc_allowed(true);
@@ -408,21 +421,32 @@ void ExponentialSimulator::computeIntegrationTerms(){
   // Do we need to compute M before computing M inverse?
   
   i_active_ = 0; 
-  for(unsigned int i=0; i<nc_; i++){
-    if (!contacts_[i]->active) continue;
-    Jc_.block(3*i_active_,0,3,model_->nv) = contacts_[i]->world_J_;
-    dJv_.segment<3>(3*i_active_) = contacts_[i]->dJv_; 
-    p0_.segment<3>(3*i_active_)  = contacts_[i]->x_anchor; 
-    p_.segment<3>(3*i_active_)   = contacts_[i]->x; 
-    dp_.segment<3>(3*i_active_)  = contacts_[i]->v;  
-    kp0_.segment<3>(3*i_active_).noalias() = contacts_[i]->optr->contact_model_->stiffness_.cwiseProduct(p0_.segment<3>(3*i_active_));
+  for(auto &cp : contacts_){
+    if (!cp->active) continue;
+    Jc_.block(3*i_active_,0,3,model_->nv) = cp->world_J_;
+    dJv_.segment<3>(3*i_active_) = cp->dJv_; 
+    p0_.segment<3>(3*i_active_)  = cp->x_anchor; 
+    p_.segment<3>(3*i_active_)   = cp->x; 
+    dp_.segment<3>(3*i_active_)  = cp->v;  
+    kp0_.segment<3>(3*i_active_).noalias() = cp->optr->contact_model_->stiffness_.cwiseProduct(p0_.segment<3>(3*i_active_));
     i_active_ += 1;  
+    if(contactChange_){
+      std::cout<<"jacobian of contact "<<cp->name_<<std::endl;
+      std::cout<<cp->world_J_<<std::endl; 
+    }
   }
+
+
   CONSIM_START_PROFILER("exponential_simulator::computeMinverse");
   Minv_ = pinocchio::computeMinverse(*model_, *data_, q_);
   Minv_.triangularView<Eigen::StrictlyLower>()
   = Minv_.transpose().triangularView<Eigen::StrictlyLower>(); // need to fill the Lower part of the matrix
   CONSIM_STOP_PROFILER("exponential_simulator::computeMinverse");
+
+  // if(contactChange_){
+  //   std::cout<<"jacobian \n"<<Jc_<<std::endl; 
+  //   std::cout<<"Minv \n"<<Minv_<<std::endl; 
+  // }
   JcT_.noalias() = Jc_.transpose(); 
   JMinv_.noalias() = Jc_ * Minv_;
   MinvJcT_.noalias() = Minv_*JcT_; 
@@ -467,17 +491,17 @@ void ExponentialSimulator::computeIntegrationTerms(){
       CONSIM_STOP_PROFILER("exponential_simulator::resizeVectorsAndMatrices");
     }
     i_active_ = 0; 
-    for(unsigned int i=0; i<nc_; i++){
-      if (!contacts_[i]->active) continue;
-      contacts_[i]->firstOrderContactKinematics(*data_);
-      contacts_[i]->optr->computePenetration(*contacts_[i]);
-      contacts_[i]->secondOrderContactKinematics(*data_);
+    for(auto &cp : contacts_){
+      if (!cp->active) continue;
+      cp->firstOrderContactKinematics(*data_);
+      cp->optr->computePenetration(*cp);
+      cp->secondOrderContactKinematics(*data_);
       /*!< computeForce updates the anchor point */ 
-      contacts_[i]->optr->contact_model_->computeForce(*contacts_[i]);
-      f_.segment<3>(3*i_active_) = contacts_[i]->f; 
+      cp->optr->contact_model_->computeForce(*cp);
+      f_.segment<3>(3*i_active_) = cp->f; 
       i_active_ += 1;  
       if (contactChange_){
-        std::cout<<contacts_[i]->name_<<" p ["<< contacts_[i]->x.transpose() << "] v ["<< contacts_[i]->v.transpose() << "] f ["<<  contacts_[i]->f.transpose() <<"]"<<std::endl; 
+        std::cout<<cp->name_<<" p ["<< cp->x.transpose() << "] v ["<< cp->v.transpose() << "] f ["<<  cp->f.transpose() <<"]"<<std::endl; 
       }
 
     }
