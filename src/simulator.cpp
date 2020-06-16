@@ -323,8 +323,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       // }
       
       CONSIM_START_PROFILER("exponential_simulator::computeIntegralsXt");
-      utilDense_.ComputeIntegralXt(A, a_, x0_, sub_dt, intxt_);
-      utilDense_.ComputeDoubleIntegralXt(A, a_, x0_, sub_dt, int2xt_); 
+      utilDense_.ComputeIntegrals(A, a_, x0_, sub_dt, intxt_, int2xt_);
       CONSIM_STOP_PROFILER("exponential_simulator::computeIntegralsXt");
 
       CONSIM_START_PROFILER("exponential_simulator::checkFrictionCone");
