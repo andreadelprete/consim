@@ -1,35 +1,24 @@
-import time
+''' Test cpp simulator with point-mass sliding on a flat floor 
+'''
+import time, os 
 import consim 
 from consim_py.simulator import RobotSimulator
 import numpy as np
 from numpy.linalg import norm as norm
 
-from example_robot_data.robots_loader import loadSolo
-
 import matplotlib.pyplot as plt 
 import consim_py.utils.plot_utils as plut
-import conf_solo_trot_cpp_vs_py as conf
+import sliding_point_conf as conf
 import pinocchio as pin 
+from pinocchio.robot_wrapper import RobotWrapper 
+
 
 class Empty:
     pass
 
-def interpolate_state(robot, x1, x2, d):
-    """ interpolate state for feedback at higher rate that plan """
-    x = np.zeros(robot.model.nq+robot.model.nv)
-    x[:robot.model.nq] =  pin.interpolate(robot.model, x1[:robot.model.nq], x2[:robot.model.nq], d)
-    x[robot.model.nq:] = x1[robot.model.nq:] + d*(x2[robot.model.nq:] - x1[robot.model.nq:])
-    return x
-
-def state_diff(robot, x1, x2):
-    """ returns x2 - x1 """
-    xdiff = np.zeros(2*robot.model.nv)
-    xdiff[:robot.model.nv] = pin.difference(robot.model, x1[:robot.model.nq], x2[:robot.model.nq]) 
-    xdiff[robot.model.nv:] = x2[robot.model.nq:] - x1[robot.model.nq:]
-    return xdiff
 
 print("".center(conf.LINE_WIDTH, '#'))
-print(" Test Solo Trot C++ VS Python".center(conf.LINE_WIDTH, '#'))
+print(" Test Sliding Point Mass C++ VS Python".center(conf.LINE_WIDTH, '#'))
 print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
@@ -56,21 +45,21 @@ for i in range(i_min, i_max):
         'forward_dyn_method': 1
     }]
 
-# for i in range(i_min, i_max):
-#     SIMU_PARAMS += [{
-#         'name': 'euler%4d'%20,
-#         'method_name': 'euler',
-#         'use_exp_int': 0,
-#         'ndt': 20,
-#         'forward_dyn_method': 1
-#     }]
+for i in range(i_min, i_max):
+    SIMU_PARAMS += [{
+        'name': 'euler%4d'%20,
+        'method_name': 'euler',
+        'use_exp_int': 0,
+        'ndt': 20,
+        'forward_dyn_method': 1
+    }]
 
     
-PLOT_FORCES = 0
+PLOT_FORCES = 1
 PLOT_SLIPPING = 0
-PLOT_BASE_POS = 0
+PLOT_BASE_POS = 1
 PLOT_INTEGRATION_ERRORS = 0
-PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
+PLOT_INTEGRATION_ERROR_TRAJECTORIES = 0
 
 RESET_STATE_ON_GROUND_TRUTH = 0  # reset the state of the system on the ground truth
 dt     = 0.002                      # controller and simulator time step
@@ -82,7 +71,11 @@ PRINT_N = int(conf.PRINT_T/dt)
 exp_max_mul = 100 
 int_max_mul = 100 
 
-robot = loadSolo(False)
+urdf_path = os.path.abspath('../../models/urdf/free_flyer.urdf')
+mesh_path = os.path.abspath('../../models')
+robot = RobotWrapper.BuildFromURDF(urdf_path, [mesh_path], pin.JointModelFreeFlyer()) 
+print(" RobotWrapper Object Created Successfully ".center(conf.LINE_WIDTH, '#'))
+print("".center(conf.LINE_WIDTH, '#'))
 nq, nv = robot.nq, robot.nv
 
 if conf.use_viewer:
@@ -92,18 +85,14 @@ if conf.use_viewer:
 
 assert(np.floor(dt_ref/dt)==dt_ref/dt)
 
-# load reference trajectories 
-whichMotion = 'trot'
-refX = np.load('../demo/references/'+whichMotion+'_reference_states.npy').squeeze()
-refU = np.load('../demo/references/'+whichMotion+'_reference_controls.npy').squeeze() 
-feedBack = np.load('../demo/references/'+whichMotion+'_feedback.npy').squeeze() 
-refX[:,2] -= 15.37e-3   # ensure contact points are inside the ground at t=0
-q0, v0 = refX[0,:nq], refX[0,nq:]
-N_SIMULATION = refU.shape[0]     
+### set a constant pushing force 
+tau = np.zeros(robot.nv)
+tau[0] = 4. 
+tau[2] = -0.19 # total fz to 10 N
+q0, v0 = conf.q0, conf.v0
 
-# TEMPORARY DEBUG CODE
-N_SIMULATION = 30
-N_SIMULATION = refX.shape[0]
+# # TEMPORARY DEBUG CODE
+N_SIMULATION = 100
 
 
 def run_simulation_cpp(q0, v0, simu_params, ground_truth):
@@ -160,14 +149,8 @@ def run_simulation_cpp(q0, v0, simu_params, ground_truth):
         time_start = time.time()
         for i in range(0, N_SIMULATION):                    
             for d in range(int(dt_ref/dt)):
-                xref = interpolate_state(robot, refX[i], refX[i+1], dt*d/dt_ref)
-                xact = np.concatenate([simu_cpp.get_q(), simu_cpp.get_v()])
-                diff = state_diff(robot, xact, xref)
-                results.u[6:,i] = refU[i] + feedBack[i].dot(diff)                 
+                results.u[:,i] = tau.copy()                
                 simu_cpp.step(results.u[:,i])
-                # for ci, cp in enumerate(cpts):
-                #     if(cp.active and not results.active[ci,i]):
-                #         print(cp.name, 'impact v', cp.v)
                 
             results.q[:,i+1] = simu_cpp.get_q()
             results.v[:,i+1] = simu_cpp.get_v()
@@ -179,8 +162,6 @@ def run_simulation_cpp(q0, v0, simu_params, ground_truth):
                 results.dp[:,ci,i+1] = cp.v
                 results.slipping[ci,i+1] = cp.slipping
                 results.active[ci,i+1] = cp.active
-                # if(cp.active and not results.active[ci,i]):
-                #     print(cp.name, 'impact v', cp.v)
             
             if(np.any(np.isnan(results.v[:,i+1])) or norm(results.v[:,i+1]) > 1e3):
                 raise Exception("Time %.3f Velocities are too large: %.1f. Stop simulation."%(
@@ -231,20 +212,22 @@ def run_simulation_py(q0, v0, simu_params, ground_truth):
     
     results.q[:,0] = np.copy(q0)
     results.v[:,0] = np.copy(v0)
+    for ci, cn in enumerate(conf.contact_frames):
+        results.f[:,ci,0] = simu_py.contacts[ci].f.copy()
     
     try:
         time_start = time.time()
         for i in range(0, N_SIMULATION):
             for d in range(int(dt_ref/dt)):
-                xref = interpolate_state(robot, refX[i], refX[i+1], dt*d/dt_ref)
-                xact = np.concatenate([simu_py.q, simu_py.v])
-                diff = state_diff(robot, xact, xref)
-                results.u[6:,i] = refU[i] + feedBack[i].dot(diff)                 
-
+                results.u[:,i] = tau.copy()
                 simu_py.simulate(results.u[6:,i], dt, ndt, simu_params['use_exp_int'])
                 
             results.q[:,i+1] = simu_py.q
             results.v[:,i+1] = simu_py.v
+            # collect the contact forces 
+            for ci, cn in enumerate(conf.contact_frames):
+                results.f[:,ci,i+1] = simu_py.contacts[ci].f.copy()
+
             
             if(np.any(np.isnan(results.v[:,i+1])) or norm(results.v[:,i+1]) > 1e3):
                 raise Exception("Time %.3f Velocities are too large: %.1f. Stop simulation."%(
@@ -285,6 +268,7 @@ for simu_params in SIMU_PARAMS:
     print("\nStart simulation c++", name)
     data[name+' cpp'] = run_simulation_cpp(q0, v0, simu_params, data_ground_truth_exp)
 
+
 # COMPUTE INTEGRATION ERRORS:
 print('\n')
 ndt = {}
@@ -313,94 +297,127 @@ line_styles = 10*['-o', '--o', '-.o', ':o']
 tt = np.arange(0.0, (N_SIMULATION+1)*dt_ref, dt_ref)[:N_SIMULATION+1]
 
 
-# PLOT INTEGRATION ERRORS
-if(PLOT_INTEGRATION_ERRORS):
-    (ff, ax) = plut.create_empty_figure(1)
-    j = 0
-    for name in sorted(total_err.keys()):
-        err = total_err[name]
-        ax.plot(ndt[name], total_err[name], line_styles[j], alpha=0.7, label=name)
-        j += 1
-    ax.set_xlabel('Number of time steps')
-    ax.set_ylabel('Mean error norm')
-    ax.set_xscale('log')
-    ax.set_yscale('log')
-    leg = ax.legend()
-    if(leg): leg.get_frame().set_alpha(0.5)
-    
-    (ff, ax) = plut.create_empty_figure(1)
-    j = 0
-    for name in sorted(total_err.keys()):
-        err = total_err[name]
-        ax.plot(ndt[name], err_max[name], line_styles[j], alpha=0.7, label=name)
-        j += 1
-    ax.set_xlabel('Number of time steps')
-    ax.set_ylabel('Max error norm')
-    ax.set_xscale('log')
-    ax.set_yscale('log')
-    leg = ax.legend()
-    if(leg): leg.get_frame().set_alpha(0.5)
-    
-if(PLOT_INTEGRATION_ERROR_TRAJECTORIES):
-    (ff, ax) = plut.create_empty_figure(1)
-    j = 0
-    for name in sorted(err_traj.keys()):
-        err = err_traj[name]
-        ax.plot(tt, err_traj[name], line_styles[j], alpha=0.7, label=name)
-        j += 1
-    ax.set_xlabel('Time [s]')
-    ax.set_ylabel('Error norm')
-    ax.set_yscale('log')
-    leg = ax.legend()
-    if(leg): leg.get_frame().set_alpha(0.5)
-    
-            
-# PLOT THE CONTACT FORCES OF ALL INTEGRATION METHODS ON THE SAME PLOT
+### plot normal contact force 
 if(PLOT_FORCES):        
     nc = len(conf.contact_frames)
-    for (name, d) in data.items():
-        (ff, ax) = plut.create_empty_figure(nc, 1)
-        for i in range(nc):
-            ax[i].plot(tt, norm(d.f[0:2,i,:], axis=0) / (1e-3+d.f[2,i,:]), alpha=0.7, label=name)
-            ax[i].set_xlabel('Time [s]')
-            ax[i].set_ylabel('Force X/Z [N]')
-            leg = ax[i].legend()
-            if(leg): leg.get_frame().set_alpha(0.5)
-            
-# PLOT THE SLIPPING FLAG OF ALL INTEGRATION METHODS ON THE SAME PLOT
-if(PLOT_SLIPPING):
-    nc = len(conf.contact_frames)
-    (ff, ax) = plut.create_empty_figure(nc, 1)
-    for (name, d) in data.items():        
-        for i in range(nc):
-            ax[i].plot(tt, d.slipping[i,:], alpha=0.7, label=name)
-            ax[i].set_xlabel('Time [s]')
-    ax[0].set_ylabel('Contact Slipping Flag')
-    leg = ax[0].legend()
-    if(leg): leg.get_frame().set_alpha(0.5)
-
-    (ff, ax) = plut.create_empty_figure(nc, 1)
-    for (name, d) in data.items():
-        for i in range(nc):
-            ax[i].plot(tt, d.active[i,:], alpha=0.7, label=name)
-            ax[i].set_xlabel('Time [s]')
-    ax[0].set_ylabel('Contact Active Flag')
-    leg = ax[0].legend()
-    if(leg): leg.get_frame().set_alpha(0.5)
-
-       
-# PLOT THE JOINT ANGLES OF ALL INTEGRATION METHODS ON THE SAME PLOT
-if(PLOT_BASE_POS):
-    (ff, ax) = plut.create_empty_figure(3)
-    ax = ax.reshape(3)
+    plt.figure("Normal Contact Froces")
     j = 0
     for (name, d) in data.items():
-        for i in range(3):
-            ax[i].plot(tt, d.q[i, :], line_styles[j], alpha=0.7, label=name)
-            ax[i].set_xlabel('Time [s]')
-            ax[i].set_ylabel('Base pos [m]')
-        j += 1
-        leg = ax[0].legend()
-        if(leg): leg.get_frame().set_alpha(0.5)
+        for i in range(nc):
+            plt.plot(tt, d.f[2,i,:],  line_styles[j], alpha=0.7, label=name)
+        j+= 1 
+    plt.xlabel('Time [s]')
+    plt.ylabel('Force Z [N]')
+    leg = plt.legend()
+    if(leg): leg.get_frame().set_alpha(0.5)
+
+### plot contact position 
+# if(PLOT_BASE_POS):
+#     (ff, ax) = plut.create_empty_figure(3)
+#     ax = ax.reshape(3)
+#     j = 0
+#     for (name, d) in data.items():
+#         for i in range(3):
+#             ax[i].plot(tt, d.q[i, :], line_styles[j], alpha=0.7, label=name)
+#             ax[i].set_xlabel('Time [s]')
+#             ax[i].set_ylabel('Base pos [m]')
+#         j += 1
+#         leg = ax[0].legend()
+#         if(leg): leg.get_frame().set_alpha(0.5)
+
+
+
+
+
+
+# # PLOT INTEGRATION ERRORS
+# if(PLOT_INTEGRATION_ERRORS):
+#     (ff, ax) = plut.create_empty_figure(1)
+#     j = 0
+#     for name in sorted(total_err.keys()):
+#         err = total_err[name]
+#         ax.plot(ndt[name], total_err[name], line_styles[j], alpha=0.7, label=name)
+#         j += 1
+#     ax.set_xlabel('Number of time steps')
+#     ax.set_ylabel('Mean error norm')
+#     ax.set_xscale('log')
+#     ax.set_yscale('log')
+#     leg = ax.legend()
+#     if(leg): leg.get_frame().set_alpha(0.5)
+    
+#     (ff, ax) = plut.create_empty_figure(1)
+#     j = 0
+#     for name in sorted(total_err.keys()):
+#         err = total_err[name]
+#         ax.plot(ndt[name], err_max[name], line_styles[j], alpha=0.7, label=name)
+#         j += 1
+#     ax.set_xlabel('Number of time steps')
+#     ax.set_ylabel('Max error norm')
+#     ax.set_xscale('log')
+#     ax.set_yscale('log')
+#     leg = ax.legend()
+#     if(leg): leg.get_frame().set_alpha(0.5)
+    
+# if(PLOT_INTEGRATION_ERROR_TRAJECTORIES):
+#     (ff, ax) = plut.create_empty_figure(1)
+#     j = 0
+#     for name in sorted(err_traj.keys()):
+#         err = err_traj[name]
+#         ax.plot(tt, err_traj[name], line_styles[j], alpha=0.7, label=name)
+#         j += 1
+#     ax.set_xlabel('Time [s]')
+#     ax.set_ylabel('Error norm')
+#     ax.set_yscale('log')
+#     leg = ax.legend()
+#     if(leg): leg.get_frame().set_alpha(0.5)
+    
+            
+# # PLOT THE CONTACT FORCES OF ALL INTEGRATION METHODS ON THE SAME PLOT
+# if(PLOT_FORCES):        
+#     nc = len(conf.contact_frames)
+#     for (name, d) in data.items():
+#         (ff, ax) = plut.create_empty_figure(nc, 1)
+#         for i in range(nc):
+#             ax[i].plot(tt, norm(d.f[0:2,i,:], axis=0) / (1e-3+d.f[2,i,:]), alpha=0.7, label=name)
+#             ax[i].set_xlabel('Time [s]')
+#             ax[i].set_ylabel('Force X/Z [N]')
+#             leg = ax[i].legend()
+#             if(leg): leg.get_frame().set_alpha(0.5)
+            
+# # PLOT THE SLIPPING FLAG OF ALL INTEGRATION METHODS ON THE SAME PLOT
+# if(PLOT_SLIPPING):
+#     nc = len(conf.contact_frames)
+#     (ff, ax) = plut.create_empty_figure(nc, 1)
+#     for (name, d) in data.items():        
+#         for i in range(nc):
+#             ax[i].plot(tt, d.slipping[i,:], alpha=0.7, label=name)
+#             ax[i].set_xlabel('Time [s]')
+#     ax[0].set_ylabel('Contact Slipping Flag')
+#     leg = ax[0].legend()
+#     if(leg): leg.get_frame().set_alpha(0.5)
+
+#     (ff, ax) = plut.create_empty_figure(nc, 1)
+#     for (name, d) in data.items():
+#         for i in range(nc):
+#             ax[i].plot(tt, d.active[i,:], alpha=0.7, label=name)
+#             ax[i].set_xlabel('Time [s]')
+#     ax[0].set_ylabel('Contact Active Flag')
+#     leg = ax[0].legend()
+#     if(leg): leg.get_frame().set_alpha(0.5)
+
+       
+# # PLOT THE JOINT ANGLES OF ALL INTEGRATION METHODS ON THE SAME PLOT
+# if(PLOT_BASE_POS):
+#     (ff, ax) = plut.create_empty_figure(3)
+#     ax = ax.reshape(3)
+#     j = 0
+#     for (name, d) in data.items():
+#         for i in range(3):
+#             ax[i].plot(tt, d.q[i, :], line_styles[j], alpha=0.7, label=name)
+#             ax[i].set_xlabel('Time [s]')
+#             ax[i].set_ylabel('Base pos [m]')
+#         j += 1
+#         leg = ax[0].legend()
+#         if(leg): leg.get_frame().set_alpha(0.5)
         
 plt.show()
