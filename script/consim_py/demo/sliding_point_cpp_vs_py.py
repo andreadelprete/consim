@@ -192,7 +192,7 @@ def run_simulation_cpp(q0, v0, simu_params, ground_truth):
 def run_simulation_py(q0, v0, simu_params, ground_truth):
     ndt = simu_params['ndt']
         
-    simu_py = RobotSimulator(conf, robot, pin.JointModelFreeFlyer())
+    simu_py = RobotSimulator(conf, robot)
     for name in conf.contact_frames:
         simu_py.add_contact(name, conf.contact_normal, conf.K, conf.B, conf.mu)
     simu_py.init(q0, v0, p0=conf.p0)
@@ -220,7 +220,7 @@ def run_simulation_py(q0, v0, simu_params, ground_truth):
         for i in range(0, N_SIMULATION):
             for d in range(int(dt_ref/dt)):
                 results.u[:,i] = tau.copy()
-                simu_py.simulate(results.u[6:,i], dt, ndt, simu_params['use_exp_int'])
+                simu_py.simulate(results.u[:,i], dt, ndt, simu_params['use_exp_int'])
                 
             results.q[:,i+1] = simu_py.q
             results.v[:,i+1] = simu_py.v
@@ -300,7 +300,7 @@ tt = np.arange(0.0, (N_SIMULATION+1)*dt_ref, dt_ref)[:N_SIMULATION+1]
 ### plot normal contact force 
 if(PLOT_FORCES):        
     nc = len(conf.contact_frames)
-    plt.figure("Normal Contact Froces")
+    plt.figure("Normal Contact Forces")
     j = 0
     for (name, d) in data.items():
         for i in range(nc):
@@ -311,20 +311,31 @@ if(PLOT_FORCES):
     leg = plt.legend()
     if(leg): leg.get_frame().set_alpha(0.5)
 
-### plot contact position 
-# if(PLOT_BASE_POS):
-#     (ff, ax) = plut.create_empty_figure(3)
-#     ax = ax.reshape(3)
-#     j = 0
-#     for (name, d) in data.items():
-#         for i in range(3):
-#             ax[i].plot(tt, d.q[i, :], line_styles[j], alpha=0.7, label=name)
-#             ax[i].set_xlabel('Time [s]')
-#             ax[i].set_ylabel('Base pos [m]')
-#         j += 1
-#         leg = ax[0].legend()
-#         if(leg): leg.get_frame().set_alpha(0.5)
+    nc = len(conf.contact_frames)
+    plt.figure("Tangent Contact Forces")
+    j = 0
+    for (name, d) in data.items():
+        for i in range(nc):
+            plt.plot(tt, np.sqrt(d.f[0,i,:]**2 + d.f[1,i,:]**2 ),  line_styles[j], alpha=0.7, label=name)
+        j+= 1 
+    plt.xlabel('Time [s]')
+    plt.ylabel('Force Tangent [N]')
+    leg = plt.legend()
+    if(leg): leg.get_frame().set_alpha(0.5)
 
+### plot contact position 
+directions = ['X', 'Y', 'Z']
+if(PLOT_BASE_POS):
+    for di, dn in enumerate(directions):
+        plt.figure("Ball %s position "%dn)
+        j = 0
+        for (name, d) in data.items():
+            plt.plot(tt, d.q[di,:],  line_styles[j], alpha=0.7, label=name)
+            j+= 1 
+        plt.xlabel('Time [s]')
+        plt.ylabel('Position %s [m]'%dn)
+        leg = plt.legend()
+        if(leg): leg.get_frame().set_alpha(0.5)
 
 
 
