@@ -87,6 +87,7 @@ namespace consim {
       const Eigen::VectorXd& get_dv() const {return dv_;};
 
     protected:
+      Eigen::Vector3d  f_tmp;
       const double sub_dt;
       Eigen::VectorXd q_;  
       Eigen::VectorXd qnext_;
@@ -257,7 +258,7 @@ namespace consim {
       Eigen::VectorXd dvMean2_; // used in method 1 of contact slipping 
       Eigen::VectorXd vMean2_; // used in method 1 of contact slipping 
 
-      Eigen::Vector3d  f_tmp;
+      
 
       // double fnor_;   // norm of normalFi_  
       // double ftan_;   // norm of tangentFi_ 

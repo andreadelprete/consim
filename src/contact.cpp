@@ -66,39 +66,41 @@ LinearPenaltyContactModel::LinearPenaltyContactModel(Eigen::Vector3d &stiffness,
 
 void LinearPenaltyContactModel::computeForce(ContactPoint& cp)
 {
-  /*!< force along normal to contact object */ 
-  normalF_ = stiffness_.cwiseProduct(cp.normal) - damping_.cwiseProduct(cp.normvel); 
+  
+  if(cp.slipping){
+    // assume that if you were slipping at previous iteration you're still slipping
+    // TODO: could be better to check whether velocity has changed direction
+    cp.v_anchor = cp.v - (cp.v.dot(cp.contactNormal_))*cp.contactNormal_;
+  }
 
+  cp.f = stiffness_.cwiseProduct(cp.delta_x) + damping_.cwiseProduct(cp.v_anchor - cp.v); 
+  /*!< force along normal to contact object */ 
+  normalNorm_ = cp.f.dot(cp.contactNormal_);
   /*!< unilateral force, no pulling into contact object */ 
-  if (cp.unilateral && normalF_.dot(cp.contactNormal_)<0){
+  if (cp.unilateral && normalNorm_<0){
     cp.f.fill(0);
-    // cp.active = false; // not so sure here I should set active=false because that should be done based on the collision checking only
     cp.slipping = false;
     return;
   } 
 
-  if(cp.slipping){
-    // assume that if you were slipping at previous iteration you're still slipping
-    // TODO: could be better to check whether velocity has changed direction
-    cp.v_anchor = cp.v - (cp.v.dot(cp.normal))*cp.normal;
-  }
-  tangentF_ = stiffness_.cwiseProduct(cp.tangent) + damping_.cwiseProduct(cp.v_anchor - cp.tanvel);
-  normalNorm_ = normalF_.norm();
+
+  normalF_ = normalNorm_ * cp.contactNormal_; 
+  tangentF_ = cp.f - normalF_;
   tangentNorm_ = tangentF_.norm();
-  cp.f = normalF_; 
+  
   if (cp.unilateral && (tangentNorm_ > friction_coeff_*normalNorm_)){
     cp.slipping = true;
     tangentDir_ = tangentF_/tangentNorm_; 
+    cp.f = normalF_;
     cp.f += friction_coeff_*normalNorm_*tangentDir_; 
     
     // assume anchor point tangent vel is equal to contact point tangent vel
-    cp.v_anchor = cp.v - (cp.v.dot(cp.normal))*cp.normal;
+    cp.v_anchor = cp.v - (cp.v.dot(cp.contactNormal_))*cp.contactNormal_;
     // f = K@(p0-p) + B@(v0-v) => p0 = p + (f - B@(v0-v))/K
     cp.x_anchor = cp.x + stiffnessInverse_.cwiseProduct(cp.f - damping_.cwiseProduct(cp.v_anchor-cp.v));
     return;
   } 
     
-  cp.f += tangentF_;
   cp.slipping = false;
 }
 
