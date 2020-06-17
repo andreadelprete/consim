@@ -152,7 +152,7 @@ void AbstractSimulator::detectContacts()
 
   if(newActive_!= nactive_){
     contactChange_ = true; 
-    std::cout <<elapsedTime_  <<" Number of active contacts changed from "<<nactive_<<" to "<<newActive_<<std::endl; 
+    // std::cout <<elapsedTime_  <<" Number of active contacts changed from "<<nactive_<<" to "<<newActive_<<std::endl; 
   }
   nactive_ = newActive_;
 }
@@ -226,9 +226,9 @@ void EulerSimulator::computeContactForces()
     cp->optr->computePenetration(*cp); 
     cp->optr->contact_model_->computeForce(*cp);
     tau_.noalias() += cp->world_J_.transpose() * cp->f; 
-    if (contactChange_){
-        std::cout<<cp->name_<<" p ["<< cp->x.transpose() << "] v ["<< cp->v.transpose() << "] f ["<<  cp->f.transpose() <<"]"<<std::endl; 
-      }
+    // if (contactChange_){
+    //     std::cout<<cp->name_<<" p ["<< cp->x.transpose() << "] v ["<< cp->v.transpose() << "] f ["<<  cp->f.transpose() <<"]"<<std::endl; 
+    //   }
   }
   CONSIM_STOP_PROFILER("compute_contact_forces");
 }
@@ -437,10 +437,9 @@ void ExponentialSimulator::computeExpLDS(){
       cp->optr->contact_model_->computeForce(*cp);
       f_.segment<3>(3*i_active_) = cp->f; 
       i_active_ += 1;  
-      if (contactChange_){
-        std::cout<<cp->name_<<" p ["<< cp->x.transpose() << "] v ["<< cp->v.transpose() << "] f ["<<  cp->f.transpose() <<"]"<<std::endl; 
-      }
-
+      // if (contactChange_){
+      //   std::cout<<cp->name_<<" p ["<< cp->x.transpose() << "] v ["<< cp->v.transpose() << "] f ["<<  cp->f.transpose() <<"]"<<std::endl; 
+      // }
     }
   }
 } // ExponentialSimulator::computeContactForces
