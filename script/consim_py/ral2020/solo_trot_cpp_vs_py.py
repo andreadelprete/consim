@@ -33,7 +33,7 @@ print(" Test Solo Trot C++ VS Python".center(conf.LINE_WIDTH, '#'))
 print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
-i_min = 1
+i_min = 5
 i_max = i_min+1
 i_ground_truth = i_max+2
 
@@ -67,7 +67,7 @@ for i in range(i_min, i_max):
 
     
 PLOT_FORCES = 0
-PLOT_SLIPPING = 0
+PLOT_SLIPPING = 1
 PLOT_BASE_POS = 0
 PLOT_INTEGRATION_ERRORS = 0
 PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
@@ -102,8 +102,8 @@ q0, v0 = refX[0,:nq], refX[0,nq:]
 N_SIMULATION = refU.shape[0]     
 
 # TEMPORARY DEBUG CODE
-N_SIMULATION = 30
-N_SIMULATION = refX.shape[0]
+#N_SIMULATION = 100
+#N_SIMULATION = refX.shape[0]
 
 
 def run_simulation_cpp(q0, v0, simu_params, ground_truth):

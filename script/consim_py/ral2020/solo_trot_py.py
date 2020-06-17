@@ -12,30 +12,16 @@ import matplotlib.pyplot as plt
 import consim_py.utils.plot_utils as plut
 import conf_solo_trot_py as conf
 import pinocchio as pin 
+import pickle 
 
-class Empty:
-    pass
-
-def interpolate_state(robot, x1, x2, d):
-    """ interpolate state for feedback at higher rate that plan """
-    x = np.zeros(robot.model.nq+robot.model.nv)
-    x[:robot.model.nq] =  pin.interpolate(robot.model, x1[:robot.model.nq], x2[:robot.model.nq], d)
-    x[robot.model.nq:] = x1[robot.model.nq:] + d*(x2[robot.model.nq:] - x1[robot.model.nq:])
-    return x
-
-def state_diff(robot, x1, x2):
-    """ returns x2 - x1 """
-    xdiff = np.zeros(2*robot.model.nv)
-    xdiff[:robot.model.nv] = pin.difference(robot.model, x1[:robot.model.nq], x2[:robot.model.nq]) 
-    xdiff[robot.model.nv:] = x2[robot.model.nq:] - x1[robot.model.nq:]
-    return xdiff
+from solo_trot_common import load_ref_traj
 
 print("".center(conf.LINE_WIDTH, '#'))
 print(" Test Solo Trot Python ".center(conf.LINE_WIDTH, '#'))
 print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
-i_min = 3
+i_min = 5
 i_max = i_min+1
 i_ground_truth = i_max+2
 
@@ -112,12 +98,15 @@ for i in range(i_min, i_max):
 #    }]
     
 PLOT_FORCES = 0
+PLOT_FORCE_PREDICTIONS = 1
 PLOT_SLIPPING = 0
 PLOT_BASE_POS = 0
 PLOT_INTEGRATION_ERRORS = 0
 PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
 
-RESET_STATE_ON_GROUND_TRUTH = 0  # reset the state of the system on the ground truth
+LOAD_GROUND_TRUTH_FROM_FILE = 0
+SAVE_GROUND_TRUTH_TO_FILE = 1
+RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
 dt     = 0.002                      # controller and simulator time step
 dt_ref = 0.010                      # time step of reference motion
 unilateral_contacts = 1
@@ -138,16 +127,12 @@ if conf.use_viewer:
 assert(np.floor(dt_ref/dt)==dt_ref/dt)
 
 # load reference trajectories 
-whichMotion = 'trot'
-refX = np.load('../demo/references/'+whichMotion+'_reference_states.npy').squeeze()
-refU = np.load('../demo/references/'+whichMotion+'_reference_controls.npy').squeeze() 
-feedBack = np.load('../demo/references/'+whichMotion+'_feedback.npy').squeeze() 
-refX[:,2] -= 15.37e-3   # ensure contact points are inside the ground at t=0
+refX, refU, feedBack = load_ref_traj(robot, dt, dt_ref)
 q0, v0 = refX[0,:nq], refX[0,nq:]
-N_SIMULATION = refU.shape[0]     
+N_SIMULATION = refU.shape[0]
 
 # TEMPORARY DEBUG CODE
-N_SIMULATION = 40
+#N_SIMULATION = 40
 #q0[2] += 1.0         # make the robot fly
 
 
@@ -177,12 +162,17 @@ def run_simulation(q0, v0, simu_params, ground_truth):
     results.q = np.zeros((nq, N_SIMULATION+1))*np.nan
     results.v = np.zeros((nv, N_SIMULATION+1))*np.nan
     results.u = np.zeros((nv, N_SIMULATION+1))
-    results.f = np.zeros((3, nc, N_SIMULATION+1))
+    results.f = np.zeros((3, nc, ndt_ref*N_SIMULATION+1))
     results.p = np.zeros((3, nc, N_SIMULATION+1))
     results.dp = np.zeros((3, nc, N_SIMULATION+1))
     results.p0 = np.zeros((3, nc, N_SIMULATION+1))
     results.slipping = np.zeros((nc, N_SIMULATION+1))
     results.active = np.zeros((nc, N_SIMULATION+1))
+    results.f_pred_int = np.zeros((3, nc, ndt_ref*N_SIMULATION+1))
+    results.f_inner = np.zeros((3, nc, ndt_ref*N_SIMULATION*ndt))
+    results.f_avg  = np.zeros((3, nc, ndt_ref*N_SIMULATION*ndt))
+    results.f_avg2 = np.zeros((3, nc, ndt_ref*N_SIMULATION*ndt))
+    results.f_pred = np.zeros((3, nc, ndt_ref*N_SIMULATION*ndt))
     
     results.q[:,0] = np.copy(q0)
     results.v[:,0] = np.copy(v0)
@@ -198,16 +188,20 @@ def run_simulation(q0, v0, simu_params, ground_truth):
     try:
         time_start = time.time()
         for i in range(0, N_SIMULATION):
-            for d in range(int(dt_ref/dt)):
-                xref = interpolate_state(robot, refX[i], refX[i+1], dt*d/dt_ref)
-                xact = np.concatenate([simu.q, simu.v])
-                diff = state_diff(robot, xact, xref)
-                results.u[6:,i] = refU[i] + feedBack[i].dot(diff)                 
+            xact = np.concatenate([simu.q, simu.v])
+            diff = state_diff(robot, xact, refX[i])
+            results.u[6:,i] = refU[i] + feedBack[i].dot(diff)                 
 
-                simu.simulate(results.u[6:,i], dt, ndt, simu_params['use_exp_int'])
-                
+            simu.simulate(results.u[6:,i], dt, ndt, simu_params['use_exp_int'])
             results.q[:,i+1] = simu.q
             results.v[:,i+1] = simu.v
+            
+            for ci, cp in enumerate(simu.contacts):
+                results.f[:,ci,i+1] = cp.f
+                results.f_inner[:,ci,i*ndt:(i+1)*ndt] = cp.f_inner
+                results.f_pred[ :,ci,i*ndt:(i+1)*ndt] = cp.f_pred
+                results.f_avg[  :,ci,i*ndt:(i+1)*ndt] = cp.f_avg
+                results.f_avg2[ :,ci,i*ndt:(i+1)*ndt] = cp.f_avg2
             
             if(np.any(np.isnan(results.v[:,i+1])) or norm(results.v[:,i+1]) > 1e3):
                 raise Exception("Time %.3f Velocities are too large: %.1f. Stop simulation."%(
@@ -215,7 +209,7 @@ def run_simulation(q0, v0, simu_params, ground_truth):
     
             if i % PRINT_N == 0:
                 print("Time %.3f" % (t))                            
-            t += dt_ref
+            t += dt
         print("Real-time factor:", t/(time.time() - time_start))
     except Exception as e:
         print(e)
@@ -236,20 +230,43 @@ def run_simulation(q0, v0, simu_params, ground_truth):
 
     return results
 
-data = {}
-print("\nStart simulation ground truth")
-data_ground_truth_exp = run_simulation(q0, v0, GROUND_TRUTH_EXP_SIMU_PARAMS, None)
-data_ground_truth_euler = run_simulation(q0, v0, GROUND_TRUTH_EULER_SIMU_PARAMS, None)
-data['ground-truth-exp'] = data_ground_truth_exp
-data['ground-truth-euler'] = data_ground_truth_euler
+if(LOAD_GROUND_TRUTH_FROM_FILE):    
+    print("\nLoad ground truth from file")
+    data = pickle.load( open( "solo_trot_cpp.p", "rb" ) )
+    
+    i0, i1 = 262, 264
+    refX = refX[i0:i1+1,:]
+    refU = refU[i0:i1,:]
+    feedBack = feedBack[i0:i1,:,:]
+#    q0, v0 = refX[0,:nq], refX[0,nq:]
+    N_SIMULATION = refU.shape[0]
+    data['ground-truth-exp'].q  = data['ground-truth-exp'].q[:,i0:i1+1]
+    data['ground-truth-exp'].v  = data['ground-truth-exp'].v[:,i0:i1+1]
+    data['ground-truth-exp'].f  = data['ground-truth-exp'].f[:,:,i0:i1+1]
+    data['ground-truth-exp'].p0 = data['ground-truth-exp'].p0[:,:,i0:i1+1]
+    data['ground-truth-exp'].slipping = data['ground-truth-exp'].slipping[:,i0:i1+1]
+    data['ground-truth-euler'].q  = data['ground-truth-euler'].q[:,i0:i1+1]
+    data['ground-truth-euler'].v  = data['ground-truth-euler'].v[:,i0:i1+1]
+    data['ground-truth-euler'].f  = data['ground-truth-euler'].f[:,:,i0:i1+1]
+    data['ground-truth-euler'].p0 = data['ground-truth-euler'].p0[:,:,i0:i1+1]
+    data['ground-truth-euler'].slipping = data['ground-truth-euler'].slipping[:,i0:i1+1]
+    q0, v0 = data['ground-truth-exp'].q[:,0], data['ground-truth-exp'].v[:,0]
+else:
+    data = {}
+    print("\nStart simulation ground truth")
+    data['ground-truth-exp'] = run_simulation(q0, v0, GROUND_TRUTH_EXP_SIMU_PARAMS, None)
+    data['ground-truth-euler'] = run_simulation(q0, v0, GROUND_TRUTH_EULER_SIMU_PARAMS, None)
+    if(SAVE_GROUND_TRUTH_TO_FILE):
+        pickle.dump( data, open( "solo_trot_cpp.p", "wb" ) )
+        
  
 for simu_params in SIMU_PARAMS:
     name = simu_params['name']
     print("\nStart simulation", name)
     if(simu_params['use_exp_int']):
-        data[name] = run_simulation(q0, v0, simu_params, data_ground_truth_exp)
+        data[name] = run_simulation(q0, v0, simu_params, data['ground-truth-exp'])
     else:
-        data[name] = run_simulation(q0, v0, simu_params, data_ground_truth_euler)
+        data[name] = run_simulation(q0, v0, simu_params, data['ground-truth-euler'])
 
 # COMPUTE INTEGRATION ERRORS:
 print('\n')
@@ -258,8 +275,8 @@ total_err, err_max, err_traj = {}, {}, {}
 for name in sorted(data.keys()):
     if('ground-truth' in name): continue
     d = data[name]
-    if(d.use_exp_int==0): data_ground_truth = data_ground_truth_euler
-    else:                 data_ground_truth = data_ground_truth_exp
+    if(d.use_exp_int==0): data_ground_truth = data['ground-truth-euler']
+    else:                 data_ground_truth = data['ground-truth-exp']
     
     err = (norm(d.q - data_ground_truth.q) + norm(d.v - data_ground_truth.v)) / d.q.shape[0]
     err_per_time = np.array(norm(d.q - data_ground_truth.q, axis=0)) + \
@@ -277,7 +294,7 @@ for name in sorted(data.keys()):
 
 # PLOT STUFF
 line_styles = 10*['-o', '--o', '-.o', ':o']
-tt = np.arange(0.0, (N_SIMULATION+1)*dt_ref, dt_ref)[:N_SIMULATION+1]
+tt = np.arange(0.0, (N_SIMULATION+1)*dt, dt)[:N_SIMULATION+1]
 
 
 # PLOT INTEGRATION ERRORS
@@ -321,7 +338,55 @@ if(PLOT_INTEGRATION_ERROR_TRAJECTORIES):
     leg = ax.legend()
     if(leg): leg.get_frame().set_alpha(0.5)
     
-            
+        
+# FOR EACH INTEGRATION METHOD PLOT THE FORCE PREDICTIONS
+if(PLOT_FORCE_PREDICTIONS):
+    T = N_SIMULATION*dt
+    tt = np.arange(0.0, (N_SIMULATION+1)*dt, dt)[:N_SIMULATION+1]
+    
+    for (name,d) in data.items():
+       (ff, ax) = plut.create_empty_figure(2,2)
+       ax = ax.reshape(4)       
+       for i in range(4):
+           ax[i].plot(tt, d.f[2,i,:], ' o', markersize=8, label=name)
+#           ax[i].plot(tt, d.f_pred_int[2,i,:], ' s', markersize=8, label=name+' pred int')
+           if('ground' not in name):
+               tt_log = np.arange(d.f_pred.shape[2]) * T / d.f_pred.shape[2]
+               ax[i].plot(tt_log, d.f_pred[2,i,:], 'r v', markersize=6, label=name+' pred ')
+               ax[i].plot(tt_log, d.f_avg[2,i,:], 'g s', markersize=6, label=name+' avg ')
+               ax[i].plot(tt_log, d.f_avg2[2,i,:], 'y s', markersize=6, label=name+' avg2 ')
+               ax[i].plot(tt_log, d.f_inner[2,i,:], 'b x', markersize=6, label=name+' real ')
+           ax[i].set_xlabel('Time [s]')
+           ax[i].set_ylabel('Force Z [N]')
+       leg = ax[-1].legend()
+       if(leg): leg.get_frame().set_alpha(0.5)
+       
+       # force prediction error of Euler, i.e. assuming force remains contact during time step
+       ndt = int(d.f_inner.shape[2] / (d.f.shape[2]-1))
+       
+       # force prediction error of matrix exponential 
+       f_pred_err = d.f_pred - d.f_inner
+       print(name, 'Force pred err max exp:', np.sum(np.abs(f_pred_err))/(f_pred_err.shape[0]*f_pred_err.shape[2]))
+       
+    (ff, ax) = plut.create_empty_figure(2,2)
+    ax = ax.reshape(4)
+    for (name,d) in data.items():       
+       tt_log = np.arange(d.f_pred.shape[2]) * T / d.f_pred.shape[2]
+       for i in range(4):
+           if('ground' in name):
+               ax[i].plot(tt, d.f[2,i,:], 'b x', markersize=6, label=name)
+#               ax[i].plot(tt_log, d.f_inner[2,i,:], 'b x', markersize=6, label=name)
+           elif(d.use_exp_int):
+               ax[i].plot(tt_log, d.f_avg[2,i,:], 's', markersize=6, label=name+' avg ')
+               ax[i].plot(tt_log, d.f_avg2[2,i,:], 's', markersize=6, label=name+' avg2 ')
+           else:
+               ax[i].plot(tt_log, d.f_inner[2,i,:], 'o', markersize=6, label=name)
+           
+           ax[i].set_xlabel('Time [s]')
+           ax[i].set_ylabel('Force Z [N]')
+       leg = ax[-1].legend()
+       if(leg): leg.get_frame().set_alpha(0.5) 
+       
 # PLOT THE CONTACT FORCES OF ALL INTEGRATION METHODS ON THE SAME PLOT
 if(PLOT_FORCES):        
     nc = len(conf.contact_frames)
