@@ -312,8 +312,8 @@ class RobotSimulator:
                 self.p0[  3*i:3*i+3] = c.p0
                 self.dp0[ 3*i:3*i+3] = c.dp0
                 i += 1
-                if(contact_changed):
-                    print(c.frame_name, 'p', c.p.T, 'v', c.v.T, 'f', c.f.T)
+#                if(contact_changed):
+#                    print(c.frame_name, 'p', c.p.T, 'v', c.v.T, 'f', c.f.T)
 
         return self.f
         
