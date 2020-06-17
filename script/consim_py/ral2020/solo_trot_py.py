@@ -14,7 +14,7 @@ import conf_solo_trot_py as conf
 import pinocchio as pin 
 import pickle 
 
-from solo_trot_common import load_ref_traj
+from solo_trot_common import load_ref_traj, play_motion, state_diff, dt_ref, Empty
 
 print("".center(conf.LINE_WIDTH, '#'))
 print(" Test Solo Trot Python ".center(conf.LINE_WIDTH, '#'))
@@ -104,11 +104,10 @@ PLOT_BASE_POS = 0
 PLOT_INTEGRATION_ERRORS = 0
 PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
 
-LOAD_GROUND_TRUTH_FROM_FILE = 0
-SAVE_GROUND_TRUTH_TO_FILE = 1
+LOAD_GROUND_TRUTH_FROM_FILE = 1
+SAVE_GROUND_TRUTH_TO_FILE = 0
 RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
 dt     = 0.002                      # controller and simulator time step
-dt_ref = 0.010                      # time step of reference motion
 unilateral_contacts = 1
 compute_predicted_forces = False
 PRINT_N = int(conf.PRINT_T/dt)
@@ -127,12 +126,12 @@ if conf.use_viewer:
 assert(np.floor(dt_ref/dt)==dt_ref/dt)
 
 # load reference trajectories 
-refX, refU, feedBack = load_ref_traj(robot, dt, dt_ref)
+refX, refU, feedBack = load_ref_traj(robot, dt)
 q0, v0 = refX[0,:nq], refX[0,nq:]
 N_SIMULATION = refU.shape[0]
 
 # TEMPORARY DEBUG CODE
-#N_SIMULATION = 40
+N_SIMULATION = 40
 #q0[2] += 1.0         # make the robot fly
 
 
@@ -162,17 +161,17 @@ def run_simulation(q0, v0, simu_params, ground_truth):
     results.q = np.zeros((nq, N_SIMULATION+1))*np.nan
     results.v = np.zeros((nv, N_SIMULATION+1))*np.nan
     results.u = np.zeros((nv, N_SIMULATION+1))
-    results.f = np.zeros((3, nc, ndt_ref*N_SIMULATION+1))
+    results.f = np.zeros((3, nc, N_SIMULATION+1))
     results.p = np.zeros((3, nc, N_SIMULATION+1))
     results.dp = np.zeros((3, nc, N_SIMULATION+1))
     results.p0 = np.zeros((3, nc, N_SIMULATION+1))
     results.slipping = np.zeros((nc, N_SIMULATION+1))
     results.active = np.zeros((nc, N_SIMULATION+1))
-    results.f_pred_int = np.zeros((3, nc, ndt_ref*N_SIMULATION+1))
-    results.f_inner = np.zeros((3, nc, ndt_ref*N_SIMULATION*ndt))
-    results.f_avg  = np.zeros((3, nc, ndt_ref*N_SIMULATION*ndt))
-    results.f_avg2 = np.zeros((3, nc, ndt_ref*N_SIMULATION*ndt))
-    results.f_pred = np.zeros((3, nc, ndt_ref*N_SIMULATION*ndt))
+    results.f_pred_int = np.zeros((3, nc, N_SIMULATION+1))
+    results.f_inner = np.zeros((3, nc, N_SIMULATION*ndt))
+    results.f_avg  = np.zeros((3, nc, N_SIMULATION*ndt))
+    results.f_avg2 = np.zeros((3, nc, N_SIMULATION*ndt))
+    results.f_pred = np.zeros((3, nc, N_SIMULATION*ndt))
     
     results.q[:,0] = np.copy(q0)
     results.v[:,0] = np.copy(v0)
@@ -216,14 +215,7 @@ def run_simulation(q0, v0, simu_params, ground_truth):
 #        raise e
 
     if conf.use_viewer:
-        for i in range(0, N_SIMULATION):
-            if(np.any(np.isnan(results.q[:,i]))):
-                break
-            time_start_viewer = time.time()
-            robot.display(results.q[:,i])
-            time_passed = time.time()-time_start_viewer
-            if(time_passed<dt):
-                time.sleep(dt-time_passed)
+        play_motion(robot, results.q, dt)
                     
     for key in simu_params.keys():
         results.__dict__[key] = simu_params[key]
@@ -234,7 +226,7 @@ if(LOAD_GROUND_TRUTH_FROM_FILE):
     print("\nLoad ground truth from file")
     data = pickle.load( open( "solo_trot_cpp.p", "rb" ) )
     
-    i0, i1 = 262, 264
+    i0, i1 = 262*5, 264*5
     refX = refX[i0:i1+1,:]
     refU = refU[i0:i1,:]
     feedBack = feedBack[i0:i1,:,:]
@@ -345,47 +337,49 @@ if(PLOT_FORCE_PREDICTIONS):
     tt = np.arange(0.0, (N_SIMULATION+1)*dt, dt)[:N_SIMULATION+1]
     
     for (name,d) in data.items():
-       (ff, ax) = plut.create_empty_figure(2,2)
-       ax = ax.reshape(4)       
-       for i in range(4):
-           ax[i].plot(tt, d.f[2,i,:], ' o', markersize=8, label=name)
-#           ax[i].plot(tt, d.f_pred_int[2,i,:], ' s', markersize=8, label=name+' pred int')
-           if('ground' not in name):
-               tt_log = np.arange(d.f_pred.shape[2]) * T / d.f_pred.shape[2]
-               ax[i].plot(tt_log, d.f_pred[2,i,:], 'r v', markersize=6, label=name+' pred ')
-               ax[i].plot(tt_log, d.f_avg[2,i,:], 'g s', markersize=6, label=name+' avg ')
-               ax[i].plot(tt_log, d.f_avg2[2,i,:], 'y s', markersize=6, label=name+' avg2 ')
-               ax[i].plot(tt_log, d.f_inner[2,i,:], 'b x', markersize=6, label=name+' real ')
-           ax[i].set_xlabel('Time [s]')
-           ax[i].set_ylabel('Force Z [N]')
-       leg = ax[-1].legend()
-       if(leg): leg.get_frame().set_alpha(0.5)
-       
-       # force prediction error of Euler, i.e. assuming force remains contact during time step
-       ndt = int(d.f_inner.shape[2] / (d.f.shape[2]-1))
-       
-       # force prediction error of matrix exponential 
-       f_pred_err = d.f_pred - d.f_inner
-       print(name, 'Force pred err max exp:', np.sum(np.abs(f_pred_err))/(f_pred_err.shape[0]*f_pred_err.shape[2]))
+        (ff, ax) = plut.create_empty_figure(2,2)
+        ax = ax.reshape(4)       
+        for i in range(4):
+            ax[i].plot(tt, d.f[2,i,:], ' o', markersize=8, label=name)
+#            ax[i].plot(tt, d.f_pred_int[2,i,:], ' s', markersize=8, label=name+' pred int')
+            if('ground' not in name):
+                tt_log = np.arange(d.f_pred.shape[2]) * T / d.f_pred.shape[2]
+                ax[i].plot(tt_log, d.f_pred[2,i,:], 'r v', markersize=6, label=name+' pred ')
+                ax[i].plot(tt_log, d.f_avg[2,i,:], 'g s', markersize=6, label=name+' avg ')
+                ax[i].plot(tt_log, d.f_avg2[2,i,:], 'y s', markersize=6, label=name+' avg2 ')
+                ax[i].plot(tt_log, d.f_inner[2,i,:], 'b x', markersize=6, label=name+' real ')
+            ax[i].set_xlabel('Time [s]')
+            ax[i].set_ylabel('Force Z [N]')
+        leg = ax[-1].legend()
+        if(leg): leg.get_frame().set_alpha(0.5)
+        
+        if('ground' not in name):
+            # force prediction error of Euler, i.e. assuming force remains contact during time step
+            ndt = int(d.f_inner.shape[2] / (d.f.shape[2]-1))
+            
+            # force prediction error of matrix exponential 
+            f_pred_err = d.f_pred - d.f_inner
+            print(name, 'Force pred err max exp:', np.sum(np.abs(f_pred_err))/(f_pred_err.shape[0]*f_pred_err.shape[2]))
        
     (ff, ax) = plut.create_empty_figure(2,2)
     ax = ax.reshape(4)
-    for (name,d) in data.items():       
-       tt_log = np.arange(d.f_pred.shape[2]) * T / d.f_pred.shape[2]
-       for i in range(4):
-           if('ground' in name):
-               ax[i].plot(tt, d.f[2,i,:], 'b x', markersize=6, label=name)
-#               ax[i].plot(tt_log, d.f_inner[2,i,:], 'b x', markersize=6, label=name)
-           elif(d.use_exp_int):
-               ax[i].plot(tt_log, d.f_avg[2,i,:], 's', markersize=6, label=name+' avg ')
-               ax[i].plot(tt_log, d.f_avg2[2,i,:], 's', markersize=6, label=name+' avg2 ')
-           else:
-               ax[i].plot(tt_log, d.f_inner[2,i,:], 'o', markersize=6, label=name)
-           
-           ax[i].set_xlabel('Time [s]')
-           ax[i].set_ylabel('Force Z [N]')
-       leg = ax[-1].legend()
-       if(leg): leg.get_frame().set_alpha(0.5) 
+    for (name,d) in data.items():
+        if('ground' in name):
+            continue
+        tt_log = np.arange(d.f_pred.shape[2]) * T / d.f_pred.shape[2]
+        for i in range(4):
+            if('ground' in name):
+                ax[i].plot(tt, d.f[2,i,:], 'b x', markersize=6, label=name)
+                ax[i].plot(tt_log, d.f_inner[2,i,:], 'b x', markersize=6, label=name)
+            elif(d.use_exp_int):
+                ax[i].plot(tt_log, d.f_avg[2,i,:], 's', markersize=6, label=name+' avg ')
+                ax[i].plot(tt_log, d.f_avg2[2,i,:], 's', markersize=6, label=name+' avg2 ')
+            else:
+                ax[i].plot(tt_log, d.f_inner[2,i,:], 'o', markersize=6, label=name)
+        ax[i].set_xlabel('Time [s]')
+        ax[i].set_ylabel('Force Z [N]')
+    leg = ax[-1].legend()
+    if(leg): leg.get_frame().set_alpha(0.5) 
        
 # PLOT THE CONTACT FORCES OF ALL INTEGRATION METHODS ON THE SAME PLOT
 if(PLOT_FORCES):        

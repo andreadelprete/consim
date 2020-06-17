@@ -13,7 +13,7 @@ import conf_solo_trot_cpp as conf
 import pinocchio as pin 
 import pickle
 
-from solo_trot_common import load_ref_traj, Empty, state_diff, dt_ref
+from solo_trot_common import load_ref_traj, Empty, state_diff, dt_ref, play_motion, plot_integration_error_vs_ndt
 
 print("".center(conf.LINE_WIDTH, '#'))
 print(" Test Solo Trot C++ ".center(conf.LINE_WIDTH, '#'))
@@ -21,7 +21,7 @@ print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
 i_min = 5
-i_max = i_min+1
+i_max = 6
 i_ground_truth = i_max+2
 
 GROUND_TRUTH_EXP_SIMU_PARAMS = {
@@ -102,7 +102,7 @@ PLOT_BASE_POS = 0
 PLOT_INTEGRATION_ERRORS = 0
 PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
 
-LOAD_GROUND_TRUTH_FROM_FILE = 0
+LOAD_GROUND_TRUTH_FROM_FILE = 1
 SAVE_GROUND_TRUTH_TO_FILE = 1
 RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
 dt     = 0.002                      # controller and simulator time step
@@ -233,23 +233,7 @@ def run_simulation(q0, v0, simu_params, ground_truth):
         print("Exception while running simulation", e)
 
     if conf.use_viewer:
-        t, i = 0.0, 0
-        time_start_viewer = time.time()
-        robot.display(results.q[:,0])
-        while True:
-            time_passed = time.time()-time_start_viewer - t
-            if(time_passed<dt):
-                time.sleep(dt-time_passed)
-                ni = 1
-            else:
-                ni = int(time_passed/dt)
-            i += ni
-            t += ni*dt
-            if(i>=N_SIMULATION or np.any(np.isnan(results.q[:,i]))):
-                break
-            robot.display(results.q[:,i])
-            
-
+        play_motion(robot, results.q, dt)
                     
     for key in simu_params.keys():
         results.__dict__[key] = simu_params[key]
@@ -260,7 +244,7 @@ if(LOAD_GROUND_TRUTH_FROM_FILE):
     print("\nLoad ground truth from file")
     data = pickle.load( open( "solo_trot_cpp.p", "rb" ) )
     
-    i0, i1 = 262, 264
+    i0, i1 = 262*5, 264*5
     refX = refX[i0:i1+1,:]
     refU = refU[i0:i1,:]
     feedBack = feedBack[i0:i1,:,:]
@@ -295,7 +279,7 @@ for simu_params in SIMU_PARAMS:
 # COMPUTE INTEGRATION ERRORS:
 print('\n')
 ndt = {}
-total_err, err_max, err_traj = {}, {}, {}
+err_2norm_avg, err_infnorm_avg, err_infnorm_max, err_traj_2norm, err_traj_infnorm = {}, {}, {}, {}, {}
 for name in sorted(data.keys()):
     if('ground-truth' in name): continue
     d = data[name]
@@ -303,70 +287,60 @@ for name in sorted(data.keys()):
     else:                 data_ground_truth = data['ground-truth-exp']
     
     err_vec = np.empty((2*robot.nv, d.q.shape[1]))
-    err_per_time = np.empty(d.q.shape[1])
-    err = 0.0
+    err_per_time_2 = np.empty(d.q.shape[1])
+    err_per_time_inf = np.empty(d.q.shape[1])
+    err_2, err_inf = 0.0, 0.0
     for i in range(d.q.shape[1]):
         err_vec[:robot.nv,i] = pin.difference(robot.model, d.q[:,i], data_ground_truth.q[:,i])
         err_vec[robot.nv:,i] = d.v[:,i] - data_ground_truth.v[:,i]
-        err_per_time[i] = norm(err_vec[:,i])
-        err += err_per_time[i]
-    err /= d.q.shape[1]
+        err_per_time_2[i]   = norm(err_vec[:,i])
+        err_per_time_inf[i] = norm(err_vec[:,i], np.inf)
+        err_2   += err_per_time_2[i]
+        err_inf += err_per_time_inf[i]
+    err_2 /= d.q.shape[1]
+    err_inf /= d.q.shape[1]
 #    err = (norm(d.q - data_ground_truth.q) + norm(d.v - data_ground_truth.v)) / d.q.shape[0]
 #    err_per_time = np.array(norm(d.q - data_ground_truth.q, axis=0)) + \
 #                    np.array(norm(d.v - data_ground_truth.v, axis=0))
-    err_peak = np.max(err_per_time)
-    print(name, 'Total error: %.2f'%np.log10(err))
-    if(d.method_name not in total_err):
-        total_err[d.method_name] = []
-        err_max[d.method_name] = []
+    err_peak = np.max(err_per_time_inf)
+    print(name, 'Log error 2-norm: %.2f'%np.log10(err_2))
+    if(d.method_name not in err_2norm_avg):
+        err_2norm_avg[d.method_name] = []
+        err_infnorm_max[d.method_name] = []
+        err_infnorm_avg[d.method_name] = []
         ndt[d.method_name] = []
-    total_err[d.method_name] += [err]
-    err_max[d.method_name] += [err_peak]
-    err_traj[name] = err_per_time
+    err_2norm_avg[d.method_name] += [err_2]
+    err_infnorm_avg[d.method_name] += [err_inf]
+    err_infnorm_max[d.method_name] += [err_peak]
+    err_traj_2norm[name] = err_per_time_2
+    err_traj_infnorm[name] = err_per_time_inf
     ndt[d.method_name] += [d.ndt]
 
 # PLOT STUFF
 line_styles = 10*['-o', '--o', '-.o', ':o']
 tt = np.arange(0.0, (N_SIMULATION+1)*dt, dt)[:N_SIMULATION+1]
-
-
+    
 # PLOT INTEGRATION ERRORS
 if(PLOT_INTEGRATION_ERRORS):
-    (ff, ax) = plut.create_empty_figure(1)
-    j = 0
-    for name in sorted(total_err.keys()):
-        err = total_err[name]
-        ax.plot(ndt[name], total_err[name], line_styles[j], alpha=0.7, label=name)
-        j += 1
-    ax.set_xlabel('Number of time steps')
-    ax.set_ylabel('Mean error norm')
-    ax.set_xscale('log')
-    ax.set_yscale('log')
-    leg = ax.legend()
-    if(leg): leg.get_frame().set_alpha(0.5)
-    
-    (ff, ax) = plut.create_empty_figure(1)
-    j = 0
-    for name in sorted(total_err.keys()):
-        err = total_err[name]
-        ax.plot(ndt[name], err_max[name], line_styles[j], alpha=0.7, label=name)
-        j += 1
-    ax.set_xlabel('Number of time steps')
-    ax.set_ylabel('Max error norm')
-    ax.set_xscale('log')
-    ax.set_yscale('log')
-    leg = ax.legend()
-    if(leg): leg.get_frame().set_alpha(0.5)
+    plot_integration_error_vs_ndt(err_2norm_avg, ndt, 'Mean error 2-norm')
+    plot_integration_error_vs_ndt(err_infnorm_avg, ndt, 'Mean error inf-norm')
+    plot_integration_error_vs_ndt(err_infnorm_max, ndt, 'Max error inf-norm')    
     
 if(PLOT_INTEGRATION_ERROR_TRAJECTORIES):
     (ff, ax) = plut.create_empty_figure(1)
-    j = 0
-    for name in sorted(err_traj.keys()):
-        err = err_traj[name]
-        ax.plot(tt, err_traj[name], line_styles[j], alpha=0.7, label=name)
-        j += 1
+    for (j,name) in enumerate(sorted(err_traj_2norm.keys())):
+        ax.plot(tt, err_traj_2norm[name], line_styles[j], alpha=0.7, label=name)
     ax.set_xlabel('Time [s]')
-    ax.set_ylabel('Error norm')
+    ax.set_ylabel('Error 2-norm')
+    ax.set_yscale('log')
+    leg = ax.legend()
+    if(leg): leg.get_frame().set_alpha(0.5)
+    
+    (ff, ax) = plut.create_empty_figure(1)
+    for (j,name) in enumerate(sorted(err_traj_infnorm.keys())):
+        ax.plot(tt, err_traj_infnorm[name], line_styles[j], alpha=0.7, label=name)
+    ax.set_xlabel('Time [s]')
+    ax.set_ylabel('Error inf-norm')
     ax.set_yscale('log')
     leg = ax.legend()
     if(leg): leg.get_frame().set_alpha(0.5)
