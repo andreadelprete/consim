@@ -14,7 +14,8 @@ import conf_solo_trot_py as conf
 import pinocchio as pin 
 import pickle 
 
-from solo_trot_common import load_ref_traj, play_motion, state_diff, dt_ref, Empty
+from solo_trot_common import load_ref_traj, Empty, state_diff, dt_ref, play_motion, \
+    plot_integration_error_vs_ndt, compute_integration_errors
 
 print("".center(conf.LINE_WIDTH, '#'))
 print(" Test Solo Trot Python ".center(conf.LINE_WIDTH, '#'))
@@ -22,7 +23,7 @@ print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
 i_min = 5
-i_max = i_min+1
+i_max = 6
 i_ground_truth = i_max+2
 
 GROUND_TRUTH_EXP_SIMU_PARAMS = {
@@ -98,7 +99,7 @@ for i in range(i_min, i_max):
 #    }]
     
 PLOT_FORCES = 0
-PLOT_FORCE_PREDICTIONS = 1
+PLOT_FORCE_PREDICTIONS = 0
 PLOT_SLIPPING = 0
 PLOT_BASE_POS = 0
 PLOT_INTEGRATION_ERRORS = 0
@@ -187,6 +188,13 @@ def run_simulation(q0, v0, simu_params, ground_truth):
     try:
         time_start = time.time()
         for i in range(0, N_SIMULATION):
+            if(RESET_STATE_ON_GROUND_TRUTH and ground_truth):
+                # first reset to ensure active contact points are correctly marked because otherwise the second
+                # time I reset the state the anchor points could be overwritten
+                simu.init(ground_truth.q[:,i], ground_truth.v[:,i], reset_anchor_points=True)
+#                print("Reset anchor points to:\n", ground_truth.p0[:,:,i])
+                simu.init(ground_truth.q[:,i], ground_truth.v[:,i], p0=ground_truth.p0[:,:,i].T.reshape(3*nc))
+                
             xact = np.concatenate([simu.q, simu.v])
             diff = state_diff(robot, xact, refX[i])
             results.u[6:,i] = refU[i] + feedBack[i].dot(diff)                 
@@ -212,7 +220,7 @@ def run_simulation(q0, v0, simu_params, ground_truth):
         print("Real-time factor:", t/(time.time() - time_start))
     except Exception as e:
         print(e)
-#        raise e
+        raise e
 
     if conf.use_viewer:
         play_motion(robot, results.q, dt)
@@ -226,7 +234,7 @@ if(LOAD_GROUND_TRUTH_FROM_FILE):
     print("\nLoad ground truth from file")
     data = pickle.load( open( "solo_trot_cpp.p", "rb" ) )
     
-    i0, i1 = 262*5, 264*5
+    i0, i1 = 1314, 1315
     refX = refX[i0:i1+1,:]
     refU = refU[i0:i1,:]
     feedBack = feedBack[i0:i1,:,:]
@@ -261,71 +269,34 @@ for simu_params in SIMU_PARAMS:
         data[name] = run_simulation(q0, v0, simu_params, data['ground-truth-euler'])
 
 # COMPUTE INTEGRATION ERRORS:
-print('\n')
-ndt = {}
-total_err, err_max, err_traj = {}, {}, {}
-for name in sorted(data.keys()):
-    if('ground-truth' in name): continue
-    d = data[name]
-    if(d.use_exp_int==0): data_ground_truth = data['ground-truth-euler']
-    else:                 data_ground_truth = data['ground-truth-exp']
-    
-    err = (norm(d.q - data_ground_truth.q) + norm(d.v - data_ground_truth.v)) / d.q.shape[0]
-    err_per_time = np.array(norm(d.q - data_ground_truth.q, axis=0)) + \
-                    np.array(norm(d.v - data_ground_truth.v, axis=0))
-    err_peak = np.max(err_per_time)
-    print(name, 'Total error: %.2f'%np.log10(err))
-    if(d.method_name not in total_err):
-        total_err[d.method_name] = []
-        err_max[d.method_name] = []
-        ndt[d.method_name] = []
-    total_err[d.method_name] += [err]
-    err_max[d.method_name] += [err_peak]
-    err_traj[name] = err_per_time
-    ndt[d.method_name] += [d.ndt]
+ndt, err_2norm_avg, err_infnorm_avg, err_infnorm_max, err_traj_2norm, err_traj_infnorm = \
+    compute_integration_errors(data, robot)
 
 # PLOT STUFF
 line_styles = 10*['-o', '--o', '-.o', ':o']
 tt = np.arange(0.0, (N_SIMULATION+1)*dt, dt)[:N_SIMULATION+1]
 
-
 # PLOT INTEGRATION ERRORS
 if(PLOT_INTEGRATION_ERRORS):
-    (ff, ax) = plut.create_empty_figure(1)
-    j = 0
-    for name in sorted(total_err.keys()):
-        err = total_err[name]
-        ax.plot(ndt[name], total_err[name], line_styles[j], alpha=0.7, label=name)
-        j += 1
-    ax.set_xlabel('Number of time steps')
-    ax.set_ylabel('Mean error norm')
-    ax.set_xscale('log')
-    ax.set_yscale('log')
-    leg = ax.legend()
-    if(leg): leg.get_frame().set_alpha(0.5)
-    
-    (ff, ax) = plut.create_empty_figure(1)
-    j = 0
-    for name in sorted(total_err.keys()):
-        err = total_err[name]
-        ax.plot(ndt[name], err_max[name], line_styles[j], alpha=0.7, label=name)
-        j += 1
-    ax.set_xlabel('Number of time steps')
-    ax.set_ylabel('Max error norm')
-    ax.set_xscale('log')
-    ax.set_yscale('log')
-    leg = ax.legend()
-    if(leg): leg.get_frame().set_alpha(0.5)
+    plot_integration_error_vs_ndt(err_2norm_avg, ndt, 'Mean error 2-norm')
+    plot_integration_error_vs_ndt(err_infnorm_avg, ndt, 'Mean error inf-norm')
+    plot_integration_error_vs_ndt(err_infnorm_max, ndt, 'Max error inf-norm')    
     
 if(PLOT_INTEGRATION_ERROR_TRAJECTORIES):
     (ff, ax) = plut.create_empty_figure(1)
-    j = 0
-    for name in sorted(err_traj.keys()):
-        err = err_traj[name]
-        ax.plot(tt, err_traj[name], line_styles[j], alpha=0.7, label=name)
-        j += 1
+    for (j,name) in enumerate(sorted(err_traj_2norm.keys())):
+        ax.plot(tt, err_traj_2norm[name], line_styles[j], alpha=0.7, label=name)
     ax.set_xlabel('Time [s]')
-    ax.set_ylabel('Error norm')
+    ax.set_ylabel('Error 2-norm')
+    ax.set_yscale('log')
+    leg = ax.legend()
+    if(leg): leg.get_frame().set_alpha(0.5)
+    
+    (ff, ax) = plut.create_empty_figure(1)
+    for (j,name) in enumerate(sorted(err_traj_infnorm.keys())):
+        ax.plot(tt, err_traj_infnorm[name], line_styles[j], alpha=0.7, label=name)
+    ax.set_xlabel('Time [s]')
+    ax.set_ylabel('Error inf-norm')
     ax.set_yscale('log')
     leg = ax.legend()
     if(leg): leg.get_frame().set_alpha(0.5)

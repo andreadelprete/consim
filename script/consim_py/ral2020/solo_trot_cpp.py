@@ -13,7 +13,8 @@ import conf_solo_trot_cpp as conf
 import pinocchio as pin 
 import pickle
 
-from solo_trot_common import load_ref_traj, Empty, state_diff, dt_ref, play_motion, plot_integration_error_vs_ndt
+from solo_trot_common import load_ref_traj, Empty, state_diff, dt_ref, play_motion, \
+    plot_integration_error_vs_ndt, compute_integration_errors
 
 print("".center(conf.LINE_WIDTH, '#'))
 print(" Test Solo Trot C++ ".center(conf.LINE_WIDTH, '#'))
@@ -244,7 +245,7 @@ if(LOAD_GROUND_TRUTH_FROM_FILE):
     print("\nLoad ground truth from file")
     data = pickle.load( open( "solo_trot_cpp.p", "rb" ) )
     
-    i0, i1 = 262*5, 264*5
+    i0, i1 = 1314, 1315
     refX = refX[i0:i1+1,:]
     refU = refU[i0:i1,:]
     feedBack = feedBack[i0:i1,:,:]
@@ -277,44 +278,8 @@ for simu_params in SIMU_PARAMS:
         data[name] = run_simulation(q0, v0, simu_params, data['ground-truth-euler'])
 
 # COMPUTE INTEGRATION ERRORS:
-print('\n')
-ndt = {}
-err_2norm_avg, err_infnorm_avg, err_infnorm_max, err_traj_2norm, err_traj_infnorm = {}, {}, {}, {}, {}
-for name in sorted(data.keys()):
-    if('ground-truth' in name): continue
-    d = data[name]
-    if(d.use_exp_int==0): data_ground_truth = data['ground-truth-euler']
-    else:                 data_ground_truth = data['ground-truth-exp']
-    
-    err_vec = np.empty((2*robot.nv, d.q.shape[1]))
-    err_per_time_2 = np.empty(d.q.shape[1])
-    err_per_time_inf = np.empty(d.q.shape[1])
-    err_2, err_inf = 0.0, 0.0
-    for i in range(d.q.shape[1]):
-        err_vec[:robot.nv,i] = pin.difference(robot.model, d.q[:,i], data_ground_truth.q[:,i])
-        err_vec[robot.nv:,i] = d.v[:,i] - data_ground_truth.v[:,i]
-        err_per_time_2[i]   = norm(err_vec[:,i])
-        err_per_time_inf[i] = norm(err_vec[:,i], np.inf)
-        err_2   += err_per_time_2[i]
-        err_inf += err_per_time_inf[i]
-    err_2 /= d.q.shape[1]
-    err_inf /= d.q.shape[1]
-#    err = (norm(d.q - data_ground_truth.q) + norm(d.v - data_ground_truth.v)) / d.q.shape[0]
-#    err_per_time = np.array(norm(d.q - data_ground_truth.q, axis=0)) + \
-#                    np.array(norm(d.v - data_ground_truth.v, axis=0))
-    err_peak = np.max(err_per_time_inf)
-    print(name, 'Log error 2-norm: %.2f'%np.log10(err_2))
-    if(d.method_name not in err_2norm_avg):
-        err_2norm_avg[d.method_name] = []
-        err_infnorm_max[d.method_name] = []
-        err_infnorm_avg[d.method_name] = []
-        ndt[d.method_name] = []
-    err_2norm_avg[d.method_name] += [err_2]
-    err_infnorm_avg[d.method_name] += [err_inf]
-    err_infnorm_max[d.method_name] += [err_peak]
-    err_traj_2norm[name] = err_per_time_2
-    err_traj_infnorm[name] = err_per_time_inf
-    ndt[d.method_name] += [d.ndt]
+ndt, err_2norm_avg, err_infnorm_avg, err_infnorm_max, err_traj_2norm, err_traj_infnorm = \
+    compute_integration_errors(data, robot)
 
 # PLOT STUFF
 line_styles = 10*['-o', '--o', '-.o', ':o']

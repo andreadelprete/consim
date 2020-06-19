@@ -5,6 +5,7 @@ Created on Wed Jun 17 21:02:12 2020
 @author: student
 """
 import numpy as np
+from numpy.linalg import norm
 import pinocchio as pin
 import time
 import consim_py.utils.plot_utils as plut
@@ -70,6 +71,45 @@ def play_motion(robot, q, dt):
         if(i>=N_SIMULATION or np.any(np.isnan(q[:,i]))):
             break
         robot.display(q[:,i])
+        
+        
+def compute_integration_errors(data, robot):
+    print('\n')
+    ndt = {}
+    err_2norm_avg, err_infnorm_avg, err_infnorm_max, err_traj_2norm, err_traj_infnorm = {}, {}, {}, {}, {}
+    for name in sorted(data.keys()):
+        if('ground-truth' in name): continue
+        d = data[name]
+        if(d.use_exp_int==0): data_ground_truth = data['ground-truth-euler']
+        else:                 data_ground_truth = data['ground-truth-exp']
+        
+        err_vec = np.empty((2*robot.nv, d.q.shape[1]))
+        err_per_time_2 = np.empty(d.q.shape[1])
+        err_per_time_inf = np.empty(d.q.shape[1])
+        err_2, err_inf = 0.0, 0.0
+        for i in range(d.q.shape[1]):
+            err_vec[:robot.nv,i] = pin.difference(robot.model, d.q[:,i], data_ground_truth.q[:,i])
+            err_vec[robot.nv:,i] = d.v[:,i] - data_ground_truth.v[:,i]
+            err_per_time_2[i]   = norm(err_vec[:,i])
+            err_per_time_inf[i] = norm(err_vec[:,i], np.inf)
+            err_2   += err_per_time_2[i]
+            err_inf += err_per_time_inf[i]
+        err_2 /= d.q.shape[1]
+        err_inf /= d.q.shape[1]
+        err_peak = np.max(err_per_time_inf)
+        print(name, 'Log error 2-norm: %.2f'%np.log10(err_2))
+        if(d.method_name not in err_2norm_avg):
+            err_2norm_avg[d.method_name] = []
+            err_infnorm_max[d.method_name] = []
+            err_infnorm_avg[d.method_name] = []
+            ndt[d.method_name] = []
+        err_2norm_avg[d.method_name] += [err_2]
+        err_infnorm_avg[d.method_name] += [err_inf]
+        err_infnorm_max[d.method_name] += [err_peak]
+        err_traj_2norm[name] = err_per_time_2
+        err_traj_infnorm[name] = err_per_time_inf
+        ndt[d.method_name] += [d.ndt]
+    return ndt, err_2norm_avg, err_infnorm_avg, err_infnorm_max, err_traj_2norm, err_traj_infnorm
         
         
 def plot_integration_error_vs_ndt(error, ndt, error_description):

@@ -30,7 +30,8 @@ class Contact:
         self.frame_id = model.getFrameId(frame_name)
         self.mu = mu
         self.f = zero(3)
-        self.reset_contact_position()
+        self.reset_anchor_point()
+        self.active = False
         
         self.t1 = np.cross(normal, np.array([1., 0., 0.]))
         self.t1 /= norm(self.t1)
@@ -38,14 +39,15 @@ class Contact:
         self.t2 /= norm(self.t2)
         
 
-    def reset_contact_position(self, p0=None):
+    def reset_anchor_point(self, p0=None):
         # Initial (0-load) position of the spring
         if(p0 is None):
             self.p0 = self.data.oMf[self.frame_id].translation.copy()
         else:
             self.p0 = np.copy(p0)
         self.dp0 = np.zeros(3)
-        self.active = False
+        # do not reset active flag otherwise anchor point is overwritten when check_collision is called
+#        self.active = False
         self.slipping = False
         
     def check_collision(self):
@@ -214,7 +216,7 @@ class RobotSimulator:
             self.gui.setLightingMode('world/floor', 'OFF')
 
     # Re-initialize the simulator
-    def init(self, q0, v0=None, reset_contact_positions=False, p0=None):
+    def init(self, q0, v0=None, reset_anchor_points=False, p0=None):
         self.first_iter = True
         self.q = q0.copy()
         if(v0 is None):
@@ -223,18 +225,16 @@ class RobotSimulator:
             self.v = v0.copy()
         self.dv = zero(self.robot.nv)
 
-        if(reset_contact_positions and p0 is None):
+        if(reset_anchor_points and p0 is None):
             # set the contact anchor points at the current contact positions
             se3.forwardKinematics(self.model, self.data, self.q)
             se3.updateFramePlacements(self.model, self.data)
             for (i,c) in enumerate(self.contacts):
-                c.reset_contact_position()
-                self.p0[3*i:3*i+3, 0] = c.p0
+                c.reset_anchor_point()
         elif(p0 is not None):
             # the user is specifying explicitly the anchor points
             for (i,c) in enumerate(self.contacts):
-                c.reset_contact_position(p0[3*i:3*i+3])
-            self.p0 = np.copy(p0)
+                c.reset_anchor_point(p0[3*i:3*i+3])
 
         self.compute_forces()
 
@@ -313,7 +313,7 @@ class RobotSimulator:
                 self.dp0[ 3*i:3*i+3] = c.dp0
                 i += 1
 #                if(contact_changed):
-#                    print(c.frame_name, 'p', c.p.T, 'v', c.v.T, 'f', c.f.T)
+#                print(i, c.frame_name, 'p', c.p.T, 'p0', c.p0.T, 'f', c.f.T)
 
         return self.f
         
