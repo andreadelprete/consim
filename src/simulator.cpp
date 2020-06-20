@@ -289,7 +289,6 @@ ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocc
   dvMean_.resize(model_->nv);
   dvMean2_.resize(model_->nv);
   vMean2_.resize(model_->nv);
-  Minv_.resize(model_->nv, model_->nv); Minv_.setZero();
   dv_bar.resize(model_->nv); dv_bar.setZero();
   temp01_.resize(model_->nv); temp01_.setZero();
   temp02_.resize(model_->nv); temp02_.setZero();
@@ -316,9 +315,9 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
   
     if (nactive_> 0){
       Eigen::internal::set_is_malloc_allowed(false);
-      CONSIM_START_PROFILER("exponential_simulator::computeIntegrationTerms");
-      computeIntegrationTerms();
-      CONSIM_STOP_PROFILER("exponential_simulator::computeIntegrationTerms");
+      CONSIM_START_PROFILER("exponential_simulator::computeExpLDS");
+      computeExpLDS();
+      CONSIM_STOP_PROFILER("exponential_simulator::computeExpLDS");
 
 
       CONSIM_START_PROFILER("exponential_simulator::computeIntegralsXt");
@@ -359,7 +358,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
 } // ExponentialSimulator::step
 
 
-void ExponentialSimulator::computeIntegrationTerms(){
+void ExponentialSimulator::computeExpLDS(){
   /**
    * computes M, nle
    * fills J, dJv, p0, p, dp, Kp0, and x0 

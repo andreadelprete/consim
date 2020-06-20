@@ -187,7 +187,7 @@ namespace consim {
 
       void resizeVectorsAndMatrices();
       // convenience method to compute terms needed in integration  
-      void computeIntegrationTerms();
+      void computeExpLDS();
 
       int slipping_method_; 
       bool compute_predicted_forces_;
@@ -210,7 +210,6 @@ namespace consim {
       Eigen::MatrixXd B;
       Eigen::MatrixXd D;
       Eigen::MatrixXd A; 
-      Eigen::MatrixXd Minv_;
       Eigen::MatrixXd JMinv_;
       Eigen::MatrixXd MinvJcT_;
       Eigen::MatrixXd Upsilon_;

@@ -33,7 +33,7 @@ def state_diff(robot, x1, x2):
     return xdiff
 
 
-whichMotion = 'trot'  # options = ['trot', 'jump"]
+whichMotion = 'jump'  # options = ['trot', 'jump"]
 USE_CONTROLLER = True 
 DISPLAY_SIMULATION = True  
 
@@ -87,7 +87,7 @@ if __name__ == "__main__":
     B = 2.4e+2 * np.ones([3,1])
     dt = 2.e-3 
     dt_ref = 1e-2 # time step of reference motion
-
+    forward_dynamics_methods = 1
     exp_max_mul = 100 
     int_max_mul = 100 
 
@@ -117,11 +117,12 @@ if __name__ == "__main__":
         # build the simulator 
         if(simu_type=='exponential'):
             sim = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
-                                        K, B , mu, anchor_slipping, predicted_forces,
+                                        K, B , mu, anchor_slipping, predicted_forces, 
+                                        forward_dynamics_methods,
                                         exp_max_mul, int_max_mul)
         else:
             sim = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
-                                            K, B , mu)
+                                            K, B , mu, forward_dynamics_methods)
                 
         # add the  contact points 
         cpts = [] # list of all contact points
