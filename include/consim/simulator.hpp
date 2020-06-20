@@ -105,6 +105,7 @@ namespace consim {
         * loops over contact points, checks active contacts and sets reference contact positions 
       */
       void detectContacts();
+      void forwardDynamics(Eigen::VectorXd &tau, Eigen::VectorXd &dv); 
       virtual void computeContactForces()=0;
 
       const pinocchio::Model *model_;

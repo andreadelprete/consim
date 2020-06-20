@@ -163,6 +163,40 @@ void AbstractSimulator::setJointFriction(const Eigen::VectorXd& joint_friction)
   joint_friction_ = joint_friction;
 }
 
+void AbstractSimulator::forwardDynamics(Eigen::VectorXd &tau, Eigen::VectorXd &dv){
+  /**
+   * Solving the Forward Dynamics  
+   *  1: pinocchio::computeMinverse()
+   *  2: pinocchio::aba()
+   *  3: cholesky decompostion 
+   **/  
+  switch (whichFD_)
+      {
+        case 1: // slower than ABA
+          mDv_ = tau - data_->nle;
+          inverseM_ = pinocchio::computeMinverse(*model_, *data_, q_);
+          inverseM_.triangularView<Eigen::StrictlyLower>()
+          = inverseM_.transpose().triangularView<Eigen::StrictlyLower>(); // need to fill the Lower part of the matrix
+          dv.noalias() = inverseM_*mDv_;
+          break;
+          
+        case 2: // fast
+          pinocchio::aba(*model_, *data_, q_, v_, tau);
+          dv = data_-> ddq;
+          break;
+          
+        case 3: // fast if some results are reused
+          dv = tau - data_->nle; 
+          // Sparse Cholesky factorization
+          pinocchio::cholesky::decompose(*model_, *data_);
+          pinocchio::cholesky::solve(*model_,*data_,dv);
+          break;
+          
+        default:
+          throw std::runtime_error("Forward Dynamics Method not recognized");
+      }
+}
+
 
 /* ____________________________________________________________________________________________*/
 /** 
@@ -218,38 +252,8 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
       if (joint_friction_flag_){
         tau_ -= joint_friction_.cwiseProduct(v_);
       }
-      /**
-       * Solving the Forward Dynamics  
-       *  1: pinocchio::computeMinverse()
-       *  2: pinocchio::aba()
-       *  3: cholesky decompostion 
-       **/  
-      switch (whichFD_)
-      {
-        case 1: // slower than ABA
-          mDv_ = tau_ - data_->nle;
-          inverseM_ = pinocchio::computeMinverse(*model_, *data_, q_);
-          inverseM_.triangularView<Eigen::StrictlyLower>()
-          = inverseM_.transpose().triangularView<Eigen::StrictlyLower>(); // need to fill the Lower part of the matrix
-          dv_.noalias() = inverseM_*mDv_;
-          break;
-          
-        case 2: // fast
-          pinocchio::aba(*model_, *data_, q_, v_, tau_);
-          dv_ = data_-> ddq;
-          break;
-          
-        case 3: // fast if some results are reused
-          dv_ = tau_ - data_->nle;
-          // Sparse Cholesky factorization
-          pinocchio::cholesky::decompose(*model_, *data_);
-          pinocchio::cholesky::solve(*model_,*data_,dv_);
-          break;
-          
-        default:
-          throw std::runtime_error("Forward Dynamics Method not recognized");
-      }
       
+      forwardDynamics(tau_, dv_); 
       /*!< integrate twice */  
       vMean_ = v_ + .5 * sub_dt*dv_;
       pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
@@ -316,12 +320,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       computeIntegrationTerms();
       CONSIM_STOP_PROFILER("exponential_simulator::computeIntegrationTerms");
 
-      // if(contactChange_){
-      //   std::cout<<"x0 ["<<x0_.transpose()<<"]"<<std::endl;
-      //   std::cout<<"dv_bar ["<<dv_bar.transpose()<<"]"<<std::endl;
-      //   std::cout<<"JMinv \n"<< JMinv_ <<std::endl; 
-      // }
-      
+
       CONSIM_START_PROFILER("exponential_simulator::computeIntegralsXt");
       utilDense_.ComputeIntegrals(A, a_, x0_, sub_dt, intxt_, int2xt_);
       CONSIM_STOP_PROFILER("exponential_simulator::computeIntegralsXt");
@@ -337,61 +336,10 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       vMean_ =  v_ +  .5 * sub_dt * dvMean2_; 
       pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
       CONSIM_STOP_PROFILER("exponential_simulator::subIntegration"); 
-      // if (!cone_flag_ || slipping_method_==1){
-      //   /*!< f projection is computed then anchor point is updated */ 
-      //   CONSIM_START_PROFILER("exponential_simulator::subIntegration");
-      //   dvMean_ = dv_bar + MinvJcT_*fpr_; 
-      //   dvMean2_.noalias() =  dv_bar + MinvJcT_*fpr2_;  
-      //   vMean_ =  v_ +  .5 * sub_dt * dvMean2_; 
-        
-      //   // temp01_.noalias() = JcT_*fpr2_; 
-      //   // temp02_ = tau_ - data_->nle + temp01_;
-      //   // dvMean2_.noalias() = Minv_*temp02_; 
-      //   // vMean2_.noalias() = v_ +  .5 * sub_dt * dvMean2_; 
-      //   pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
-      //   CONSIM_STOP_PROFILER("exponential_simulator::subIntegration"); 
-      //   /* PSEUDO-CODE
-      //   dv_mean = dv_bar + JMinv.T @ f_pr
-      //   v_mean = v + 0.5*dt*(dv_bar + JMinv.T @ f_pr2)
-      //   */
-      // }
-      // else{
-      //   /*!< anchor point is optimized, then one f projection is computed and itegrated */ 
-      //   // computeSlipping(); // slipping qp not implemented 
-      //   temp01_.noalias() = JcT_*fpr_; 
-      //   temp02_ = tau_ - data_->nle + temp01_;
-      //   dvMean_.noalias() = Minv_*temp02_; 
-      //   vMean_ = v_ + .5 * sub_dt* dvMean_; 
-      //   pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
-      // }
+
     } /*!< active contacts */
     else{
-      switch (whichFD_)
-      {
-      case 1:
-        mDv_ = tau_ - data_->nle; 
-        inverseM_ = pinocchio::computeMinverse(*model_, *data_, q_);
-        inverseM_.triangularView<Eigen::StrictlyLower>()
-        = inverseM_.transpose().triangularView<Eigen::StrictlyLower>(); // need to fill the Lower part of the matrix
-        dvMean_.noalias() = inverseM_*mDv_; 
-        break;
-      
-      case 2:
-        pinocchio::aba(*model_, *data_, q_, v_, tau_);
-        dvMean_ = data_-> ddq; 
-        break;
-      
-      case 3:
-        dvMean_ = tau_ - data_->nle;
-        // Sparse Cholesky factorization
-        pinocchio::cholesky::decompose(*model_, *data_);
-        pinocchio::cholesky::solve(*model_,*data_,dvMean_);
-        break;
-      
-      default:
-        throw std::runtime_error("Forward Dynamics Method not recognized");
-      }
-
+      forwardDynamics(tau_, dvMean_); 
       vMean_ = v_ + .5 * sub_dt*dvMean_;
       pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
     } /*!< no active contacts */
@@ -431,18 +379,18 @@ void ExponentialSimulator::computeIntegrationTerms(){
     i_active_ += 1;  
   }
 
+  forwardDynamics(tau_, dv_bar);  
 
-  CONSIM_START_PROFILER("exponential_simulator::computeMinverse");
-  Minv_ = pinocchio::computeMinverse(*model_, *data_, q_);
-  Minv_.triangularView<Eigen::StrictlyLower>()
-  = Minv_.transpose().triangularView<Eigen::StrictlyLower>(); // need to fill the Lower part of the matrix
-  CONSIM_STOP_PROFILER("exponential_simulator::computeMinverse");
+  if(whichFD_!= 1){
+    inverseM_ = pinocchio::computeMinverse(*model_, *data_, q_);
+    inverseM_.triangularView<Eigen::StrictlyLower>()
+    = inverseM_.transpose().triangularView<Eigen::StrictlyLower>(); // need to fill the Lower part of the matrix
+  }
+
   JcT_.noalias() = Jc_.transpose(); 
-  JMinv_.noalias() = Jc_ * Minv_;
-  MinvJcT_.noalias() = Minv_*JcT_; 
+  MinvJcT_.noalias() = inverseM_*JcT_; 
   Upsilon_.noalias() =  Jc_*MinvJcT_;
-  temp02_ = tau_ - data_->nle; 
-  dv_bar.noalias() = Minv_ * temp02_; 
+
   tempStepMat_.noalias() =  Upsilon_ * K;
   A.block(3*nactive_, 0, 3*nactive_, 3*nactive_).noalias() = -tempStepMat_;  
   tempStepMat_.noalias() = Upsilon_ * B; 

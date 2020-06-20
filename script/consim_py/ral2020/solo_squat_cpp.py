@@ -51,33 +51,33 @@ for i in range(i_min, i_max):
         'forward_dyn_method': 1
     }]
 
-#for i in range(i_min, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'exp ABA%4d'%(2**i),
-#        'method_name': 'exp ABA',
-#        'use_exp_int': 1,
-#        'ndt': 2**i,
-#        'forward_dyn_method': 2
-#    }]
-#
-#for i in range(i_min, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'exp Chol%4d'%(2**i),
-#        'method_name': 'exp Chol',
-#        'use_exp_int': 1,
-#        'ndt': 2**i,
-#        'forward_dyn_method': 3
-#    }]
+for i in range(i_min, i_max):
+   SIMU_PARAMS += [{
+       'name': 'exp ABA%4d'%(2**i),
+       'method_name': 'exp ABA',
+       'use_exp_int': 1,
+       'ndt': 2**i,
+       'forward_dyn_method': 2
+   }]
+
+for i in range(i_min, i_max):
+   SIMU_PARAMS += [{
+       'name': 'exp Chol%4d'%(2**i),
+       'method_name': 'exp Chol',
+       'use_exp_int': 1,
+       'ndt': 2**i,
+       'forward_dyn_method': 3
+   }]
     
 # EULER INTEGRATOR WITH STANDARD SETTINGS
-#for i in range(i_min, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'euler Minv%4d'%(2**i),
-#        'method_name': 'euler Minv',
-#        'use_exp_int': 0,
-#        'ndt': 2**i,
-#        'forward_dyn_method': 1
-#    }]
+for i in range(i_min, i_max):
+   SIMU_PARAMS += [{
+       'name': 'euler Minv%4d'%(2**i),
+       'method_name': 'euler Minv',
+       'use_exp_int': 0,
+       'ndt': 2**i,
+       'forward_dyn_method': 1
+   }]
 
 for i in range(i_min, i_max):
     SIMU_PARAMS += [{
@@ -88,14 +88,14 @@ for i in range(i_min, i_max):
         'forward_dyn_method': 2
     }]
 
-#for i in range(i_min, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'euler Chol%4d'%(2**i),
-#        'method_name': 'euler Chol',
-#        'use_exp_int': 0,
-#        'ndt': 2**i,
-#        'forward_dyn_method': 3
-#    }]
+for i in range(i_min, i_max):
+   SIMU_PARAMS += [{
+       'name': 'euler Chol%4d'%(2**i),
+       'method_name': 'euler Chol',
+       'use_exp_int': 0,
+       'ndt': 2**i,
+       'forward_dyn_method': 3
+   }]
     
 PLOT_FORCES = 0
 PLOT_BASE_POS = 0
