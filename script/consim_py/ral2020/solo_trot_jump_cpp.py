@@ -37,7 +37,7 @@ GROUND_TRUTH_EULER_SIMU_PARAMS = {
     'method_name': 'ground-truth-euler-semi',
     'use_exp_int': 0,
     'ndt': 2**i_ground_truth,
-    'semi_implicit': 1
+    'semi_implicit': 0
 }
 
 SIMU_PARAMS = []
@@ -45,8 +45,8 @@ SIMU_PARAMS = []
 # EXPONENTIAL INTEGRATOR WITH STANDARD SETTINGS
 for i in range(i_min, i_max):
     SIMU_PARAMS += [{
-        'name': 'exp Minv%4d'%(2**i),
-        'method_name': 'exp Minv',
+        'name': 'exp %4d'%(2**i),
+        'method_name': 'exp',
         'use_exp_int': 1,
         'ndt': 2**i,
         'forward_dyn_method': 1
@@ -69,6 +69,17 @@ for i in range(i_min, i_max):
 #        'ndt': 2**i,
 #        'forward_dyn_method': 3
 #    }]
+ 
+# EULER INTEGRATOR WITH EXPLICIT INTEGRATION
+for i in range(i_min, i_max):
+    SIMU_PARAMS += [{
+        'name': 'euler %4d'%(2**i),
+        'method_name': 'euler',
+        'use_exp_int': 0,
+        'ndt': 2**i,
+        'forward_dyn_method': 1,
+        'semi_implicit': 0
+    }]
     
 # EULER INTEGRATOR WITH SEMI-IMPLICIT INTEGRATION
 for i in range(i_min, i_max):
@@ -100,14 +111,14 @@ for i in range(i_min, i_max):
 #    }]
 
 PLOT_FORCES = 0
-PLOT_VELOCITY_NORM = 1
+PLOT_VELOCITY_NORM = 0
 PLOT_SLIPPING = 0
 PLOT_BASE_POS = 0
 PLOT_INTEGRATION_ERRORS = 1
-PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
+PLOT_INTEGRATION_ERROR_TRAJECTORIES = 0
 
 LOAD_GROUND_TRUTH_FROM_FILE = 0
-SAVE_GROUND_TRUTH_TO_FILE = 0
+SAVE_GROUND_TRUTH_TO_FILE = 1
 RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
 
 #motionName = 'trot'

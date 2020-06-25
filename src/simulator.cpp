@@ -261,7 +261,7 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
         pinocchio::integrate(*model_, q_, v_ * sub_dt, qnext_);
       } 
       else{
-        vMean_ = v_ + .5 * sub_dt*dv_;
+        vMean_ = v_ - .5 * sub_dt*dv_;
         pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
       }
       q_ = qnext_;
