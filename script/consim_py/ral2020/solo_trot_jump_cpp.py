@@ -21,8 +21,8 @@ print(" Test Solo Trot C++ ".center(conf.LINE_WIDTH, '#'))
 print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
-i_min = 5
-i_max = 6
+i_min = 0
+i_max = 8
 i_ground_truth = i_max+2
 
 GROUND_TRUTH_EXP_SIMU_PARAMS = {
@@ -100,16 +100,23 @@ for i in range(i_min, i_max):
 PLOT_FORCES = 0
 PLOT_SLIPPING = 0
 PLOT_BASE_POS = 0
-PLOT_INTEGRATION_ERRORS = 0
-PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
+PLOT_INTEGRATION_ERRORS = 1
+PLOT_INTEGRATION_ERROR_TRAJECTORIES = 0
 
 LOAD_GROUND_TRUTH_FROM_FILE = 1
 SAVE_GROUND_TRUTH_TO_FILE = 1
 RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
-dt     = 0.002                      # controller and simulator time step
+
+#motionName = 'trot'
+motionName = 'jump'
+if(motionName=='trot'):
+    dt = 0.002      # controller and simulator time step
+elif(motionName=='jump'):
+    dt = 0.010      # controller and simulator time step
 unilateral_contacts = 1
 compute_predicted_forces = False
 PRINT_N = int(conf.PRINT_T/dt)
+ground_truth_file_name = "solo_"+motionName+str(dt)+"_cpp.p"
 
 exp_max_mul = 100 
 int_max_mul = 100 
@@ -125,7 +132,7 @@ if conf.use_viewer:
 assert(np.floor(dt_ref/dt)==dt_ref/dt)
 
 # load reference trajectories 
-refX, refU, feedBack = load_ref_traj(robot, dt)
+refX, refU, feedBack = load_ref_traj(robot, dt, motionName)
 q0, v0 = refX[0,:nq], refX[0,nq:]
 N_SIMULATION = refU.shape[0]
 
@@ -221,7 +228,7 @@ def run_simulation(q0, v0, simu_params, ground_truth):
 #                if(cp.active and not results.active[ci,i]):
 #                    print(cp.name, 'impact v', cp.v)
             
-            if(np.any(np.isnan(results.v[:,i+1])) or norm(results.v[:,i+1]) > 1e3):
+            if(np.any(np.isnan(results.v[:,i+1])) or norm(results.v[:,i+1]) > 1e6):
                 raise Exception("Time %.3f Velocities are too large: %.1f. Stop simulation."%(
                                 t, norm(results.v[:,i+1])))
     
@@ -243,30 +250,27 @@ def run_simulation(q0, v0, simu_params, ground_truth):
 
 if(LOAD_GROUND_TRUTH_FROM_FILE):    
     print("\nLoad ground truth from file")
-    data = pickle.load( open( "solo_trot_cpp.p", "rb" ) )
+    data = pickle.load( open( ground_truth_file_name, "rb" ) )
     
-    i0, i1 = 1314, 1315
-    refX = refX[i0:i1+1,:]
-    refU = refU[i0:i1,:]
-    feedBack = feedBack[i0:i1,:,:]
-#    q0, v0 = refX[0,:nq], refX[0,nq:]
-    N_SIMULATION = refU.shape[0]
-    data['ground-truth-exp'].q  = data['ground-truth-exp'].q[:,i0:i1+1]
-    data['ground-truth-exp'].v  = data['ground-truth-exp'].v[:,i0:i1+1]
-    data['ground-truth-exp'].p0 = data['ground-truth-exp'].p0[:,:,i0:i1+1]
-    data['ground-truth-exp'].slipping = data['ground-truth-exp'].slipping[:,i0:i1+1]
-    data['ground-truth-euler'].q  = data['ground-truth-euler'].q[:,i0:i1+1]
-    data['ground-truth-euler'].v  = data['ground-truth-euler'].v[:,i0:i1+1]
-    data['ground-truth-euler'].p0 = data['ground-truth-euler'].p0[:,:,i0:i1+1]
-    data['ground-truth-euler'].slipping = data['ground-truth-euler'].slipping[:,i0:i1+1]
-    q0, v0 = data['ground-truth-exp'].q[:,0], data['ground-truth-exp'].v[:,0]
+#    i0, i1 = 1314, 1315
+#    refX = refX[i0:i1+1,:]
+#    refU = refU[i0:i1,:]
+#    feedBack = feedBack[i0:i1,:,:]
+##    q0, v0 = refX[0,:nq], refX[0,nq:]
+#    N_SIMULATION = refU.shape[0]
+#    for key in ['ground-truth-exp', 'ground-truth-euler']:
+#        data[key].q  = data[key].q[:,i0:i1+1]
+#        data[key].v  = data[key].v[:,i0:i1+1]
+#        data[key].p0 = data[key].p0[:,:,i0:i1+1]
+#        data[key].slipping = data[key].slipping[:,i0:i1+1]
+#    q0, v0 = data['ground-truth-exp'].q[:,0], data['ground-truth-exp'].v[:,0]
 else:
     data = {}
     print("\nStart simulation ground truth")
     data['ground-truth-exp'] = run_simulation(q0, v0, GROUND_TRUTH_EXP_SIMU_PARAMS, None)
     data['ground-truth-euler'] = run_simulation(q0, v0, GROUND_TRUTH_EULER_SIMU_PARAMS, None)
     if(SAVE_GROUND_TRUTH_TO_FILE):
-        pickle.dump( data, open( "solo_trot_cpp.p", "wb" ) )
+        pickle.dump( data, open( ground_truth_file_name, "wb" ) )
 
 
 for simu_params in SIMU_PARAMS:

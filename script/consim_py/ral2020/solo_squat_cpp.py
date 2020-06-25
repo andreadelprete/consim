@@ -1,4 +1,4 @@
-''' Test cpp simulator with point-mass sliding on a flat floor 
+''' Test cpp simulator with Solo squatting with TSID on a flat floor 
 '''
 import time
 import consim 
@@ -17,7 +17,7 @@ class Empty:
     pass
 
 print("".center(conf.LINE_WIDTH, '#'))
-print(" Test Sliding Mass ".center(conf.LINE_WIDTH, '#'))
+print(" Test Solo Squat ".center(conf.LINE_WIDTH, '#'))
 print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested

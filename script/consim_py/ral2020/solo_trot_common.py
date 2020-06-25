@@ -13,7 +13,7 @@ import consim_py.utils.plot_utils as plut
 class Empty:
     pass
 
-dt_ref = 0.01
+dt_ref = 0.01   # time step of reference trajectories
 
 def interpolate_state(robot, x1, x2, d):
     """ interpolate state for feedback at higher rate that plan """
@@ -31,12 +31,11 @@ def state_diff(robot, x1, x2):
     return xdiff
     
     
-def load_ref_traj(robot, dt):
+def load_ref_traj(robot, dt, motionName='trot'):
     ''' Load reference trajectories '''
-    whichMotion = 'trot'
-    refX_ = np.load('../demo/references/'+whichMotion+'_reference_states.npy').squeeze()
-    refU_ = np.load('../demo/references/'+whichMotion+'_reference_controls.npy').squeeze() 
-    feedBack_ = np.load('../demo/references/'+whichMotion+'_feedback.npy').squeeze() 
+    refX_ = np.load('../demo/references/'+motionName+'_reference_states.npy').squeeze()
+    refU_ = np.load('../demo/references/'+motionName+'_reference_controls.npy').squeeze() 
+    feedBack_ = np.load('../demo/references/'+motionName+'_feedback.npy').squeeze() 
     refX_[:,2] -= 15.37e-3   # ensure contact points are inside the ground at t=0
     N = refU_.shape[0]     
     

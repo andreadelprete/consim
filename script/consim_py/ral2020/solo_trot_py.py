@@ -99,11 +99,11 @@ for i in range(i_min, i_max):
 #    }]
     
 PLOT_FORCES = 0
-PLOT_FORCE_PREDICTIONS = 0
+PLOT_FORCE_PREDICTIONS = 1
 PLOT_SLIPPING = 0
 PLOT_BASE_POS = 0
 PLOT_INTEGRATION_ERRORS = 0
-PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
+PLOT_INTEGRATION_ERROR_TRAJECTORIES = 0
 
 LOAD_GROUND_TRUTH_FROM_FILE = 1
 SAVE_GROUND_TRUTH_TO_FILE = 0
@@ -307,30 +307,30 @@ if(PLOT_FORCE_PREDICTIONS):
     T = N_SIMULATION*dt
     tt = np.arange(0.0, (N_SIMULATION+1)*dt, dt)[:N_SIMULATION+1]
     
-    for (name,d) in data.items():
-        (ff, ax) = plut.create_empty_figure(2,2)
-        ax = ax.reshape(4)       
-        for i in range(4):
-            ax[i].plot(tt, d.f[2,i,:], ' o', markersize=8, label=name)
-#            ax[i].plot(tt, d.f_pred_int[2,i,:], ' s', markersize=8, label=name+' pred int')
-            if('ground' not in name):
-                tt_log = np.arange(d.f_pred.shape[2]) * T / d.f_pred.shape[2]
-                ax[i].plot(tt_log, d.f_pred[2,i,:], 'r v', markersize=6, label=name+' pred ')
-                ax[i].plot(tt_log, d.f_avg[2,i,:], 'g s', markersize=6, label=name+' avg ')
-                ax[i].plot(tt_log, d.f_avg2[2,i,:], 'y s', markersize=6, label=name+' avg2 ')
-                ax[i].plot(tt_log, d.f_inner[2,i,:], 'b x', markersize=6, label=name+' real ')
-            ax[i].set_xlabel('Time [s]')
-            ax[i].set_ylabel('Force Z [N]')
-        leg = ax[-1].legend()
-        if(leg): leg.get_frame().set_alpha(0.5)
-        
-        if('ground' not in name):
-            # force prediction error of Euler, i.e. assuming force remains contact during time step
-            ndt = int(d.f_inner.shape[2] / (d.f.shape[2]-1))
-            
-            # force prediction error of matrix exponential 
-            f_pred_err = d.f_pred - d.f_inner
-            print(name, 'Force pred err max exp:', np.sum(np.abs(f_pred_err))/(f_pred_err.shape[0]*f_pred_err.shape[2]))
+#    for (name,d) in data.items():
+#        (ff, ax) = plut.create_empty_figure(2,2)
+#        ax = ax.reshape(4)       
+#        for i in range(4):
+#            ax[i].plot(tt, d.f[2,i,:], ' o', markersize=8, label=name)
+##            ax[i].plot(tt, d.f_pred_int[2,i,:], ' s', markersize=8, label=name+' pred int')
+#            if('ground' not in name):
+#                tt_log = np.arange(d.f_pred.shape[2]) * T / d.f_pred.shape[2]
+#                ax[i].plot(tt_log, d.f_pred[2,i,:], 'r v', markersize=6, label=name+' pred ')
+#                ax[i].plot(tt_log, d.f_avg[2,i,:], 'g s', markersize=6, label=name+' avg ')
+#                ax[i].plot(tt_log, d.f_avg2[2,i,:], 'y s', markersize=6, label=name+' avg2 ')
+#                ax[i].plot(tt_log, d.f_inner[2,i,:], 'b x', markersize=6, label=name+' real ')
+#            ax[i].set_xlabel('Time [s]')
+#            ax[i].set_ylabel('Force Z [N]')
+#        leg = ax[-1].legend()
+#        if(leg): leg.get_frame().set_alpha(0.5)
+#        
+#        if('ground' not in name):
+#            # force prediction error of Euler, i.e. assuming force remains contact during time step
+#            ndt = int(d.f_inner.shape[2] / (d.f.shape[2]-1))
+#            
+#            # force prediction error of matrix exponential 
+#            f_pred_err = d.f_pred - d.f_inner
+#            print(name, 'Force pred err max exp:', np.sum(np.abs(f_pred_err))/(f_pred_err.shape[0]*f_pred_err.shape[2]))
        
     (ff, ax) = plut.create_empty_figure(2,2)
     ax = ax.reshape(4)
