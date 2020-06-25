@@ -17,7 +17,7 @@ from solo_trot_common import load_ref_traj, Empty, state_diff, dt_ref, play_moti
     plot_integration_error_vs_ndt, compute_integration_errors
 
 print("".center(conf.LINE_WIDTH, '#'))
-print(" Test Solo Trot C++ ".center(conf.LINE_WIDTH, '#'))
+print(" Test Solo Trot/Jump C++ ".center(conf.LINE_WIDTH, '#'))
 print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
@@ -34,9 +34,10 @@ GROUND_TRUTH_EXP_SIMU_PARAMS = {
 
 GROUND_TRUTH_EULER_SIMU_PARAMS = {
     'name': 'ground-truth %d'%(2**i_ground_truth),
-    'method_name': 'ground-truth-euler',
+    'method_name': 'ground-truth-euler-semi',
     'use_exp_int': 0,
     'ndt': 2**i_ground_truth,
+    'semi_implicit': 1
 }
 
 SIMU_PARAMS = []
@@ -69,14 +70,15 @@ for i in range(i_min, i_max):
 #        'forward_dyn_method': 3
 #    }]
     
-# EULER INTEGRATOR WITH STANDARD SETTINGS
+# EULER INTEGRATOR WITH SEMI-IMPLICIT INTEGRATION
 for i in range(i_min, i_max):
     SIMU_PARAMS += [{
-        'name': 'euler Minv%4d'%(2**i),
-        'method_name': 'euler Minv',
+        'name': 'euler semi%4d'%(2**i),
+        'method_name': 'euler semi',
         'use_exp_int': 0,
         'ndt': 2**i,
-        'forward_dyn_method': 1
+        'forward_dyn_method': 1,
+        'semi_implicit': 1
     }]
 
 #for i in range(i_min, i_max):
@@ -98,13 +100,14 @@ for i in range(i_min, i_max):
 #    }]
 
 PLOT_FORCES = 0
+PLOT_VELOCITY_NORM = 1
 PLOT_SLIPPING = 0
 PLOT_BASE_POS = 0
 PLOT_INTEGRATION_ERRORS = 1
-PLOT_INTEGRATION_ERROR_TRAJECTORIES = 0
+PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
 
-LOAD_GROUND_TRUTH_FROM_FILE = 1
-SAVE_GROUND_TRUTH_TO_FILE = 1
+LOAD_GROUND_TRUTH_FROM_FILE = 0
+SAVE_GROUND_TRUTH_TO_FILE = 0
 RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
 
 #motionName = 'trot'
@@ -150,14 +153,19 @@ def run_simulation(q0, v0, simu_params, ground_truth):
         #  2: pinocchio.aba()
         #  3: Cholesky factorization 
         forward_dyn_method = 1
+    try:
+        semi_implicit = simu_params['semi_implicit']
+    except:
+        semi_implicit = 0
         
     if(simu_params['use_exp_int']):
         simu = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
                                     conf.K, conf.B, conf.mu, conf.anchor_slipping_method,
-                                    compute_predicted_forces, forward_dyn_method, exp_max_mul, int_max_mul)
+                                    compute_predicted_forces, forward_dyn_method, semi_implicit,
+                                    exp_max_mul, int_max_mul)
     else:
         simu = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
-                                        conf.K, conf.B, conf.mu, forward_dyn_method)
+                                        conf.K, conf.B, conf.mu, forward_dyn_method, semi_implicit)
                                         
     cpts = []
     for cf in conf.contact_frames:
@@ -327,6 +335,17 @@ if(PLOT_FORCES):
             leg = ax[i].legend()
             if(leg): leg.get_frame().set_alpha(0.5)
             
+if(PLOT_VELOCITY_NORM):
+    (ff, ax) = plut.create_empty_figure(1)
+    for (j,name) in enumerate(sorted(data.keys())):
+        if(data[name].use_exp_int):
+            ax.plot(tt, norm(data[name].v, axis=0), line_styles[j], alpha=0.7, label=name)
+    ax.set_xlabel('Time [s]')
+    ax.set_ylabel('Velocity 2-norm')
+    ax.set_yscale('log')
+    leg = ax.legend()
+    if(leg): leg.get_frame().set_alpha(0.5)
+        
 # PLOT THE SLIPPING FLAG OF ALL INTEGRATION METHODS ON THE SAME PLOT
 if(PLOT_SLIPPING):
     nc = len(conf.contact_frames)

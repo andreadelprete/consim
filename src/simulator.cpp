@@ -25,8 +25,9 @@ namespace consim {
  * AbstractSimulator Class 
 */
 
-AbstractSimulator::AbstractSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD): 
-model_(&model), data_(&data), dt_(dt), n_integration_steps_(n_integration_steps), sub_dt(dt / ((double)n_integration_steps)), whichFD_(whichFD) {
+AbstractSimulator::AbstractSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD, bool semi_implicit): 
+model_(&model), data_(&data), dt_(dt), n_integration_steps_(n_integration_steps), sub_dt(dt / ((double)n_integration_steps)), 
+whichFD_(whichFD), semi_implicit_(semi_implicit) {
   q_.resize(model.nq); q_.setZero();
   v_.resize(model.nv); v_.setZero();
   dv_.resize(model.nv); dv_.setZero();
@@ -203,8 +204,8 @@ void AbstractSimulator::forwardDynamics(Eigen::VectorXd &tau, Eigen::VectorXd &d
  * EulerSimulator Class 
 */
 
-EulerSimulator::EulerSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD):
-AbstractSimulator(model, data, dt, n_integration_steps, whichFD) {}
+EulerSimulator::EulerSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD, bool semi_implicit):
+AbstractSimulator(model, data, dt, n_integration_steps, whichFD, semi_implicit) {}
 
 
 void EulerSimulator::computeContactForces() 
@@ -254,11 +255,17 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
       }
       
       forwardDynamics(tau_, dv_); 
-      /*!< integrate twice */  
-      vMean_ = v_ + .5 * sub_dt*dv_;
-      pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
-      q_ = qnext_;
+      /*!< integrate twice */ 
       v_ += dv_ * sub_dt;
+      if(semi_implicit_){
+        pinocchio::integrate(*model_, q_, v_ * sub_dt, qnext_);
+      } 
+      else{
+        vMean_ = v_ + .5 * sub_dt*dv_;
+        pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
+      }
+      q_ = qnext_;
+      
       
       tau_.fill(0);
       // \brief adds contact forces to tau_
@@ -277,10 +284,10 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
 */
 
 ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, 
-                                            int n_integration_steps, int whichFD,
+                                            int n_integration_steps, int whichFD, bool semi_implicit,
                                             int slipping_method, bool compute_predicted_forces, 
                                             int exp_max_mat_mul, int lds_max_mat_mul) : 
-                                            AbstractSimulator(model, data, dt, n_integration_steps, whichFD), 
+                                            AbstractSimulator(model, data, dt, n_integration_steps, whichFD, semi_implicit), 
                                             slipping_method_(slipping_method),
                                             compute_predicted_forces_(compute_predicted_forces), 
                                             expMaxMatMul_(exp_max_mat_mul),
@@ -329,22 +336,23 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       CONSIM_STOP_PROFILER("exponential_simulator::checkFrictionCone");
 
       /*!< f projection is computed then anchor point is updated */ 
-      CONSIM_START_PROFILER("exponential_simulator::subIntegration");
       dvMean_ = dv_bar + MinvJcT_*fpr_; 
       dvMean2_.noalias() =  dv_bar + MinvJcT_*fpr2_;  
       vMean_ =  v_ +  .5 * sub_dt * dvMean2_; 
-      pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
-      CONSIM_STOP_PROFILER("exponential_simulator::subIntegration"); 
-
     } /*!< active contacts */
     else{
       forwardDynamics(tau_, dvMean_); 
       vMean_ = v_ + .5 * sub_dt*dvMean_;
-      pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
     } /*!< no active contacts */
  
-    q_ = qnext_;
     v_ += sub_dt*dvMean_;
+    if(semi_implicit_ && nactive_==0){
+      pinocchio::integrate(*model_, q_, v_ * sub_dt, qnext_);
+    }
+    else{
+      pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
+    }
+    q_ = qnext_;
     dv_ = dvMean_; 
     
     //

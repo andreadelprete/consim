@@ -31,7 +31,7 @@ namespace consim {
 
   class AbstractSimulator {
     public:
-      AbstractSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD); 
+      AbstractSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD, bool semi_implicit); 
       ~AbstractSimulator(){};
 
       /**
@@ -101,6 +101,8 @@ namespace consim {
       double elapsedTime_;  
       bool resetflag_ = false;
       bool contactChange_; 
+      bool semi_implicit_; // flag to activate semi-implicit Euler integration scheme
+
       /**
         * loops over contact points, checks active contacts and sets reference contact positions 
       */
@@ -140,7 +142,7 @@ namespace consim {
   class EulerSimulator : public AbstractSimulator
   {
     public: 
-      EulerSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD); 
+      EulerSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD, bool semi_implicit); 
       ~EulerSimulator(){};
 
     /**
@@ -166,7 +168,7 @@ namespace consim {
        * 2: a QP method to update the anchor point velocity, then average force is computed 
        **/  
       ExponentialSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps,
-              int whichFD, int slipping_method=1, bool compute_predicted_forces=false, int exp_max_mat_mul=100, int lds_max_mat_mul=100); 
+              int whichFD, bool semi_implicit, int slipping_method=1, bool compute_predicted_forces=false, int exp_max_mat_mul=100, int lds_max_mat_mul=100); 
 
       ~ExponentialSimulator(){};
       void step(const Eigen::VectorXd &tau) override;
