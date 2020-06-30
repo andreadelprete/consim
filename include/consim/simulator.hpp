@@ -161,6 +161,8 @@ namespace consim {
 
   class ExponentialSimulator : public AbstractSimulator
   {
+    typedef Eigen::DiagonalMatrix<double, Eigen::Dynamic> DiagonalMatrixXd;
+
     public:
       /**
        * slipping metho selects anchor point update method during slipping 
@@ -208,11 +210,11 @@ namespace consim {
       Eigen::VectorXd dv_bar; 
       // contact acceleration components 
       Eigen::VectorXd dJv_;  
-      Eigen::MatrixXd K;
-      Eigen::MatrixXd B;
+      DiagonalMatrixXd K;
+      DiagonalMatrixXd B;
       Eigen::MatrixXd D;
       Eigen::MatrixXd A; 
-      Eigen::MatrixXd JMinv_;
+      // Eigen::MatrixXd JMinv_;
       Eigen::MatrixXd MinvJcT_;
       Eigen::MatrixXd Upsilon_;
       Eigen::MatrixXd JcT_; 

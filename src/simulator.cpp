@@ -417,16 +417,18 @@ void ExponentialSimulator::computeExpLDS(){
    * computes the kinematics at the end of the integration step, 
    * runs contact detection 
    * resizes matrices to match the number of active contacts if needed 
-   * compute the contact froces of the active contacts 
+   * compute the contact forces of the active contacts 
    **/  
   
-  CONSIM_START_PROFILER("pinocchio::computeKinematics");
+  CONSIM_START_PROFILER("pinocchio::kinematics+dynamics");
   pinocchio::forwardKinematics(*model_, *data_, q_, v_, fkDv_);
   pinocchio::computeJointJacobians(*model_, *data_);
   pinocchio::updateFramePlacements(*model_, *data_);
   pinocchio::crba(*model_, *data_, q_);
   pinocchio::nonLinearEffects(*model_, *data_, q_, v_); 
-  CONSIM_STOP_PROFILER("pinocchio::computeKinematics");
+  CONSIM_STOP_PROFILER("pinocchio::kinematics+dynamics");
+
+  CONSIM_START_PROFILER("ExponentialSimulator::contactDetection+ForceComputation");
   detectContacts(); /*!<inactive contacts get automatically filled with zero here */
 
   if (nactive_>0){
@@ -450,6 +452,7 @@ void ExponentialSimulator::computeExpLDS(){
       // }
     }
   }
+  CONSIM_STOP_PROFILER("ExponentialSimulator::contactDetection+ForceComputation");
 } // ExponentialSimulator::computeContactForces
 
 
@@ -485,12 +488,9 @@ void ExponentialSimulator::computePredictedXandF(){
     default:
       break;
     }
-    //  prdiction terms also have memory allocation 
-    
-    
+    //  prediction terms also have memory allocation 
     predictedXf_ = expAdt_*x0_ + inteAdt_*a_; 
     predictedForce_ = kp0_ + D*predictedXf_;
-    
   }
   else{
     predictedXf_ = x0_;
@@ -642,15 +642,15 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
     intxt_.resize(6 * nactive_); intxt_.setZero();
     int2xt_.resize(6 * nactive_); int2xt_.setZero();
     kp0_.resize(3 * nactive_); kp0_.setZero();
-    K.resize(3 * nactive_, 3 * nactive_); K.setZero();
-    B.resize(3 * nactive_, 3 * nactive_); B.setZero();
+    K.resize(3 * nactive_); K.setZero();
+    B.resize(3 * nactive_); B.setZero();
     D.resize(3 * nactive_, 6 * nactive_); D.setZero();
     A.resize(6 * nactive_, 6 * nactive_); A.setZero();
     A.block(0, 3*nactive_, 3*nactive_, 3*nactive_) = Eigen::MatrixXd::Identity(3*nactive_, 3*nactive_); 
     Jc_.resize(3 * nactive_, model_->nv); Jc_.setZero();
     JcT_.resize(model_->nv, 3 * nactive_); JcT_.setZero();
     Upsilon_.resize(3 * nactive_, 3 * nactive_); Upsilon_.setZero();
-    JMinv_.resize(3 * nactive_, model_->nv); JMinv_.setZero();
+    // JMinv_.resize(3 * nactive_, model_->nv); JMinv_.setZero();
     MinvJcT_.resize(model_->nv, 3*nactive_); MinvJcT_.setZero();
     dJv_.resize(3 * nactive_); dJv_.setZero();
     utilDense_.resize(6 * nactive_);
@@ -696,12 +696,8 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
     i_active_ = 0; 
     for(unsigned int i=0; i<nc_; i++){
       if (!contacts_[i]->active) continue;
-      K(3*i_active_, 3*i_active_) = contacts_[i]->optr->contact_model_->stiffness_(0);
-      K(3*i_active_+1, 3*i_active_+1) = contacts_[i]->optr->contact_model_->stiffness_(1);
-      K(3*i_active_+2, 3*i_active_+2) = contacts_[i]->optr->contact_model_->stiffness_(2);
-      B(3*i_active_, 3*i_active_) = contacts_[i]->optr->contact_model_->damping_(0);
-      B(3*i_active_+1, 3*i_active_+1) = contacts_[i]->optr->contact_model_->damping_(1);
-      B(3*i_active_+2, 3*i_active_+2) = contacts_[i]->optr->contact_model_->damping_(2);
+      K.diagonal().segment<3>(3*i_active_) = contacts_[i]->optr->contact_model_->stiffness_;
+      B.diagonal().segment<3>(3*i_active_) = contacts_[i]->optr->contact_model_->damping_;
 
       // fill up contact normals and tangents for constraints 
       // cone_constraints_.block<1,3>(4*i_active_, 3*i_active_) = (1/sqrt(2)) * contacts_[i]->optr->contact_model_->friction_coeff_*contacts_[i]->contactNormal_.transpose() - contacts_[i]->contactTangentA_.transpose();
@@ -713,8 +709,8 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
       i_active_ += 1; 
     }
     // fillout D 
-    D.block(0,0, 3*nactive_, 3*nactive_).noalias() = -K;
-    D.block(0,3*nactive_, 3*nactive_, 3*nactive_).noalias() = -B; 
+    D.block(0,0, 3*nactive_, 3*nactive_) = -1*K;
+    D.block(0,3*nactive_, 3*nactive_, 3*nactive_) = -1*B; 
 
     // std::cout<<"resize vectors and matrices"<<std::endl;
     
