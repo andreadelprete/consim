@@ -29,8 +29,8 @@ print(" Test Consim C++ ".center(LINE_WIDTH, '#'))
 print("".center(LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
-i_min = 5
-i_max = 6
+i_min = 0
+i_max = 1
 i_ground_truth = i_max+2
 
 GROUND_TRUTH_EXP_SIMU_PARAMS = {
@@ -57,7 +57,7 @@ for i in range(i_min, i_max):
         'method_name': 'exp',
         'use_exp_int': 1,
         'ndt': 2**i,
-        'forward_dyn_method': 1
+        'forward_dyn_method': 3
     }]
  
 # EULER INTEGRATOR WITH EXPLICIT INTEGRATION
@@ -67,7 +67,7 @@ for i in range(i_min, i_max):
         'method_name': 'euler',
         'use_exp_int': 0,
         'ndt': 2**i,
-        'forward_dyn_method': 1,
+        'forward_dyn_method': 3,
         'semi_implicit': 0
     }]
     

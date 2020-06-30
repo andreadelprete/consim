@@ -174,6 +174,7 @@ void AbstractSimulator::forwardDynamics(Eigen::VectorXd &tau, Eigen::VectorXd &d
   switch (whichFD_)
       {
         case 1: // slower than ABA
+          pinocchio::nonLinearEffects(*model_, *data_, q_, v_);
           mDv_ = tau - data_->nle;
           inverseM_ = pinocchio::computeMinverse(*model_, *data_, q_);
           inverseM_.triangularView<Eigen::StrictlyLower>()
@@ -187,8 +188,10 @@ void AbstractSimulator::forwardDynamics(Eigen::VectorXd &tau, Eigen::VectorXd &d
           break;
           
         case 3: // fast if some results are reused
+          pinocchio::nonLinearEffects(*model_, *data_, q_, v_);
           dv = tau - data_->nle; 
           // Sparse Cholesky factorization
+          pinocchio::crba(*model_, *data_, q_);
           pinocchio::cholesky::decompose(*model_, *data_);
           pinocchio::cholesky::solve(*model_,*data_,dv);
           break;
@@ -215,8 +218,6 @@ void EulerSimulator::computeContactForces()
   pinocchio::forwardKinematics(*model_, *data_, q_, v_);
   pinocchio::computeJointJacobians(*model_, *data_);
   pinocchio::updateFramePlacements(*model_, *data_);
-  pinocchio::crba(*model_, *data_, q_);
-  pinocchio::nonLinearEffects(*model_, *data_, q_, v_);
   /*!< loops over all contacts and objects to detect contacts and update contact positions*/
   
   detectContacts();
@@ -385,23 +386,36 @@ void ExponentialSimulator::computeExpLDS(){
     kp0_.segment<3>(3*i_active_).noalias() = cp->optr->contact_model_->stiffness_.cwiseProduct(p0_.segment<3>(3*i_active_));
     i_active_ += 1;  
   }
+  JcT_.noalias() = Jc_.transpose(); 
 
+  CONSIM_START_PROFILER("ExponentialSimulator::forwardDynamics");
   forwardDynamics(tau_, dv_bar);  
+  CONSIM_STOP_PROFILER("ExponentialSimulator::forwardDynamics");
 
-  if(whichFD_!= 1){
-    inverseM_ = pinocchio::computeMinverse(*model_, *data_, q_);
-    inverseM_.triangularView<Eigen::StrictlyLower>()
-    = inverseM_.transpose().triangularView<Eigen::StrictlyLower>(); // need to fill the Lower part of the matrix
+  
+  if(whichFD_==1 || whichFD_==2){
+    if(whichFD_==2){
+      inverseM_ = pinocchio::computeMinverse(*model_, *data_, q_);
+      inverseM_.triangularView<Eigen::StrictlyLower>()
+      = inverseM_.transpose().triangularView<Eigen::StrictlyLower>(); // need to fill the Lower part of the matrix
+    }
+    MinvJcT_.noalias() = inverseM_*JcT_; 
+  }
+  else if(whichFD_==3){
+    // Sparse Cholesky factorization
+    for(int i=0; i<JcT_.cols(); i++){
+      dv_ = JcT_.col(i);  // use dv_ as temporary buffer
+      // pinocchio::cholesky::decompose(*model_, *data_); // decomposition already computed
+      pinocchio::cholesky::solve(*model_,*data_,dv_);
+      MinvJcT_.col(i) = dv_;
+    }
   }
 
-  JcT_.noalias() = Jc_.transpose(); 
-  MinvJcT_.noalias() = inverseM_*JcT_; 
   Upsilon_.noalias() =  Jc_*MinvJcT_;
-
   tempStepMat_.noalias() =  Upsilon_ * K;
-  A.block(3*nactive_, 0, 3*nactive_, 3*nactive_).noalias() = -tempStepMat_;  
+  A.bottomLeftCorner(3*nactive_, 3*nactive_).noalias() = -tempStepMat_;  
   tempStepMat_.noalias() = Upsilon_ * B; 
-  A.block(3*nactive_, 3*nactive_, 3*nactive_, 3*nactive_).noalias() = -tempStepMat_; 
+  A.bottomRightCorner(3*nactive_, 3*nactive_).noalias() = -tempStepMat_; 
   temp04_.noalias() = Jc_* dv_bar;  
   b_.noalias() = temp04_ + dJv_; 
   a_.tail(3*nactive_) = b_;
@@ -420,13 +434,11 @@ void ExponentialSimulator::computeExpLDS(){
    * compute the contact forces of the active contacts 
    **/  
   
-  CONSIM_START_PROFILER("pinocchio::kinematics+dynamics");
+  CONSIM_START_PROFILER("pinocchio::kinematics");
   pinocchio::forwardKinematics(*model_, *data_, q_, v_, fkDv_);
   pinocchio::computeJointJacobians(*model_, *data_);
   pinocchio::updateFramePlacements(*model_, *data_);
-  pinocchio::crba(*model_, *data_, q_);
-  pinocchio::nonLinearEffects(*model_, *data_, q_, v_); 
-  CONSIM_STOP_PROFILER("pinocchio::kinematics+dynamics");
+  CONSIM_STOP_PROFILER("pinocchio::kinematics");
 
   CONSIM_START_PROFILER("ExponentialSimulator::contactDetection+ForceComputation");
   detectContacts(); /*!<inactive contacts get automatically filled with zero here */
@@ -709,8 +721,8 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
       i_active_ += 1; 
     }
     // fillout D 
-    D.block(0,0, 3*nactive_, 3*nactive_) = -1*K;
-    D.block(0,3*nactive_, 3*nactive_, 3*nactive_) = -1*B; 
+    D.leftCols(3*nactive_) = -1*K;
+    D.rightCols(3*nactive_) = -1*B; 
 
     // std::cout<<"resize vectors and matrices"<<std::endl;
     
