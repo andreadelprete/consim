@@ -107,7 +107,7 @@ PLOT_CONTACT_POINT_PREDICTION = 0
 PLOT_ANCHOR_POINTS = 0
 
 dt = 0.01                      # controller time step
-T = 0.5
+T = 1.5
 unilateral_contacts = 1
 compute_predicted_forces = False
 exm_max_mul = 100 

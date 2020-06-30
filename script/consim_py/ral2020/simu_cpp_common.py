@@ -31,7 +31,7 @@ def state_diff(robot, x1, x2):
     return xdiff
     
     
-def load_ref_traj(robot, dt, motionName='trot'):
+def load_solo_ref_traj(robot, dt, motionName='trot'):
     ''' Load reference trajectories '''
     refX_ = np.load('../demo/references/'+motionName+'_reference_states.npy').squeeze()
     refU_ = np.load('../demo/references/'+motionName+'_reference_controls.npy').squeeze() 

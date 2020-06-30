@@ -15,8 +15,9 @@ class TsidQuadruped:
         - Regularization task for contact forces
     '''
 
-    def __init__(self, conf, robot, q0=None, viewer=True):
+    def __init__(self, conf, dt, robot, com_offset, com_frequency, com_amplitude, q0=None, viewer=True):
         self.conf = conf
+        self.dt = dt
         self.robot = tsid.RobotWrapper(robot.model, False)
 
         if q0 is None:
@@ -48,8 +49,7 @@ class TsidQuadruped:
 
 #        assert [robot.model().existFrame(name) for name in conf.contact_frames]
 
-        formulation = tsid.InverseDynamicsFormulationAccForce(
-            "tsid", robot, False)
+        formulation = tsid.InverseDynamicsFormulationAccForce("tsid", robot, False)
         formulation.computeProblemData(0.0, q, v)
         data = formulation.data()
 
@@ -118,6 +118,43 @@ class TsidQuadruped:
         self.contacts_active = {}
         for name in conf.contact_frames:
             self.contacts_active[name] = True
+            
+#        com_pos = np.empty((3, N_SIMULATION))*nan
+#        com_vel = np.empty((3, N_SIMULATION))*nan
+#        com_acc = np.empty((3, N_SIMULATION))*nan
+#        com_pos_ref = np.empty((3, N_SIMULATION))*nan
+#        com_vel_ref = np.empty((3, N_SIMULATION))*nan
+#        com_acc_ref = np.empty((3, N_SIMULATION))*nan
+#        # acc_des = acc_ref - Kp*pos_err - Kd*vel_err
+#        com_acc_des = np.empty((3, N_SIMULATION))*nan
+        self.offset = com_offset + self.robot.com(self.formulation.data())
+        self.two_pi_f = np.copy(com_frequency)
+        self.amp = np.copy(com_amplitude)
+        self.two_pi_f_amp = self.two_pi_f * self.amp
+        self.two_pi_f_squared_amp = self.two_pi_f * self.two_pi_f_amp
+        self.sampleCom = self.trajCom.computeNext()
+        self.reset(q, v, 0.0)
+        
+    def reset(self, q, v, time_before_start):
+        self.i = 0
+        self.t = 0.0
+        
+    def compute_control(self, q, v):
+        self.sampleCom.pos(self.offset + self.amp * np.sin(self.two_pi_f*self.t))
+        self.sampleCom.vel(self.two_pi_f_amp * np.cos(self.two_pi_f*self.t))
+        self.sampleCom.acc(-self.two_pi_f_squared_amp * np.sin(self.two_pi_f*self.t))
+        self.comTask.setReference(self.sampleCom)
+
+        HQPData = self.formulation.computeProblemData(self.t, q, v)
+        sol = self.solver.solve(HQPData)
+        if(sol.status != 0):
+            print("[%d] QP problem could not be solved! Error code:" % (self.i), sol.status)
+            return None
+
+        u = self.formulation.getActuatorForces(sol)
+        self.i += 1
+        self.t += self.dt
+        return u
 
     def integrate_dv(self, q, v, dv, dt):
         v_mean = v + 0.5*dt*dv
