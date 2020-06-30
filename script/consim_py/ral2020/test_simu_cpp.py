@@ -29,7 +29,7 @@ print(" Test Consim C++ ".center(LINE_WIDTH, '#'))
 print("".center(LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
-i_min = 0
+i_min = 5
 i_max = 6
 i_ground_truth = i_max+2
 
@@ -105,16 +105,16 @@ PLOT_CONTACT_POINTS = 0
 PLOT_VELOCITY_NORM = 0
 PLOT_SLIPPING = 0
 PLOT_BASE_POS = 0
-PLOT_INTEGRATION_ERRORS = 1
-PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
+PLOT_INTEGRATION_ERRORS = 0
+PLOT_INTEGRATION_ERROR_TRAJECTORIES = 0
 
-LOAD_GROUND_TRUTH_FROM_FILE = 0
+LOAD_GROUND_TRUTH_FROM_FILE = 1
 SAVE_GROUND_TRUTH_TO_FILE = 1
 RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
 
 TEST_NAME = 'solo-squat'
 #TEST_NAME = 'solo-trot'
-TEST_NAME = 'solo-jump'
+#TEST_NAME = 'solo-jump'
 #TEST_NAME = 'romeo-walk'
 
 N_SIMULATION = 300
@@ -152,12 +152,6 @@ if(robot_name=='solo'):
     robot = loadSolo(False)
 elif(robot_name=='romeo'):
     import conf_romeo_cpp as conf
-#    robot = loadRomeo()
-#    URDF_FILENAME = "romeo.urdf"
-#    URDF_SUBPATH = "/romeo_description/urdf/" + URDF_FILENAME
-#    modelPath = getModelPath(URDF_SUBPATH)
-#    urdf = modelPath+URDF_SUBPATH
-#    srdf = modelPath+'/romeo_description/srdf/romeo.srdf'
     robot = RobotWrapper.BuildFromURDF(conf.urdf, [conf.modelPath], pin.JointModelFreeFlyer())
     
     contact_point = np.ones((3,4)) * conf.lz
@@ -248,6 +242,7 @@ def run_simulation(q0, v0, simu_params, ground_truth):
     results.p0 = np.zeros((3, nc, N_SIMULATION+1))
     results.slipping = np.zeros((nc, N_SIMULATION+1))
     results.active = np.zeros((nc, N_SIMULATION+1))
+    results.computation_times = {'inner-step': Empty()}
     
     results.q[:,0] = np.copy(q0)
     results.v[:,0] = np.copy(v0)
@@ -262,6 +257,7 @@ def run_simulation(q0, v0, simu_params, ground_truth):
     
     try:
         controller.reset(q0, v0, conf.T_pre)
+        consim.stop_watch_reset_all()
         time_start = time.time()
         for i in range(0, N_SIMULATION):
             if(RESET_STATE_ON_GROUND_TRUTH and ground_truth):                
@@ -299,7 +295,16 @@ def run_simulation(q0, v0, simu_params, ground_truth):
             if i % PRINT_N == 0:
                 print("Time %.3f" % (t))  
             t += dt
+        
         print("Real-time factor:", t/(time.time() - time_start))
+        consim.stop_watch_report(3)
+        if(simu_params['use_exp_int']):
+            results.computation_times['inner-step'].avg = \
+                consim.stop_watch_get_average_time("exponential_simulator::substep")
+        else:
+            results.computation_times['inner-step'].avg = \
+                consim.stop_watch_get_average_time("euler_simulator::substep")
+        print("Inner step: %.1f us"%(results.computation_times['inner-step'].avg*1e6))
     except Exception as e:
 #        raise e
         print("Exception while running simulation", e)
