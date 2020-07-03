@@ -13,7 +13,8 @@ import pinocchio as pin
 from pinocchio.robot_wrapper import RobotWrapper
 import pickle
 
-from simu_cpp_common import Empty, dt_ref, play_motion, load_solo_ref_traj, plot_integration_error_vs_ndt, compute_integration_errors
+from simu_cpp_common import Empty, dt_ref, play_motion, load_solo_ref_traj, \
+    plot_multi_x_vs_y_log_scale, compute_integration_errors
 
 # CONTROLLERS
 from linear_feedback_controller import LinearFeedbackController
@@ -30,7 +31,7 @@ print("".center(LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
 i_min = 0
-i_max = 1
+i_max = 7
 i_ground_truth = i_max+2
 
 GROUND_TRUTH_EXP_SIMU_PARAMS = {
@@ -52,14 +53,18 @@ SIMU_PARAMS = []
 
 # EXPONENTIAL INTEGRATOR WITH STANDARD SETTINGS
 for i in range(i_min, i_max):
-    SIMU_PARAMS += [{
-        'name': 'exp %4d'%(2**i),
-        'method_name': 'exp',
-        'use_exp_int': 1,
-        'ndt': 2**i,
-        'forward_dyn_method': 3
-    }]
- 
+    for m in [0, 1, 2, 3, -1]:
+        SIMU_PARAMS += [{
+            'name': 'exp %4d mmm%2d'%(2**i,m),
+            'method_name': 'exp mmm%2d'%(m),
+            'use_exp_int': 1,
+            'ndt': 2**i,
+            'forward_dyn_method': 3,
+            'max_mat_mult': m
+        }]
+
+i_min += 0
+i_max += 4
 # EULER INTEGRATOR WITH EXPLICIT INTEGRATION
 for i in range(i_min, i_max):
     SIMU_PARAMS += [{
@@ -70,7 +75,7 @@ for i in range(i_min, i_max):
         'forward_dyn_method': 3,
         'semi_implicit': 0
     }]
-    
+#    
 # EULER INTEGRATOR WITH SEMI-IMPLICIT INTEGRATION
 #for i in range(i_min, i_max):
 #    SIMU_PARAMS += [{
@@ -105,10 +110,11 @@ PLOT_CONTACT_POINTS = 0
 PLOT_VELOCITY_NORM = 0
 PLOT_SLIPPING = 0
 PLOT_BASE_POS = 0
-PLOT_INTEGRATION_ERRORS = 0
-PLOT_INTEGRATION_ERROR_TRAJECTORIES = 0
+PLOT_INTEGRATION_ERRORS = 1
+PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
+PLOT_MATRIX_MULTIPLICATIONS = 0
 
-LOAD_GROUND_TRUTH_FROM_FILE = 1
+LOAD_GROUND_TRUTH_FROM_FILE = 0
 SAVE_GROUND_TRUTH_TO_FILE = 1
 RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
 
@@ -200,6 +206,7 @@ elif(ctrl_type=='tsid-biped'):
 
 def run_simulation(q0, v0, simu_params, ground_truth):        
     ndt = simu_params['ndt']
+    use_exp_int = simu_params['use_exp_int']
     try:
         forward_dyn_method = simu_params['forward_dyn_method']
     except:
@@ -212,12 +219,16 @@ def run_simulation(q0, v0, simu_params, ground_truth):
         semi_implicit = simu_params['semi_implicit']
     except:
         semi_implicit = 0
+    try:
+        max_mat_mult = simu_params['max_mat_mult']
+    except:
+        max_mat_mult = 100
         
-    if(simu_params['use_exp_int']):
+    if(use_exp_int):
         simu = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
                                     conf.K, conf.B, conf.mu, conf.anchor_slipping_method,
                                     compute_predicted_forces, forward_dyn_method, semi_implicit,
-                                    exp_max_mul, int_max_mul)
+                                    max_mat_mult, max_mat_mult)
     else:
         simu = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
                                         conf.K, conf.B, conf.mu, forward_dyn_method, semi_implicit)
@@ -242,7 +253,9 @@ def run_simulation(q0, v0, simu_params, ground_truth):
     results.p0 = np.zeros((3, nc, N_SIMULATION+1))
     results.slipping = np.zeros((nc, N_SIMULATION+1))
     results.active = np.zeros((nc, N_SIMULATION+1))
-    results.computation_times = {'inner-step': Empty()}
+    results.mat_mult = np.zeros(N_SIMULATION+1)
+    results.computation_times = {'inner-step': Empty(), 
+                                 'compute-integrals': Empty()}
     
     results.q[:,0] = np.copy(q0)
     results.v[:,0] = np.copy(v0)
@@ -278,6 +291,9 @@ def run_simulation(q0, v0, simu_params, ground_truth):
             results.q[:,i+1] = simu.get_q()
             results.v[:,i+1] = simu.get_v()
             
+            if(use_exp_int):
+                results.mat_mult[i] = simu.getMatrixMultiplications()
+            
             for ci, cp in enumerate(cpts):
                 results.f[:,ci,i+1] = cp.f
                 results.p[:,ci,i+1] = cp.x
@@ -292,19 +308,24 @@ def run_simulation(q0, v0, simu_params, ground_truth):
                 raise Exception("Time %.3f Velocities are too large: %.1f. Stop simulation."%(
                                 t, norm(results.v[:,i+1])))
     
-            if i % PRINT_N == 0:
-                print("Time %.3f" % (t))  
+#            if i % PRINT_N == 0:
+#                print("Time %.3f" % (t))  
             t += dt
         
-        print("Real-time factor:", t/(time.time() - time_start))
-        consim.stop_watch_report(3)
-        if(simu_params['use_exp_int']):
+#        print("Real-time factor:", t/(time.time() - time_start))
+#        consim.stop_watch_report(3)
+        if(use_exp_int):
             results.computation_times['inner-step'].avg = \
                 consim.stop_watch_get_average_time("exponential_simulator::substep")
+            results.computation_times['compute-integrals'].avg = \
+                consim.stop_watch_get_average_time("exponential_simulator::computeIntegralsXt")
         else:
             results.computation_times['inner-step'].avg = \
                 consim.stop_watch_get_average_time("euler_simulator::substep")
-        print("Inner step: %.1f us"%(results.computation_times['inner-step'].avg*1e6))
+            results.computation_times['compute-integrals'].avg = 0
+        for key in results.computation_times.keys():
+            print("%20s: %.1f us"%(key, results.computation_times[key].avg*1e6))
+            
     except Exception as e:
 #        raise e
         print("Exception while running simulation", e)
@@ -351,18 +372,19 @@ for simu_params in SIMU_PARAMS:
         data[name] = run_simulation(q0, v0, simu_params, data['ground-truth-euler'])
 
 # COMPUTE INTEGRATION ERRORS:
-ndt, err_2norm_avg, err_infnorm_avg, err_infnorm_max, err_traj_2norm, err_traj_infnorm = \
+ndt, comp_time, err_2norm_avg, err_infnorm_avg, err_infnorm_max, err_traj_2norm, err_traj_infnorm = \
     compute_integration_errors(data, robot)
 
 # PLOT STUFF
-line_styles = 10*['-o', '--o', '-.o', ':o']
+line_styles = 100*['-o', '--o', '-.o', ':o']
 tt = np.arange(0.0, (N_SIMULATION+1)*dt, dt)[:N_SIMULATION+1]
     
 # PLOT INTEGRATION ERRORS
 if(PLOT_INTEGRATION_ERRORS):
-#    plot_integration_error_vs_ndt(err_2norm_avg, ndt, 'Mean error 2-norm')
-    plot_integration_error_vs_ndt(err_infnorm_avg, ndt, 'Mean error inf-norm')
-    plot_integration_error_vs_ndt(err_infnorm_max, ndt, 'Max error inf-norm')    
+#    plot_multi_x_vs_y_log_scale(err_2norm_avg, ndt, 'Mean error 2-norm')
+    plot_multi_x_vs_y_log_scale(err_infnorm_avg, ndt, 'Mean error inf-norm')
+#    plot_multi_x_vs_y_log_scale(err_infnorm_max, ndt, 'Max error inf-norm')   
+    plot_multi_x_vs_y_log_scale(err_infnorm_avg, comp_time, 'Mean error inf-norm', 'Computation time')
     
 if(PLOT_INTEGRATION_ERROR_TRAJECTORIES):
 #    (ff, ax) = plut.create_empty_figure(1)
@@ -383,6 +405,18 @@ if(PLOT_INTEGRATION_ERROR_TRAJECTORIES):
     leg = ax.legend()
     if(leg): leg.get_frame().set_alpha(0.5)
     
+
+if(PLOT_MATRIX_MULTIPLICATIONS):    
+    (ff, ax) = plut.create_empty_figure(1)
+    j=0
+    for (name,d) in data.items():
+        if('mat_mult' in d.__dict__.keys()):
+            ax.plot(tt, d.mat_mult, line_styles[j], alpha=0.7, label=name)
+            j+=1
+    ax.set_xlabel('Time [s]')
+    ax.set_ylabel('Matrix Multiplications')
+    leg = ax.legend()
+    if(leg): leg.get_frame().set_alpha(0.5)
             
 # PLOT THE CONTACT FORCES OF ALL INTEGRATION METHODS ON THE SAME PLOT
 if(PLOT_FORCES):        
@@ -438,7 +472,7 @@ if(PLOT_SLIPPING):
         ax = ax.reshape(ax.shape[0]*ax.shape[1])
     for (name, d) in data.items():        
         for i in range(nc):
-            ax[i].plot(tt, d.slipping[i,:], alpha=0.7, label=name)
+            ax[i].plot(tt, d.slipping[i,:tt.shape[0]], alpha=0.7, label=name)
             ax[i].set_xlabel('Time [s]')
     ax[0].set_ylabel('Contact Slipping Flag')
     leg = ax[0].legend()
@@ -451,7 +485,7 @@ if(PLOT_SLIPPING):
         ax = ax.reshape(ax.shape[0]*ax.shape[1])
     for (name, d) in data.items():
         for i in range(nc):
-            ax[i].plot(tt, d.active[i,:], alpha=0.7, label=name)
+            ax[i].plot(tt, d.active[i,:tt.shape[0]], alpha=0.7, label=name)
             ax[i].set_xlabel('Time [s]')
     ax[0].set_ylabel('Contact Active Flag')
     leg = ax[0].legend()

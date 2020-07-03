@@ -175,6 +175,8 @@ namespace consim {
       ~ExponentialSimulator(){};
       void step(const Eigen::VectorXd &tau) override;
 
+      int getMatrixMultiplications(){ return utilDense_.getMatrixMultiplications(); }
+
     protected:
       /**
        * AbstractSimulator::computeContactState() must be called before  

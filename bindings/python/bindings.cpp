@@ -82,7 +82,7 @@ ExponentialSimulator* build_exponential_simulator(
     data = pinocchio::Data(model);
   }
   ExponentialSimulator* sim = new ExponentialSimulator(model, data, dt, n_integration_steps, whichFD, semi_implicit, which_slipping, 
-                                  compute_predicted_forces, exp_max_mat_mul = 100, lds_max_mat_mul);
+                                  compute_predicted_forces, exp_max_mat_mul, lds_max_mat_mul);
   sim->addObject(*obj);
 
   return sim;
@@ -220,8 +220,8 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
         .def("step", &ExponentialSimulator::step)
         .def("get_q", &ExponentialSimulator::get_q,bp::return_value_policy<bp::copy_const_reference>(), "configuration state vector")
         .def("get_v", &ExponentialSimulator::get_v,bp::return_value_policy<bp::copy_const_reference>(), "tangent vector to configuration")
-        .def("get_dv", &ExponentialSimulator::get_dv,bp::return_value_policy<bp::copy_const_reference>(), "time derivative of tangent vector to configuration");
-
+        .def("get_dv", &ExponentialSimulator::get_dv,bp::return_value_policy<bp::copy_const_reference>(), "time derivative of tangent vector to configuration")
+        .def("getMatrixMultiplications", &ExponentialSimulator::getMatrixMultiplications);
 }
 
 }

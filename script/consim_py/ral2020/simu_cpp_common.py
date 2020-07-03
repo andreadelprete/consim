@@ -74,7 +74,7 @@ def play_motion(robot, q, dt):
         
 def compute_integration_errors(data, robot):
     print('\n')
-    ndt = {}
+    ndt, comp_time = {}, {}
     err_2norm_avg, err_infnorm_avg, err_infnorm_max, err_traj_2norm, err_traj_infnorm = {}, {}, {}, {}, {}
     for name in sorted(data.keys()):
         if('ground-truth' in name): continue
@@ -102,24 +102,26 @@ def compute_integration_errors(data, robot):
             err_infnorm_max[d.method_name] = []
             err_infnorm_avg[d.method_name] = []
             ndt[d.method_name] = []
+            comp_time[d.method_name] = []
         err_2norm_avg[d.method_name] += [err_2]
         err_infnorm_avg[d.method_name] += [err_inf]
         err_infnorm_max[d.method_name] += [err_peak]
         err_traj_2norm[name] = err_per_time_2
         err_traj_infnorm[name] = err_per_time_inf
         ndt[d.method_name] += [d.ndt]
-    return ndt, err_2norm_avg, err_infnorm_avg, err_infnorm_max, err_traj_2norm, err_traj_infnorm
+        comp_time[d.method_name] += [d.computation_times['inner-step'].avg * d.ndt]
+    return ndt, comp_time, err_2norm_avg, err_infnorm_avg, err_infnorm_max, err_traj_2norm, err_traj_infnorm
         
         
-def plot_integration_error_vs_ndt(error, ndt, error_description):
+def plot_multi_x_vs_y_log_scale(y, x, ylabel, xlabel='Number of time steps'):
     line_styles = 10*['-o', '--o', '-.o', ':o']
     (ff, ax) = plut.create_empty_figure(1)
     j = 0
-    for name in sorted(error.keys()):
-        ax.plot(ndt[name], error[name], line_styles[j], alpha=0.7, label=name)
+    for name in sorted(y.keys()):
+        ax.plot(x[name], y[name], line_styles[j], alpha=0.7, label=name)
         j += 1
-    ax.set_xlabel('Number of time steps')
-    ax.set_ylabel(error_description)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
     ax.set_xscale('log')
     ax.set_yscale('log')
     leg = ax.legend()
