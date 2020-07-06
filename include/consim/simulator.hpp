@@ -7,6 +7,7 @@
 #include <pinocchio/multibody/data.hpp>
 #include <pinocchio/spatial/motion.hpp>
 
+#define PROFILERYES
 #include <MatrixExponential.hpp>
 #include <LDSUtility.hpp>
 #include <MatExpIntegral.hpp>
@@ -176,6 +177,9 @@ namespace consim {
       void step(const Eigen::VectorXd &tau) override;
 
       int getMatrixMultiplications(){ return utilDense_.getMatrixMultiplications(); }
+      // Return the L1 norm of the last matrix used for computing the matrix exponential
+      double getMatrixExpL1Norm(){ return utilDense_.getL1Norm(); }
+      void useMatrixBalancing(bool flag){ utilDense_.useBalancing(flag); }
 
     protected:
       /**

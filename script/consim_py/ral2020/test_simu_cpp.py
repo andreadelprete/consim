@@ -30,8 +30,8 @@ print(" Test Consim C++ ".center(LINE_WIDTH, '#'))
 print("".center(LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
-i_min = 0
-i_max = 7
+i_min = 2
+i_max = 3
 i_ground_truth = i_max+2
 
 GROUND_TRUTH_EXP_SIMU_PARAMS = {
@@ -41,19 +41,12 @@ GROUND_TRUTH_EXP_SIMU_PARAMS = {
     'ndt': 2**i_ground_truth,
 }
 
-GROUND_TRUTH_EULER_SIMU_PARAMS = {
-    'name': 'ground-truth %d'%(2**i_ground_truth),
-    'method_name': 'ground-truth-euler-semi',
-    'use_exp_int': 0,
-    'ndt': 2**i_ground_truth,
-    'semi_implicit': 0
-}
-
 SIMU_PARAMS = []
 
 # EXPONENTIAL INTEGRATOR WITH STANDARD SETTINGS
 for i in range(i_min, i_max):
-    for m in [0, 1, 2, 3, -1]:
+    for m in [0, 1, 2, 3, 4, -1]:
+#    for m in [-1]:
         SIMU_PARAMS += [{
             'name': 'exp %4d mmm%2d'%(2**i,m),
             'method_name': 'exp mmm%2d'%(m),
@@ -62,20 +55,40 @@ for i in range(i_min, i_max):
             'forward_dyn_method': 3,
             'max_mat_mult': m
         }]
+        
+#for i in range(i_min, i_max):
+#    for m in [7, 8, 9, -1]:
+#        SIMU_PARAMS += [{
+#            'name': 'exp %4d mmm%2d NB'%(2**i,m),
+#            'method_name': 'exp mmm%2d NB'%(m),
+#            'use_exp_int': 1,
+#            'ndt': 2**i,
+#            'forward_dyn_method': 3,
+#            'max_mat_mult': m,
+#            'use_balancing': False
+#        }]
 
 i_min += 0
-i_max += 4
+i_max += 3
+i_ground_truth = i_max+2
+GROUND_TRUTH_EULER_SIMU_PARAMS = {
+    'name': 'ground-truth %d'%(2**i_ground_truth),
+    'method_name': 'ground-truth-euler-semi',
+    'use_exp_int': 0,
+    'ndt': 2**i_ground_truth,
+    'semi_implicit': 0
+}
 # EULER INTEGRATOR WITH EXPLICIT INTEGRATION
-for i in range(i_min, i_max):
-    SIMU_PARAMS += [{
-        'name': 'euler %4d'%(2**i),
-        'method_name': 'euler',
-        'use_exp_int': 0,
-        'ndt': 2**i,
-        'forward_dyn_method': 3,
-        'semi_implicit': 0
-    }]
-#    
+#for i in range(i_min, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'euler %4d'%(2**i),
+#        'method_name': 'euler',
+#        'use_exp_int': 0,
+#        'ndt': 2**i,
+#        'forward_dyn_method': 3,
+#        'semi_implicit': 0
+#    }]
+    
 # EULER INTEGRATOR WITH SEMI-IMPLICIT INTEGRATION
 #for i in range(i_min, i_max):
 #    SIMU_PARAMS += [{
@@ -107,19 +120,20 @@ for i in range(i_min, i_max):
 
 PLOT_FORCES = 0
 PLOT_CONTACT_POINTS = 0
-PLOT_VELOCITY_NORM = 0
+PLOT_VELOCITY_NORM = 1
 PLOT_SLIPPING = 0
 PLOT_BASE_POS = 0
-PLOT_INTEGRATION_ERRORS = 1
+PLOT_INTEGRATION_ERRORS = 0
 PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
-PLOT_MATRIX_MULTIPLICATIONS = 0
+PLOT_MATRIX_MULTIPLICATIONS = 1
+PLOT_MATRIX_NORMS = 1
 
 LOAD_GROUND_TRUTH_FROM_FILE = 0
 SAVE_GROUND_TRUTH_TO_FILE = 1
 RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
 
-TEST_NAME = 'solo-squat'
-#TEST_NAME = 'solo-trot'
+#TEST_NAME = 'solo-squat'
+TEST_NAME = 'solo-trot'
 #TEST_NAME = 'solo-jump'
 #TEST_NAME = 'romeo-walk'
 
@@ -223,12 +237,16 @@ def run_simulation(q0, v0, simu_params, ground_truth):
         max_mat_mult = simu_params['max_mat_mult']
     except:
         max_mat_mult = 100
+    try:
+        use_balancing = simu_params['use_balancing']
+    except:
+        use_balancing = True
         
     if(use_exp_int):
         simu = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
                                     conf.K, conf.B, conf.mu, conf.anchor_slipping_method,
                                     compute_predicted_forces, forward_dyn_method, semi_implicit,
-                                    max_mat_mult, max_mat_mult)
+                                    max_mat_mult, max_mat_mult, use_balancing)
     else:
         simu = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
                                         conf.K, conf.B, conf.mu, forward_dyn_method, semi_implicit)
@@ -253,7 +271,9 @@ def run_simulation(q0, v0, simu_params, ground_truth):
     results.p0 = np.zeros((3, nc, N_SIMULATION+1))
     results.slipping = np.zeros((nc, N_SIMULATION+1))
     results.active = np.zeros((nc, N_SIMULATION+1))
-    results.mat_mult = np.zeros(N_SIMULATION+1)
+    if(use_exp_int):
+        results.mat_mult = np.zeros(N_SIMULATION+1)
+        results.mat_norm = np.zeros(N_SIMULATION+1)
     results.computation_times = {'inner-step': Empty(), 
                                  'compute-integrals': Empty()}
     
@@ -293,6 +313,7 @@ def run_simulation(q0, v0, simu_params, ground_truth):
             
             if(use_exp_int):
                 results.mat_mult[i] = simu.getMatrixMultiplications()
+                results.mat_norm[i] = simu.getMatrixExpL1Norm()
             
             for ci, cp in enumerate(cpts):
                 results.f[:,ci,i+1] = cp.f
@@ -329,6 +350,8 @@ def run_simulation(q0, v0, simu_params, ground_truth):
     except Exception as e:
 #        raise e
         print("Exception while running simulation", e)
+        results.computation_times['inner-step'].avg = np.nan
+        results.computation_times['compute-integrals'].avg = np.nan
 
     if conf.use_viewer:
         play_motion(robot, results.q, dt)
@@ -372,8 +395,7 @@ for simu_params in SIMU_PARAMS:
         data[name] = run_simulation(q0, v0, simu_params, data['ground-truth-euler'])
 
 # COMPUTE INTEGRATION ERRORS:
-ndt, comp_time, err_2norm_avg, err_infnorm_avg, err_infnorm_max, err_traj_2norm, err_traj_infnorm = \
-    compute_integration_errors(data, robot)
+res = compute_integration_errors(data, robot)
 
 # PLOT STUFF
 line_styles = 100*['-o', '--o', '-.o', ':o']
@@ -382,9 +404,9 @@ tt = np.arange(0.0, (N_SIMULATION+1)*dt, dt)[:N_SIMULATION+1]
 # PLOT INTEGRATION ERRORS
 if(PLOT_INTEGRATION_ERRORS):
 #    plot_multi_x_vs_y_log_scale(err_2norm_avg, ndt, 'Mean error 2-norm')
-    plot_multi_x_vs_y_log_scale(err_infnorm_avg, ndt, 'Mean error inf-norm')
+    plot_multi_x_vs_y_log_scale(res.err_infnorm_avg, res.ndt, 'Mean error inf-norm')
 #    plot_multi_x_vs_y_log_scale(err_infnorm_max, ndt, 'Max error inf-norm')   
-    plot_multi_x_vs_y_log_scale(err_infnorm_avg, comp_time, 'Mean error inf-norm', 'Computation time')
+    plot_multi_x_vs_y_log_scale(res.err_infnorm_avg, res.comp_time, 'Mean error inf-norm', 'Computation time')
     
 if(PLOT_INTEGRATION_ERROR_TRAJECTORIES):
 #    (ff, ax) = plut.create_empty_figure(1)
@@ -397,8 +419,8 @@ if(PLOT_INTEGRATION_ERROR_TRAJECTORIES):
 #    if(leg): leg.get_frame().set_alpha(0.5)
     
     (ff, ax) = plut.create_empty_figure(1)
-    for (j,name) in enumerate(sorted(err_traj_infnorm.keys())):
-        ax.plot(tt, err_traj_infnorm[name], line_styles[j], alpha=0.7, label=name)
+    for (j,name) in enumerate(sorted(res.err_traj_infnorm.keys())):
+        ax.plot(tt, res.err_traj_infnorm[name], line_styles[j], alpha=0.7, label=name)
     ax.set_xlabel('Time [s]')
     ax.set_ylabel('Error inf-norm')
     ax.set_yscale('log')
@@ -407,6 +429,7 @@ if(PLOT_INTEGRATION_ERROR_TRAJECTORIES):
     
 
 if(PLOT_MATRIX_MULTIPLICATIONS):    
+    plot_multi_x_vs_y_log_scale(res.mat_mult, res.ndt, 'Mat mult', logy=False)
     (ff, ax) = plut.create_empty_figure(1)
     j=0
     for (name,d) in data.items():
@@ -415,6 +438,19 @@ if(PLOT_MATRIX_MULTIPLICATIONS):
             j+=1
     ax.set_xlabel('Time [s]')
     ax.set_ylabel('Matrix Multiplications')
+    leg = ax.legend()
+    if(leg): leg.get_frame().set_alpha(0.5)
+    
+if(PLOT_MATRIX_NORMS):    
+    plot_multi_x_vs_y_log_scale(res.mat_norm, res.ndt, 'Mat norm')
+    (ff, ax) = plut.create_empty_figure(1)
+    j=0
+    for (name,d) in data.items():
+        if('mat_norm' in d.__dict__.keys()):
+            ax.plot(tt, d.mat_norm, line_styles[j], alpha=0.7, label=name)
+            j+=1
+    ax.set_xlabel('Time [s]')
+    ax.set_ylabel('Matrix Norm')
     leg = ax.legend()
     if(leg): leg.get_frame().set_alpha(0.5)
             

@@ -69,7 +69,7 @@ ExponentialSimulator* build_exponential_simulator(
     float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data,
     Eigen::Vector3d stifness, Eigen::Vector3d damping, double frictionCoefficient, int which_slipping,
     bool compute_predicted_forces, int whichFD, bool semi_implicit,
-    int exp_max_mat_mul, int lds_max_mat_mul)
+    int exp_max_mat_mul, int lds_max_mat_mul, bool useMatrixBalancing)
 {
   LinearPenaltyContactModel *contact_model = new LinearPenaltyContactModel(
       stifness, damping, frictionCoefficient);
@@ -83,6 +83,7 @@ ExponentialSimulator* build_exponential_simulator(
   }
   ExponentialSimulator* sim = new ExponentialSimulator(model, data, dt, n_integration_steps, whichFD, semi_implicit, which_slipping, 
                                   compute_predicted_forces, exp_max_mat_mul, lds_max_mat_mul);
+  sim->useMatrixBalancing(useMatrixBalancing);
   sim->addObject(*obj);
 
   return sim;
@@ -221,7 +222,8 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
         .def("get_q", &ExponentialSimulator::get_q,bp::return_value_policy<bp::copy_const_reference>(), "configuration state vector")
         .def("get_v", &ExponentialSimulator::get_v,bp::return_value_policy<bp::copy_const_reference>(), "tangent vector to configuration")
         .def("get_dv", &ExponentialSimulator::get_dv,bp::return_value_policy<bp::copy_const_reference>(), "time derivative of tangent vector to configuration")
-        .def("getMatrixMultiplications", &ExponentialSimulator::getMatrixMultiplications);
+        .def("getMatrixMultiplications", &ExponentialSimulator::getMatrixMultiplications)
+        .def("getMatrixExpL1Norm", &ExponentialSimulator::getMatrixExpL1Norm);
 }
 
 }
