@@ -72,11 +72,12 @@ def play_motion(robot, q, dt):
         robot.display(q[:,i])
         
         
-def compute_integration_errors(data, robot):
+def compute_integration_errors(data, robot, dt):
     print('\n')
     res = Empty()
-    res.ndt, res.comp_time = {}, {}
-    res.err_2norm_avg, res.err_infnorm_avg, res.err_infnorm_max, res.err_traj_2norm, res.err_traj_infnorm = {}, {}, {}, {}, {}
+    res.ndt, res.dt, res.comp_time, res.realtime_factor = {}, {}, {}, {}
+    res.err_2norm_avg, res.err_infnorm_avg, res.err_infnorm_max = {}, {}, {}
+    res.err_traj_2norm, res.err_traj_infnorm = {}, {}
     res.mat_mult, res.mat_norm = {}, {}
     for name in sorted(data.keys()):
         if('ground-truth' in name): continue
@@ -98,24 +99,24 @@ def compute_integration_errors(data, robot):
         err_2 /= d.q.shape[1]
         err_inf /= d.q.shape[1]
         err_peak = np.max(err_per_time_inf)
-        print(name, 'Log error 2-norm: %.2f'%np.log10(err_2))
+        print(name, 'Log error inf-norm: %.2f'%np.log10(err_inf))
         if(d.method_name not in res.err_2norm_avg):
-            res.err_2norm_avg[d.method_name] = []
-            res.err_infnorm_max[d.method_name] = []
-            res.err_infnorm_avg[d.method_name] = []
-            res.ndt[d.method_name] = []
-            res.comp_time[d.method_name] = []
-            res.mat_mult[d.method_name] = []
-            res.mat_norm[d.method_name] = []
+            for k in res.__dict__.keys():
+                res.__dict__[k][d.method_name] = []
+
         res.err_2norm_avg[d.method_name] += [err_2]
         res.err_infnorm_avg[d.method_name] += [err_inf]
         res.err_infnorm_max[d.method_name] += [err_peak]
         res.err_traj_2norm[name] = err_per_time_2
         res.err_traj_infnorm[name] = err_per_time_inf
         res.ndt[d.method_name] += [d.ndt]
-        res.comp_time[d.method_name] += [d.computation_times['inner-step'].avg * d.ndt]
-        res.mat_mult[d.method_name] += [np.mean(d.mat_mult)]
-        res.mat_norm[d.method_name] += [np.mean(d.mat_norm)]
+        res.dt[d.method_name] += [dt/d.ndt]
+        comp_time = d.computation_times['inner-step'].avg * d.ndt
+        res.comp_time[d.method_name] += [comp_time]
+        res.realtime_factor[d.method_name] += [dt/comp_time]
+        if(d.use_exp_int==1):
+            res.mat_mult[d.method_name] += [np.mean(d.mat_mult)]
+            res.mat_norm[d.method_name] += [np.mean(d.mat_norm)]
     return res
         
         
@@ -124,12 +125,13 @@ def plot_multi_x_vs_y_log_scale(y, x, ylabel, xlabel='Number of time steps', log
     (ff, ax) = plut.create_empty_figure(1)
     j = 0
     for name in sorted(y.keys()):
-        ax.plot(x[name], y[name], line_styles[j], alpha=0.7, label=name)
-        j += 1
+        if(len(y[name])>0):
+            ax.plot(x[name], y[name], line_styles[j], alpha=0.7, markerSize=10, label=name)
+            j += 1
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax.set_xscale('log')
     if(logy):
         ax.set_yscale('log')
-    leg = ax.legend()
+    leg = ax.legend(loc='best')
     if(leg): leg.get_frame().set_alpha(0.5)

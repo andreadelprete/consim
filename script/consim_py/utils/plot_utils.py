@@ -54,7 +54,7 @@ mpl.rcParams['legend.fontsize'] = DEFAULT_LEGEND_FONT_SIZE
 # opacity of of legend frame
 mpl.rcParams['legend.framealpha'] = 0.5
 mpl.rcParams['figure.facecolor'] = DEFAULT_FIGURE_FACE_COLOR
-mpl.rcParams['figure.figsize'] = 23, 18  # 12, 9 #
+mpl.rcParams['figure.figsize'] = 16, 9 #23, 18  # 12, 9
 
 
 def create_empty_figure(nRows=1, nCols=1, spinesPos=None, sharex=True, name=None):

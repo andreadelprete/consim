@@ -23,16 +23,67 @@ from consim_py.ral2020.tsid_biped import TsidBiped
 
 def ndprint(a, format_string ='{0:.2f}'):
     print([format_string.format(v,i) for i,v in enumerate(a)])
-    
+
+plut.SAVE_FIGURES = 1
+PLOT_FORCES = 0
+PLOT_CONTACT_POINTS = 0
+PLOT_VELOCITY_NORM = 1
+PLOT_SLIPPING = 1
+PLOT_BASE_POS = 0
+PLOT_INTEGRATION_ERRORS = 1
+PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
+PLOT_MATRIX_MULTIPLICATIONS = 1
+PLOT_MATRIX_NORMS = 1
+
+LOAD_GROUND_TRUTH_FROM_FILE = 0
+SAVE_GROUND_TRUTH_TO_FILE = 1
+RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
+
+#TEST_NAME = 'solo-squat'
+#TEST_NAME = 'solo-trot'
+#TEST_NAME = 'solo-jump'
+TEST_NAME = 'romeo-walk'
+
 LINE_WIDTH = 100
 print("".center(LINE_WIDTH, '#'))
 print(" Test Consim C++ ".center(LINE_WIDTH, '#'))
+print(TEST_NAME.center(LINE_WIDTH, '#'))
 print("".center(LINE_WIDTH, '#'))
 
-# parameters of the simulation to be tested
-i_min = 2
-i_max = 3
-i_ground_truth = i_max+2
+plut.FIGURE_PATH = './'+TEST_NAME+'/'
+N_SIMULATION = 300
+dt = 0.010      # controller and simulator time step
+
+if(TEST_NAME=='solo-squat'):
+    robot_name = 'solo'
+    motionName = 'squat'
+    ctrl_type = 'tsid-quadruped'
+    com_offset = np.array([0.0, -0.0, 0.0])
+    com_amp    = np.array([0.0, 0.0, 0.05])
+    com_freq   = np.array([0.0, .0, 2.0])
+if(TEST_NAME=='solo-trot'):
+    robot_name = 'solo'
+    motionName = 'trot'
+    ctrl_type = 'linear'
+    dt = 0.002      # controller and simulator time step
+    assert(np.floor(dt_ref/dt)==dt_ref/dt)
+if(TEST_NAME=='solo-jump'):
+    robot_name = 'solo'
+    motionName = 'jump'
+    ctrl_type = 'linear'
+    assert(np.floor(dt_ref/dt)==dt_ref/dt)
+elif(TEST_NAME=='romeo-walk'):
+    robot_name = 'romeo'
+    motionName = 'walk'
+    ctrl_type = 'tsid-biped'
+    dt = 0.04
+
+# ground truth computed with time step 1/64 ms
+ground_truth_dt = 1e-3/64
+i_ground_truth = int(np.log2(dt / ground_truth_dt))
+i_min = 0
+i_max = i_ground_truth - 2
+
 
 GROUND_TRUTH_EXP_SIMU_PARAMS = {
     'name': 'ground-truth %d'%(2**i_ground_truth),
@@ -55,18 +106,6 @@ for i in range(i_min, i_max):
             'forward_dyn_method': 3,
             'max_mat_mult': m
         }]
-        
-#for i in range(i_min, i_max):
-#    for m in [7, 8, 9, -1]:
-#        SIMU_PARAMS += [{
-#            'name': 'exp %4d mmm%2d NB'%(2**i,m),
-#            'method_name': 'exp mmm%2d NB'%(m),
-#            'use_exp_int': 1,
-#            'ndt': 2**i,
-#            'forward_dyn_method': 3,
-#            'max_mat_mult': m,
-#            'use_balancing': False
-#        }]
 
 i_min += 0
 i_max += 3
@@ -78,16 +117,17 @@ GROUND_TRUTH_EULER_SIMU_PARAMS = {
     'ndt': 2**i_ground_truth,
     'semi_implicit': 0
 }
+
 # EULER INTEGRATOR WITH EXPLICIT INTEGRATION
-#for i in range(i_min, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'euler %4d'%(2**i),
-#        'method_name': 'euler',
-#        'use_exp_int': 0,
-#        'ndt': 2**i,
-#        'forward_dyn_method': 3,
-#        'semi_implicit': 0
-#    }]
+for i in range(i_min, i_max):
+    SIMU_PARAMS += [{
+        'name': 'euler %4d'%(2**i),
+        'method_name': 'euler',
+        'use_exp_int': 0,
+        'ndt': 2**i,
+        'forward_dyn_method': 3,
+        'semi_implicit': 0
+    }]
     
 # EULER INTEGRATOR WITH SEMI-IMPLICIT INTEGRATION
 #for i in range(i_min, i_max):
@@ -118,51 +158,7 @@ GROUND_TRUTH_EULER_SIMU_PARAMS = {
 #        'forward_dyn_method': 3
 #    }]
 
-PLOT_FORCES = 0
-PLOT_CONTACT_POINTS = 0
-PLOT_VELOCITY_NORM = 1
-PLOT_SLIPPING = 0
-PLOT_BASE_POS = 0
-PLOT_INTEGRATION_ERRORS = 0
-PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
-PLOT_MATRIX_MULTIPLICATIONS = 1
-PLOT_MATRIX_NORMS = 1
 
-LOAD_GROUND_TRUTH_FROM_FILE = 0
-SAVE_GROUND_TRUTH_TO_FILE = 1
-RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
-
-#TEST_NAME = 'solo-squat'
-TEST_NAME = 'solo-trot'
-#TEST_NAME = 'solo-jump'
-#TEST_NAME = 'romeo-walk'
-
-N_SIMULATION = 300
-dt = 0.010      # controller and simulator time step
-
-if(TEST_NAME=='solo-squat'):
-    robot_name = 'solo'
-    motionName = 'squat'
-    ctrl_type = 'tsid-quadruped'
-    com_offset = np.array([0.0, -0.0, 0.0])
-    com_amp    = np.array([0.0, 0.0, 0.05])
-    com_freq   = np.array([0.0, .0, 2.0])
-if(TEST_NAME=='solo-trot'):
-    robot_name = 'solo'
-    motionName = 'trot'
-    ctrl_type = 'linear'
-    dt = 0.002      # controller and simulator time step
-    assert(np.floor(dt_ref/dt)==dt_ref/dt)
-if(TEST_NAME=='solo-jump'):
-    robot_name = 'solo'
-    motionName = 'jump'
-    ctrl_type = 'linear'
-    assert(np.floor(dt_ref/dt)==dt_ref/dt)
-elif(TEST_NAME=='romeo-walk'):
-    robot_name = 'romeo'
-    motionName = 'walk'
-    ctrl_type = 'tsid-biped'
-    dt = 0.04
     
 unilateral_contacts = 1
 compute_predicted_forces = False
@@ -192,9 +188,6 @@ elif(robot_name=='romeo'):
 
 PRINT_N = int(conf.PRINT_T/dt)
 ground_truth_file_name = robot_name+"_"+motionName+str(dt)+"_cpp.p"
-
-exp_max_mul = 100 
-int_max_mul = 100 
 
 nq, nv = robot.nq, robot.nv
 
@@ -344,8 +337,8 @@ def run_simulation(q0, v0, simu_params, ground_truth):
             results.computation_times['inner-step'].avg = \
                 consim.stop_watch_get_average_time("euler_simulator::substep")
             results.computation_times['compute-integrals'].avg = 0
-        for key in results.computation_times.keys():
-            print("%20s: %.1f us"%(key, results.computation_times[key].avg*1e6))
+#        for key in results.computation_times.keys():
+#            print("%20s: %.1f us"%(key, results.computation_times[key].avg*1e6))
             
     except Exception as e:
 #        raise e
@@ -395,18 +388,26 @@ for simu_params in SIMU_PARAMS:
         data[name] = run_simulation(q0, v0, simu_params, data['ground-truth-euler'])
 
 # COMPUTE INTEGRATION ERRORS:
-res = compute_integration_errors(data, robot)
+res = compute_integration_errors(data, robot, dt)
 
 # PLOT STUFF
 line_styles = 100*['-o', '--o', '-.o', ':o']
 tt = np.arange(0.0, (N_SIMULATION+1)*dt, dt)[:N_SIMULATION+1]
-    
+descr_str = "k_%.1f_b_%.1f"%(np.log10(conf.K[0]), np.log10(conf.B[0]))
+
 # PLOT INTEGRATION ERRORS
 if(PLOT_INTEGRATION_ERRORS):
 #    plot_multi_x_vs_y_log_scale(err_2norm_avg, ndt, 'Mean error 2-norm')
-    plot_multi_x_vs_y_log_scale(res.err_infnorm_avg, res.ndt, 'Mean error inf-norm')
-#    plot_multi_x_vs_y_log_scale(err_infnorm_max, ndt, 'Max error inf-norm')   
-    plot_multi_x_vs_y_log_scale(res.err_infnorm_avg, res.comp_time, 'Mean error inf-norm', 'Computation time')
+#    plot_multi_x_vs_y_log_scale(err_infnorm_max, ndt, 'Max error inf-norm')
+
+    plot_multi_x_vs_y_log_scale(res.err_infnorm_avg, res.dt, 'Mean error inf-norm', 'Time step [s]')
+    plut.saveFigure("local_err_vs_dt_"+descr_str)
+
+    plot_multi_x_vs_y_log_scale(res.err_infnorm_avg, res.comp_time, 'Mean error inf-norm', 'Computation time per step')
+    plut.saveFigure("local_err_vs_comp_time_"+descr_str)
+    
+    plot_multi_x_vs_y_log_scale(res.err_infnorm_avg, res.realtime_factor, 'Mean error inf-norm', 'Real-time factor')
+    plut.saveFigure("local_err_vs_realtime_factor_"+descr_str)
     
 if(PLOT_INTEGRATION_ERROR_TRAJECTORIES):
 #    (ff, ax) = plut.create_empty_figure(1)
@@ -420,13 +421,14 @@ if(PLOT_INTEGRATION_ERROR_TRAJECTORIES):
     
     (ff, ax) = plut.create_empty_figure(1)
     for (j,name) in enumerate(sorted(res.err_traj_infnorm.keys())):
-        ax.plot(tt, res.err_traj_infnorm[name], line_styles[j], alpha=0.7, label=name)
+        if(len(res.err_traj_infnorm[name])>0):
+            ax.plot(tt, res.err_traj_infnorm[name], line_styles[j], alpha=0.7, label=name)
     ax.set_xlabel('Time [s]')
     ax.set_ylabel('Error inf-norm')
     ax.set_yscale('log')
     leg = ax.legend()
     if(leg): leg.get_frame().set_alpha(0.5)
-    
+    plut.saveFigure("local_err_traj_"+descr_str)
 
 if(PLOT_MATRIX_MULTIPLICATIONS):    
     plot_multi_x_vs_y_log_scale(res.mat_mult, res.ndt, 'Mat mult', logy=False)
@@ -440,6 +442,7 @@ if(PLOT_MATRIX_MULTIPLICATIONS):
     ax.set_ylabel('Matrix Multiplications')
     leg = ax.legend()
     if(leg): leg.get_frame().set_alpha(0.5)
+    plut.saveFigure("matrix_multiplications_"+descr_str)
     
 if(PLOT_MATRIX_NORMS):    
     plot_multi_x_vs_y_log_scale(res.mat_norm, res.ndt, 'Mat norm')
@@ -453,6 +456,7 @@ if(PLOT_MATRIX_NORMS):
     ax.set_ylabel('Matrix Norm')
     leg = ax.legend()
     if(leg): leg.get_frame().set_alpha(0.5)
+    plut.saveFigure("matrix_norms_"+descr_str)
             
 # PLOT THE CONTACT FORCES OF ALL INTEGRATION METHODS ON THE SAME PLOT
 if(PLOT_FORCES):        
@@ -497,6 +501,7 @@ if(PLOT_VELOCITY_NORM):
     ax.set_yscale('log')
     leg = ax.legend()
     if(leg): leg.get_frame().set_alpha(0.5)
+    plut.saveFigure("velocity_norm_"+descr_str)
         
 # PLOT THE SLIPPING FLAG OF ALL INTEGRATION METHODS ON THE SAME PLOT
 if(PLOT_SLIPPING):
@@ -513,6 +518,7 @@ if(PLOT_SLIPPING):
     ax[0].set_ylabel('Contact Slipping Flag')
     leg = ax[0].legend()
     if(leg): leg.get_frame().set_alpha(0.5)
+    plut.saveFigure("slipping_flag_"+descr_str)
 
     if(nc<5):
         (ff, ax) = plut.create_empty_figure(nc, 1)
@@ -526,6 +532,7 @@ if(PLOT_SLIPPING):
     ax[0].set_ylabel('Contact Active Flag')
     leg = ax[0].legend()
     if(leg): leg.get_frame().set_alpha(0.5)
+    plut.saveFigure("active_contact_flag_"+descr_str)
 
        
 # PLOT THE JOINT ANGLES OF ALL INTEGRATION METHODS ON THE SAME PLOT
@@ -542,4 +549,4 @@ if(PLOT_BASE_POS):
         leg = ax[0].legend()
         if(leg): leg.get_frame().set_alpha(0.5)
         
-plt.show()
+#plt.show()
