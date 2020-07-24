@@ -17,6 +17,7 @@ contact_normal = np.array([0., 0., 1.])
 K = 1e5*np.ones(3)
 B = 1e2*np.ones(3)
 anchor_slipping_method = 1
+unilateral_contacts = 1
 
 DATA_FILE_TSID = '../demo/references/romeo_walking_traj_tsid.npz'
 modelPath = '/home/student/devel/src/tsid/models/romeo'

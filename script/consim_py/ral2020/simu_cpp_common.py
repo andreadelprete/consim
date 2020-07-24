@@ -54,6 +54,7 @@ def load_solo_ref_traj(robot, dt, motionName='trot'):
 
 
 def play_motion(robot, q, dt):
+    ''' play motion in viewer '''
     N_SIMULATION = q.shape[1]
     t, i = 0.0, 0
     time_start_viewer = time.time()
@@ -135,3 +136,150 @@ def plot_multi_x_vs_y_log_scale(y, x, ylabel, xlabel='Number of time steps', log
         ax.set_yscale('log')
     leg = ax.legend(loc='best')
     if(leg): leg.get_frame().set_alpha(0.5)
+    
+    
+def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_truth=None):  
+    import consim
+    compute_predicted_forces = False     
+    nq, nv = robot.nq, robot.nv
+    ndt = simu_params['ndt']
+    use_exp_int = simu_params['use_exp_int']
+    try:
+        forward_dyn_method = simu_params['forward_dyn_method']
+    except:
+        # forward_dyn_method Options 
+        #  1: pinocchio.Minverse()
+        #  2: pinocchio.aba()
+        #  3: Cholesky factorization 
+        forward_dyn_method = 1
+    try:
+        semi_implicit = simu_params['semi_implicit']
+    except:
+        semi_implicit = 0
+    try:
+        max_mat_mult = simu_params['max_mat_mult']
+    except:
+        max_mat_mult = 100
+    try:
+        use_balancing = simu_params['use_balancing']
+    except:
+        use_balancing = True
+        
+    if(use_exp_int):
+        simu = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
+                                    conf.K, conf.B, conf.mu, conf.anchor_slipping_method,
+                                    compute_predicted_forces, forward_dyn_method, semi_implicit,
+                                    max_mat_mult, max_mat_mult, use_balancing)
+    else:
+        simu = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
+                                        conf.K, conf.B, conf.mu, forward_dyn_method, semi_implicit)
+                                        
+    cpts = []
+    for cf in conf.contact_frames:
+        if not robot.model.existFrame(cf):
+            print(("ERROR: Frame", cf, "does not exist"))
+        cpts += [simu.add_contact_point(cf, robot.model.getFrameId(cf), conf.unilateral_contacts)]
+        
+    simu.reset_state(q0, v0, True)
+            
+    t = 0.0    
+    nc = len(conf.contact_frames)
+    results = Empty()
+    results.q = np.zeros((nq, N+1))
+    results.v = np.zeros((nv, N+1))
+    results.u = np.zeros((nv, N+1))
+    results.f = np.zeros((3, nc, N+1))
+    results.p = np.zeros((3, nc, N+1))
+    results.dp = np.zeros((3, nc, N+1))
+    results.p0 = np.zeros((3, nc, N+1))
+    results.slipping = np.zeros((nc, N+1))
+    results.active = np.zeros((nc, N+1))
+    if(use_exp_int):
+        results.mat_mult = np.zeros(N+1)
+        results.mat_norm = np.zeros(N+1)
+    results.computation_times = {'inner-step': Empty(), 
+                                 'compute-integrals': Empty()}
+    
+    results.q[:,0] = np.copy(q0)
+    results.v[:,0] = np.copy(v0)
+    for ci, cp in enumerate(cpts):
+        results.f[:,ci,0] = cp.f
+        results.p[:,ci,0] = cp.x
+        results.p0[:,ci,0] = cp.x_anchor
+        results.dp[:,ci,0] = cp.v
+        results.slipping[ci,0] = cp.slipping
+        results.active[ci,0] = cp.active
+#    print('K*p', conf.K[2]*results.p[2,:,0].squeeze())
+    
+    try:
+        controller.reset(q0, v0, conf.T_pre)
+        consim.stop_watch_reset_all()
+        time_start = time.time()
+        for i in range(0, N):
+            if(ground_truth):                
+                # first reset to ensure active contact points are correctly marked because otherwise the second
+                # time I reset the state the anchor points could be overwritten
+                reset_anchor_points = True
+                simu.reset_state(ground_truth.q[:,i], ground_truth.v[:,i], reset_anchor_points)
+                # then reset anchor points
+                for ci, cp in enumerate(cpts):
+                    cp.resetAnchorPoint(ground_truth.p0[:,ci,i], bool(ground_truth.slipping[ci,i]))
+                # then reset once againt to compute updated contact forces, but without touching anchor points
+                reset_anchor_points = False
+                simu.reset_state(ground_truth.q[:,i], ground_truth.v[:,i], reset_anchor_points)
+                    
+            results.u[6:,i] = controller.compute_control(simu.get_q(), simu.get_v())
+            simu.step(results.u[:,i])
+                
+            results.q[:,i+1] = simu.get_q()
+            results.v[:,i+1] = simu.get_v()
+            
+            if(use_exp_int):
+                results.mat_mult[i] = simu.getMatrixMultiplications()
+                results.mat_norm[i] = simu.getMatrixExpL1Norm()
+            
+            for ci, cp in enumerate(cpts):
+                results.f[:,ci,i+1] = cp.f
+                results.p[:,ci,i+1] = cp.x
+                results.p0[:,ci,i+1] = cp.x_anchor
+                results.dp[:,ci,i+1] = cp.v
+                results.slipping[ci,i+1] = cp.slipping
+                results.active[ci,i+1] = cp.active
+#                if(cp.active != results.active[ci,i]):
+#                    print("%.3f"%t, cp.name, 'changed contact state to ', cp.active, cp.x)
+            
+            if(np.any(np.isnan(results.v[:,i+1])) or norm(results.v[:,i+1]) > 1e6):
+                raise Exception("Time %.3f Velocities are too large: %.1f. Stop simulation."%(
+                                t, norm(results.v[:,i+1])))
+    
+#            if i % PRINT_N == 0:
+#                print("Time %.3f" % (t))  
+            t += dt
+        
+#        print("Real-time factor:", t/(time.time() - time_start))
+#        consim.stop_watch_report(3)
+        if(use_exp_int):
+            results.computation_times['inner-step'].avg = \
+                consim.stop_watch_get_average_time("exponential_simulator::substep")
+            results.computation_times['compute-integrals'].avg = \
+                consim.stop_watch_get_average_time("exponential_simulator::computeIntegralsXt")
+        else:
+            results.computation_times['inner-step'].avg = \
+                consim.stop_watch_get_average_time("euler_simulator::substep")
+            results.computation_times['compute-integrals'].avg = 0
+#        for key in results.computation_times.keys():
+#            print("%20s: %.1f us"%(key, results.computation_times[key].avg*1e6))
+            
+    except Exception as e:
+#        raise e
+        print("Exception while running simulation", e)
+        results.computation_times['inner-step'].avg = np.nan
+        results.computation_times['compute-integrals'].avg = np.nan
+
+    if conf.use_viewer:
+        play_motion(robot, results.q, dt)
+                    
+    for key in simu_params.keys():
+        results.__dict__[key] = simu_params[key]
+
+    return results

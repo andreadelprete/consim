@@ -14,7 +14,7 @@ from pinocchio.robot_wrapper import RobotWrapper
 import pickle
 
 from simu_cpp_common import Empty, dt_ref, play_motion, load_solo_ref_traj, \
-    plot_multi_x_vs_y_log_scale, compute_integration_errors
+    plot_multi_x_vs_y_log_scale, compute_integration_errors, run_simulation
 
 # CONTROLLERS
 from linear_feedback_controller import LinearFeedbackController
@@ -24,7 +24,7 @@ from consim_py.ral2020.tsid_biped import TsidBiped
 def ndprint(a, format_string ='{0:.2f}'):
     print([format_string.format(v,i) for i,v in enumerate(a)])
 
-plut.SAVE_FIGURES = 1
+plut.SAVE_FIGURES = 0
 PLOT_FORCES = 0
 PLOT_CONTACT_POINTS = 0
 PLOT_VELOCITY_NORM = 1
@@ -40,9 +40,9 @@ SAVE_GROUND_TRUTH_TO_FILE = 1
 RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
 
 #TEST_NAME = 'solo-squat'
-#TEST_NAME = 'solo-trot'
+TEST_NAME = 'solo-trot'
 #TEST_NAME = 'solo-jump'
-TEST_NAME = 'romeo-walk'
+#TEST_NAME = 'romeo-walk'
 
 LINE_WIDTH = 100
 print("".center(LINE_WIDTH, '#'))
@@ -51,7 +51,7 @@ print(TEST_NAME.center(LINE_WIDTH, '#'))
 print("".center(LINE_WIDTH, '#'))
 
 plut.FIGURE_PATH = './'+TEST_NAME+'/'
-N_SIMULATION = 300
+Ns = 300
 dt = 0.010      # controller and simulator time step
 
 if(TEST_NAME=='solo-squat'):
@@ -96,8 +96,8 @@ SIMU_PARAMS = []
 
 # EXPONENTIAL INTEGRATOR WITH STANDARD SETTINGS
 for i in range(i_min, i_max):
-    for m in [0, 1, 2, 3, 4, -1]:
-#    for m in [-1]:
+#    for m in [0, 1, 2, 3, 4, -1]:
+    for m in [-1]:
         SIMU_PARAMS += [{
             'name': 'exp %4d mmm%2d'%(2**i,m),
             'method_name': 'exp mmm%2d'%(m),
@@ -161,7 +161,7 @@ for i in range(i_min, i_max):
 
     
 unilateral_contacts = 1
-compute_predicted_forces = False
+
 
 if(robot_name=='solo'):
     import conf_solo_cpp as conf
@@ -201,158 +201,15 @@ if(ctrl_type=='linear'):
     refX, refU, feedBack = load_solo_ref_traj(robot, dt, motionName)
     controller = LinearFeedbackController(robot, dt, refX, refU, feedBack)
     q0, v0 = controller.q0, controller.v0
-    N_SIMULATION = controller.refU.shape[0]
+    N = controller.refU.shape[0]
 elif(ctrl_type=='tsid-quadruped'):
     controller = TsidQuadruped(conf, dt, robot, com_offset, com_freq, com_amp, conf.q0, viewer=False)
     q0, v0 = conf.q0, conf.v0
 elif(ctrl_type=='tsid-biped'):
     controller = TsidBiped(conf, dt, conf.urdf, conf.modelPath, conf.srdf)
     q0, v0 = controller.q0, controller.v0
-    N_SIMULATION = controller.N+int((conf.T_pre+conf.T_post)/dt)
-    
+    N = controller.N+int((conf.T_pre+conf.T_post)/dt)
 
-def run_simulation(q0, v0, simu_params, ground_truth):        
-    ndt = simu_params['ndt']
-    use_exp_int = simu_params['use_exp_int']
-    try:
-        forward_dyn_method = simu_params['forward_dyn_method']
-    except:
-        # forward_dyn_method Options 
-        #  1: pinocchio.Minverse()
-        #  2: pinocchio.aba()
-        #  3: Cholesky factorization 
-        forward_dyn_method = 1
-    try:
-        semi_implicit = simu_params['semi_implicit']
-    except:
-        semi_implicit = 0
-    try:
-        max_mat_mult = simu_params['max_mat_mult']
-    except:
-        max_mat_mult = 100
-    try:
-        use_balancing = simu_params['use_balancing']
-    except:
-        use_balancing = True
-        
-    if(use_exp_int):
-        simu = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
-                                    conf.K, conf.B, conf.mu, conf.anchor_slipping_method,
-                                    compute_predicted_forces, forward_dyn_method, semi_implicit,
-                                    max_mat_mult, max_mat_mult, use_balancing)
-    else:
-        simu = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
-                                        conf.K, conf.B, conf.mu, forward_dyn_method, semi_implicit)
-                                        
-    cpts = []
-    for cf in conf.contact_frames:
-        if not robot.model.existFrame(cf):
-            print(("ERROR: Frame", cf, "does not exist"))
-        cpts += [simu.add_contact_point(cf, robot.model.getFrameId(cf), unilateral_contacts)]
-        
-    simu.reset_state(q0, v0, True)
-            
-    t = 0.0    
-    nc = len(conf.contact_frames)
-    results = Empty()
-    results.q = np.zeros((nq, N_SIMULATION+1))
-    results.v = np.zeros((nv, N_SIMULATION+1))
-    results.u = np.zeros((nv, N_SIMULATION+1))
-    results.f = np.zeros((3, nc, N_SIMULATION+1))
-    results.p = np.zeros((3, nc, N_SIMULATION+1))
-    results.dp = np.zeros((3, nc, N_SIMULATION+1))
-    results.p0 = np.zeros((3, nc, N_SIMULATION+1))
-    results.slipping = np.zeros((nc, N_SIMULATION+1))
-    results.active = np.zeros((nc, N_SIMULATION+1))
-    if(use_exp_int):
-        results.mat_mult = np.zeros(N_SIMULATION+1)
-        results.mat_norm = np.zeros(N_SIMULATION+1)
-    results.computation_times = {'inner-step': Empty(), 
-                                 'compute-integrals': Empty()}
-    
-    results.q[:,0] = np.copy(q0)
-    results.v[:,0] = np.copy(v0)
-    for ci, cp in enumerate(cpts):
-        results.f[:,ci,0] = cp.f
-        results.p[:,ci,0] = cp.x
-        results.p0[:,ci,0] = cp.x_anchor
-        results.dp[:,ci,0] = cp.v
-        results.slipping[ci,0] = cp.slipping
-        results.active[ci,0] = cp.active
-#    print('K*p', conf.K[2]*results.p[2,:,0].squeeze())
-    
-    try:
-        controller.reset(q0, v0, conf.T_pre)
-        consim.stop_watch_reset_all()
-        time_start = time.time()
-        for i in range(0, N_SIMULATION):
-            if(RESET_STATE_ON_GROUND_TRUTH and ground_truth):                
-                # first reset to ensure active contact points are correctly marked because otherwise the second
-                # time I reset the state the anchor points could be overwritten
-                reset_anchor_points = True
-                simu.reset_state(ground_truth.q[:,i], ground_truth.v[:,i], reset_anchor_points)
-                # then reset anchor points
-                for ci, cp in enumerate(cpts):
-                    cp.resetAnchorPoint(ground_truth.p0[:,ci,i], bool(ground_truth.slipping[ci,i]))
-                # then reset once againt to compute updated contact forces, but without touching anchor points
-                reset_anchor_points = False
-                simu.reset_state(ground_truth.q[:,i], ground_truth.v[:,i], reset_anchor_points)
-                    
-            results.u[6:,i] = controller.compute_control(simu.get_q(), simu.get_v())
-            simu.step(results.u[:,i])
-                
-            results.q[:,i+1] = simu.get_q()
-            results.v[:,i+1] = simu.get_v()
-            
-            if(use_exp_int):
-                results.mat_mult[i] = simu.getMatrixMultiplications()
-                results.mat_norm[i] = simu.getMatrixExpL1Norm()
-            
-            for ci, cp in enumerate(cpts):
-                results.f[:,ci,i+1] = cp.f
-                results.p[:,ci,i+1] = cp.x
-                results.p0[:,ci,i+1] = cp.x_anchor
-                results.dp[:,ci,i+1] = cp.v
-                results.slipping[ci,i+1] = cp.slipping
-                results.active[ci,i+1] = cp.active
-#                if(cp.active != results.active[ci,i]):
-#                    print("%.3f"%t, cp.name, 'changed contact state to ', cp.active, cp.x)
-            
-            if(np.any(np.isnan(results.v[:,i+1])) or norm(results.v[:,i+1]) > 1e6):
-                raise Exception("Time %.3f Velocities are too large: %.1f. Stop simulation."%(
-                                t, norm(results.v[:,i+1])))
-    
-#            if i % PRINT_N == 0:
-#                print("Time %.3f" % (t))  
-            t += dt
-        
-#        print("Real-time factor:", t/(time.time() - time_start))
-#        consim.stop_watch_report(3)
-        if(use_exp_int):
-            results.computation_times['inner-step'].avg = \
-                consim.stop_watch_get_average_time("exponential_simulator::substep")
-            results.computation_times['compute-integrals'].avg = \
-                consim.stop_watch_get_average_time("exponential_simulator::computeIntegralsXt")
-        else:
-            results.computation_times['inner-step'].avg = \
-                consim.stop_watch_get_average_time("euler_simulator::substep")
-            results.computation_times['compute-integrals'].avg = 0
-#        for key in results.computation_times.keys():
-#            print("%20s: %.1f us"%(key, results.computation_times[key].avg*1e6))
-            
-    except Exception as e:
-#        raise e
-        print("Exception while running simulation", e)
-        results.computation_times['inner-step'].avg = np.nan
-        results.computation_times['compute-integrals'].avg = np.nan
-
-    if conf.use_viewer:
-        play_motion(robot, results.q, dt)
-                    
-    for key in simu_params.keys():
-        results.__dict__[key] = simu_params[key]
-
-    return results
 
 if(LOAD_GROUND_TRUTH_FROM_FILE):    
     print("\nLoad ground truth from file")
@@ -363,7 +220,7 @@ if(LOAD_GROUND_TRUTH_FROM_FILE):
 #    refU = refU[i0:i1,:]
 #    feedBack = feedBack[i0:i1,:,:]
 ##    q0, v0 = refX[0,:nq], refX[0,nq:]
-#    N_SIMULATION = refU.shape[0]
+#    N = refU.shape[0]
 #    for key in ['ground-truth-exp', 'ground-truth-euler']:
 #        data[key].q  = data[key].q[:,i0:i1+1]
 #        data[key].v  = data[key].v[:,i0:i1+1]
@@ -373,8 +230,9 @@ if(LOAD_GROUND_TRUTH_FROM_FILE):
 else:
     data = {}
     print("\nStart simulation ground truth")
-    data['ground-truth-exp'] = run_simulation(q0, v0, GROUND_TRUTH_EXP_SIMU_PARAMS, None)
-    data['ground-truth-euler'] = run_simulation(q0, v0, GROUND_TRUTH_EULER_SIMU_PARAMS, None)
+    
+    data['ground-truth-exp'] = run_simulation(conf, dt, N, robot, controller, q0, v0, GROUND_TRUTH_EXP_SIMU_PARAMS)
+    data['ground-truth-euler'] = run_simulation(conf, dt, N, robot, controller, q0, v0, GROUND_TRUTH_EULER_SIMU_PARAMS)
     if(SAVE_GROUND_TRUTH_TO_FILE):
         pickle.dump( data, open( ground_truth_file_name, "wb" ) )
 
@@ -383,16 +241,16 @@ for simu_params in SIMU_PARAMS:
     name = simu_params['name']
     print("\nStart simulation", name)
     if(simu_params['use_exp_int']):
-        data[name] = run_simulation(q0, v0, simu_params, data['ground-truth-exp'])
+        data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, data['ground-truth-exp'])
     else:
-        data[name] = run_simulation(q0, v0, simu_params, data['ground-truth-euler'])
+        data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, data['ground-truth-euler'])
 
 # COMPUTE INTEGRATION ERRORS:
 res = compute_integration_errors(data, robot, dt)
 
 # PLOT STUFF
 line_styles = 100*['-o', '--o', '-.o', ':o']
-tt = np.arange(0.0, (N_SIMULATION+1)*dt, dt)[:N_SIMULATION+1]
+tt = np.arange(0.0, (N+1)*dt, dt)[:N+1]
 descr_str = "k_%.1f_b_%.1f"%(np.log10(conf.K[0]), np.log10(conf.B[0]))
 
 # PLOT INTEGRATION ERRORS
