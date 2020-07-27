@@ -24,8 +24,8 @@ print(" Test Solo ".center(conf.LINE_WIDTH, '#'))
 print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
-i_min = 3
-i_max = i_min+3
+i_min = 6
+i_max = i_min+1
 i_ground_truth = i_max+2
 
 GROUND_TRUTH_SIMU_PARAMS = {
@@ -79,13 +79,13 @@ for i in range(i_min, i_max):
 #       }]
 
 # EULER SIMULATOR with Cholesky
-for i in range(5, i_max):
-    SIMU_PARAMS += [{
-        'name': 'euler%4d Chol'%(2**i),
-        'method_name': 'euler Chol',
-        'use_exp_int': 0,
-        'ndt': 2**i,
-    }]
+#for i in range(5, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'euler%4d Chol'%(2**i),
+#        'method_name': 'euler Chol',
+#        'use_exp_int': 0,
+#        'ndt': 2**i,
+#    }]
     
 ## EULER SIMULATOR with ABA
 #for i in range(5, i_max):
@@ -110,20 +110,20 @@ for i in range(5, i_max):
 PLOT_UPSILON = 0
 PLOT_FORCES = 0
 PLOT_BASE_POS = 0
-PLOT_FORCE_PREDICTIONS = 0
-PLOT_INTEGRATION_ERRORS = 1
+PLOT_FORCE_PREDICTIONS = 1
+PLOT_INTEGRATION_ERRORS = 0
 PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
 PLOT_MAT_MULT_EXPM = 0
 PLOT_MAT_NORM_EXPM = 0
 
 ASSUME_A_INVERTIBLE = 0
 USE_CONTROLLER = 1
-dt = 0.01                      # controller time step
+dt = 0.02                      # controller time step
 T = 0.1
 
 offset = np.array([0.0, -0.0, 0.0])
 amp = np.array([0.0, 0.0, 0.05])
-two_pi_f = 2*np.pi*np.array([0.0, .0, 2.0])
+frequency = np.array([0.0, .0, 2.0])
 
 N_SIMULATION = int(T/dt)        # number of time steps simulated
 PRINT_N = int(conf.PRINT_T/dt)
@@ -137,15 +137,16 @@ q0, v0 = np.copy(simu.q), np.copy(simu.v)
 
 # DEBUG
 #q0[2] += 1.0
-#q0[2] += 1e-2
-q0[2] -= 6e-6
-v0[2] -= 10e-2
+q0[2] += 1e-2
+
+#q0[2] -= 6e-6
+#v0[2] -= 10e-2
 
 for name in conf.contact_frames:
     simu.add_contact(name, conf.contact_normal, conf.K, conf.B, conf.mu)
 simu.init(q0, v0)
 
-invdyn = TsidQuadruped(conf, solo, q0, viewer=False)
+invdyn = TsidQuadruped(conf, dt, solo, offset, frequency, amp, q0, viewer=False)
 robot = invdyn.robot
 
 com_pos = np.empty((3, N_SIMULATION))*nan
@@ -156,10 +157,6 @@ com_vel_ref = np.empty((3, N_SIMULATION))*nan
 com_acc_ref = np.empty((3, N_SIMULATION))*nan
 # acc_des = acc_ref - Kp*pos_err - Kd*vel_err
 com_acc_des = np.empty((3, N_SIMULATION))*nan
-offset += invdyn.robot.com(invdyn.formulation.data())
-two_pi_f_amp = two_pi_f * amp
-two_pi_f_squared_amp = two_pi_f * two_pi_f_amp
-sampleCom = invdyn.trajCom.computeNext()
 
 def run_simulation(q, v, simu_params):
     simu = RobotSimulator(conf, solo, se3.JointModelFreeFlyer())
@@ -188,10 +185,15 @@ def run_simulation(q, v, simu_params):
     time_start = time.time()
     q = np.zeros((nq, N_SIMULATION+1))*np.nan
     v = np.zeros((nv, N_SIMULATION+1))*np.nan
-    f = np.zeros((simu.nk, N_SIMULATION+1))
-    f_pred_int = np.zeros((simu.nk, N_SIMULATION+1))
-    f_inner = np.zeros((simu.nk, N_SIMULATION*ndt))
-    f_pred = np.zeros((simu.nk, N_SIMULATION*ndt))
+    f, f_inner, f_pred = {}, {}, {}
+    for c in simu.contacts:
+        f[c.frame_name] = np.zeros((3, N_SIMULATION+1))
+        f_inner[c.frame_name] = np.zeros((3, N_SIMULATION*ndt))
+        f_pred[c.frame_name] = np.zeros((3, N_SIMULATION*ndt))
+#    f = np.zeros((simu.nk, N_SIMULATION+1))
+#    f_pred_int = np.zeros((simu.nk, N_SIMULATION+1))
+#    f_inner = np.zeros((simu.nk, N_SIMULATION*ndt))
+#    f_pred = np.zeros((simu.nk, N_SIMULATION*ndt))
     dp = np.zeros((simu.nk, N_SIMULATION+1))
     dp_fd = np.zeros((simu.nk, N_SIMULATION+1))
     dJv = np.zeros((simu.nk, N_SIMULATION+1))
@@ -209,12 +211,7 @@ def run_simulation(q, v, simu_params):
     try:
         for i in range(0, N_SIMULATION):
     
-            if(USE_CONTROLLER):
-                sampleCom.pos(offset + amp * np.sin(two_pi_f*t))
-                sampleCom.vel(two_pi_f_amp * np.cos(two_pi_f*t))
-                sampleCom.acc(-two_pi_f_squared_amp * np.sin(two_pi_f*t))
-                invdyn.comTask.setReference(sampleCom)
-    
+            if(USE_CONTROLLER):  
                 HQPData = invdyn.formulation.computeProblemData(t, q[:,i], v[:,i])
                 sol = invdyn.solver.solve(HQPData)
                 if(sol.status != 0):
@@ -229,18 +226,19 @@ def run_simulation(q, v, simu_params):
     
             q[:,i+1], v[:,i+1], f_i = simu.simulate(u, dt, ndt,
                                       simu_params['use_exp_int'])
-#            f[:, i+1] = f_i
-#            f_pred_int[:,i+1] = simu.f_pred_int        
-#            f_inner[:, i*ndt:(i+1)*ndt] = simu.f_inner
-#            f_pred[:, i*ndt:(i+1)*ndt] = simu.f_pred        
+            for c in simu.contacts:
+                f[c.frame_name][:, i+1] = c.f
+#                f_pred_int[:,i+1] = simu.f_pred_int        
+                f_inner[c.frame_name][:, i*ndt:(i+1)*ndt] = c.f_inner
+                f_pred[c.frame_name][:, i*ndt:(i+1)*ndt] = c.f_pred        
             dv = simu.dv
     
             com_pos[:, i] = invdyn.robot.com(invdyn.formulation.data())
             com_vel[:, i] = invdyn.robot.com_vel(invdyn.formulation.data())
             com_acc[:, i] = invdyn.comTask.getAcceleration(dv)
-            com_pos_ref[:, i] = sampleCom.pos()
-            com_vel_ref[:, i] = sampleCom.vel()
-            com_acc_ref[:, i] = sampleCom.acc()
+            com_pos_ref[:, i] = invdyn.sampleCom.pos()
+            com_vel_ref[:, i] = invdyn.sampleCom.vel()
+            com_acc_ref[:, i] = invdyn.sampleCom.acc()
             com_acc_des[:, i] = invdyn.comTask.getDesiredAcceleration
             
 #            dp[:,i] = simu.debug_dp
@@ -281,7 +279,7 @@ def run_simulation(q, v, simu_params):
     results.f = f
     results.f_inner = f_inner
     results.f_pred = f_pred
-    results.f_pred_int = f_pred_int
+#    results.f_pred_int = f_pred_int
     results.dp = dp
     results.dp_fd = dp_fd
     results.dJv = dJv
@@ -400,27 +398,32 @@ if(PLOT_FORCES):
 # FOR EACH INTEGRATION METHOD PLOT THE FORCE PREDICTIONS
 if(PLOT_FORCE_PREDICTIONS):
     for (name,d) in data.items():
-       (ff, ax) = plut.create_empty_figure(2,2)
-       ax = ax.reshape(4)
-       tt_log = np.arange(d.f_pred.shape[1]) * T / d.f_pred.shape[1]
-       for i in range(4):
-           ax[i].plot(tt, d.f[2+3*i,:], ' o', markersize=8, label=name)
-           ax[i].plot(tt, d.f_pred_int[2+3*i,:], ' s', markersize=8, label=name+' pred int')
-           ax[i].plot(tt_log, d.f_pred[2+3*i,:], 'r v', markersize=6, label=name+' pred ')
-           ax[i].plot(tt_log, d.f_inner[2+3*i,:], 'b x', markersize=6, label=name+' real ')
-           ax[i].set_xlabel('Time [s]')
-           ax[i].set_ylabel('Force Z [N]')
-       leg = ax[-1].legend()
-       if(leg): leg.get_frame().set_alpha(0.5)
+        if('truth' in name):
+            continue
+        
+        for contact_name in d.f.keys():
+            tt_log = np.arange(d.f_pred[contact_name].shape[1]) * T / d.f_pred[contact_name].shape[1]
+            for i in range(3):
+                (ff, ax) = plut.create_empty_figure(1)
+#            ax.plot(tt, d.f[i,:], ' o', markersize=8, label=name)
+#            ax[i].plot(tt, d.f_pred_int[2+3*i,:], ' s', markersize=8, label=name+' pred int')
+#            ax.plot(tt_log, d.f_pred[i,:], 'r v', markersize=6, label=name+' pred ')
+#            ax.plot(tt_log, d.f_inner[i,:], 'b x', markersize=6, label=name+' real ')
+                ax.plot(tt_log, d.f_pred[contact_name][i,:], 'r-v', markersize=6, label='Predicted')
+                ax.plot(tt_log, d.f_inner[contact_name][i,:], 'b--x', markersize=6, label='Real')
+                ax.set_xlabel('Time [s]')
+                ax.set_ylabel('Force [N]')
+                leg = ax.legend()
+                if(leg): leg.get_frame().set_alpha(0.5)
        
-       # force prediction error of Euler, i.e. assuming force remains contact during time step
-       ndt = int(d.f_inner.shape[1] / (d.f.shape[1]-1))
-       f_pred_err_euler = np.array([d.f[:,int(np.floor(i/ndt))] - d.f_inner[:,i] for i in range(d.f_inner.shape[1])]).T
-       
-       # force prediction error of matrix exponential 
-       f_pred_err = d.f_pred - d.f_inner
-       print(name, 'Force pred err max exp:', np.sum(np.abs(f_pred_err))/(f_pred_err.shape[0]*f_pred_err.shape[1]))
-       print(name, 'Force pred err Euler:  ', np.sum(np.abs(f_pred_err_euler))/(f_pred_err.shape[0]*f_pred_err.shape[1]))
+        # force prediction error of Euler, i.e. assuming force remains contact during time step
+#        ndt = int(d.f_inner[contact_name].shape[1] / (d.f[contact_name].shape[1]-1))
+#        f_pred_err_euler = np.array([d.f[contact_name][:,int(np.floor(i/ndt))] - d.f_inner[contact_name][:,i] for i in range(d.f_inner[contact_name].shape[1])]).T
+#       
+#        # force prediction error of matrix exponential 
+#        f_pred_err = d.f_pred - d.f_inner
+#        print(name, 'Force pred err max exp:', np.sum(np.abs(f_pred_err))/(f_pred_err.shape[0]*f_pred_err.shape[1]))
+#        print(name, 'Force pred err Euler:  ', np.sum(np.abs(f_pred_err_euler))/(f_pred_err.shape[0]*f_pred_err.shape[1]))
 
 # PLOT THE JOINT ANGLES OF ALL INTEGRATION METHODS ON THE SAME PLOT
 if(PLOT_BASE_POS):
