@@ -15,7 +15,7 @@ mu = .3                            # friction coefficient
 contact_frames = ['RAnkleRoll', 'LAnkleRoll']
 contact_normal = np.array([0., 0., 1.])
 K = 1e5*np.ones(3)
-B = 1e2*np.ones(3)
+B = 3e2*np.ones(3)
 anchor_slipping_method = 1
 unilateral_contacts = 1
 
