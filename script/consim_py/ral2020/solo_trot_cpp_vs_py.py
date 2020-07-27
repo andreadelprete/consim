@@ -102,7 +102,7 @@ q0, v0 = refX[0,:nq], refX[0,nq:]
 N_SIMULATION = refU.shape[0]     
 
 # TEMPORARY DEBUG CODE
-#N_SIMULATION = 100
+N_SIMULATION = 100
 #N_SIMULATION = refX.shape[0]
 
 

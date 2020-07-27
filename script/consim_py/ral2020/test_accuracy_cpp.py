@@ -1,4 +1,4 @@
-''' Test cpp simulator with different robots, controllers and reference motions
+''' Test accuracy-speed trade-off of cpp simulators with different robots, controllers and reference motions
 '''
 import time
 import consim 
@@ -24,7 +24,7 @@ from consim_py.ral2020.tsid_biped import TsidBiped
 def ndprint(a, format_string ='{0:.2f}'):
     print([format_string.format(v,i) for i,v in enumerate(a)])
 
-plut.SAVE_FIGURES = 0
+plut.SAVE_FIGURES = 1
 PLOT_FORCES = 0
 PLOT_CONTACT_POINTS = 0
 PLOT_VELOCITY_NORM = 1
@@ -40,9 +40,9 @@ SAVE_GROUND_TRUTH_TO_FILE = 1
 RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
 
 #TEST_NAME = 'solo-squat'
-TEST_NAME = 'solo-trot'
+#TEST_NAME = 'solo-trot'
 #TEST_NAME = 'solo-jump'
-#TEST_NAME = 'romeo-walk'
+TEST_NAME = 'romeo-walk'
 
 LINE_WIDTH = 100
 print("".center(LINE_WIDTH, '#'))
@@ -51,7 +51,7 @@ print(TEST_NAME.center(LINE_WIDTH, '#'))
 print("".center(LINE_WIDTH, '#'))
 
 plut.FIGURE_PATH = './'+TEST_NAME+'/'
-Ns = 300
+N = 300
 dt = 0.010      # controller and simulator time step
 
 if(TEST_NAME=='solo-squat'):
@@ -96,8 +96,8 @@ SIMU_PARAMS = []
 
 # EXPONENTIAL INTEGRATOR WITH STANDARD SETTINGS
 for i in range(i_min, i_max):
-#    for m in [0, 1, 2, 3, 4, -1]:
-    for m in [-1]:
+    for m in [0, 1, 2, 3, 4, -1]:
+#    for m in [-1]:
         SIMU_PARAMS += [{
             'name': 'exp %4d mmm%2d'%(2**i,m),
             'method_name': 'exp mmm%2d'%(m),

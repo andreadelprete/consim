@@ -14,8 +14,8 @@ import conf_solo_trot_py as conf
 import pinocchio as pin 
 import pickle 
 
-from solo_trot_common import load_ref_traj, Empty, state_diff, dt_ref, play_motion, \
-    plot_integration_error_vs_ndt, compute_integration_errors
+from simu_cpp_common import load_solo_ref_traj, Empty, state_diff, dt_ref, play_motion, \
+    plot_multi_x_vs_y_log_scale, compute_integration_errors
 
 print("".center(conf.LINE_WIDTH, '#'))
 print(" Test Solo Trot Python ".center(conf.LINE_WIDTH, '#'))
@@ -71,14 +71,14 @@ for i in range(i_min, i_max):
 #    }]
     
 # EULER INTEGRATOR WITH STANDARD SETTINGS
-for i in range(i_min, i_max):
-    SIMU_PARAMS += [{
-        'name': 'euler Minv%4d'%(2**i),
-        'method_name': 'euler Minv',
-        'use_exp_int': 0,
-        'ndt': 2**i,
-        'forward_dyn_method': 1
-    }]
+#for i in range(i_min, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'euler Minv%4d'%(2**i),
+#        'method_name': 'euler Minv',
+#        'use_exp_int': 0,
+#        'ndt': 2**i,
+#        'forward_dyn_method': 1
+#    }]
 
 #for i in range(i_min, i_max):
 #    SIMU_PARAMS += [{
@@ -98,14 +98,14 @@ for i in range(i_min, i_max):
 #        'forward_dyn_method': 3
 #    }]
     
-PLOT_FORCES = 0
+PLOT_FORCES = 1
 PLOT_FORCE_PREDICTIONS = 1
 PLOT_SLIPPING = 0
 PLOT_BASE_POS = 0
 PLOT_INTEGRATION_ERRORS = 0
-PLOT_INTEGRATION_ERROR_TRAJECTORIES = 0
+PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
 
-LOAD_GROUND_TRUTH_FROM_FILE = 1
+LOAD_GROUND_TRUTH_FROM_FILE = 0
 SAVE_GROUND_TRUTH_TO_FILE = 0
 RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
 dt     = 0.002                      # controller and simulator time step
@@ -127,7 +127,7 @@ if conf.use_viewer:
 assert(np.floor(dt_ref/dt)==dt_ref/dt)
 
 # load reference trajectories 
-refX, refU, feedBack = load_ref_traj(robot, dt)
+refX, refU, feedBack = load_solo_ref_traj(robot, dt)
 q0, v0 = refX[0,:nq], refX[0,nq:]
 N_SIMULATION = refU.shape[0]
 
@@ -220,7 +220,7 @@ def run_simulation(q0, v0, simu_params, ground_truth):
         print("Real-time factor:", t/(time.time() - time_start))
     except Exception as e:
         print(e)
-        raise e
+#        raise e
 
     if conf.use_viewer:
         play_motion(robot, results.q, dt)
@@ -269,8 +269,7 @@ for simu_params in SIMU_PARAMS:
         data[name] = run_simulation(q0, v0, simu_params, data['ground-truth-euler'])
 
 # COMPUTE INTEGRATION ERRORS:
-ndt, err_2norm_avg, err_infnorm_avg, err_infnorm_max, err_traj_2norm, err_traj_infnorm = \
-    compute_integration_errors(data, robot)
+res = compute_integration_errors(data, robot, dt)
 
 # PLOT STUFF
 line_styles = 10*['-o', '--o', '-.o', ':o']
@@ -278,23 +277,13 @@ tt = np.arange(0.0, (N_SIMULATION+1)*dt, dt)[:N_SIMULATION+1]
 
 # PLOT INTEGRATION ERRORS
 if(PLOT_INTEGRATION_ERRORS):
-    plot_integration_error_vs_ndt(err_2norm_avg, ndt, 'Mean error 2-norm')
-    plot_integration_error_vs_ndt(err_infnorm_avg, ndt, 'Mean error inf-norm')
-    plot_integration_error_vs_ndt(err_infnorm_max, ndt, 'Max error inf-norm')    
+    plot_multi_x_vs_y_log_scale(res.err_infnorm_avg, res.ndt, 'Mean error inf-norm')
+    plot_multi_x_vs_y_log_scale(res.err_infnorm_max, res.ndt, 'Max error inf-norm')    
     
 if(PLOT_INTEGRATION_ERROR_TRAJECTORIES):
     (ff, ax) = plut.create_empty_figure(1)
-    for (j,name) in enumerate(sorted(err_traj_2norm.keys())):
-        ax.plot(tt, err_traj_2norm[name], line_styles[j], alpha=0.7, label=name)
-    ax.set_xlabel('Time [s]')
-    ax.set_ylabel('Error 2-norm')
-    ax.set_yscale('log')
-    leg = ax.legend()
-    if(leg): leg.get_frame().set_alpha(0.5)
-    
-    (ff, ax) = plut.create_empty_figure(1)
-    for (j,name) in enumerate(sorted(err_traj_infnorm.keys())):
-        ax.plot(tt, err_traj_infnorm[name], line_styles[j], alpha=0.7, label=name)
+    for (j,name) in enumerate(sorted(res.err_traj_infnorm.keys())):
+        ax.plot(tt, res.err_traj_infnorm[name], line_styles[j], alpha=0.7, label=name)
     ax.set_xlabel('Time [s]')
     ax.set_ylabel('Error inf-norm')
     ax.set_yscale('log')

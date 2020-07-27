@@ -112,16 +112,22 @@ def compute_integration_errors(data, robot, dt):
         res.err_traj_infnorm[name] = err_per_time_inf
         res.ndt[d.method_name] += [d.ndt]
         res.dt[d.method_name] += [dt/d.ndt]
-        comp_time = d.computation_times['inner-step'].avg * d.ndt
+        try:
+            comp_time = d.computation_times['inner-step'].avg * d.ndt
+        except:
+            comp_time = np.nan
         res.comp_time[d.method_name] += [comp_time]
         res.realtime_factor[d.method_name] += [dt/comp_time]
         if(d.use_exp_int==1):
-            res.mat_mult[d.method_name] += [np.mean(d.mat_mult)]
-            res.mat_norm[d.method_name] += [np.mean(d.mat_norm)]
+            try:
+                res.mat_mult[d.method_name] += [np.mean(d.mat_mult)]
+                res.mat_norm[d.method_name] += [np.mean(d.mat_norm)]
+            except:
+                pass
     return res
         
         
-def plot_multi_x_vs_y_log_scale(y, x, ylabel, xlabel='Number of time steps', logy=True):
+def plot_multi_x_vs_y_log_scale(y, x, ylabel, xlabel='Number of time steps', logy=True, logx=True):
     line_styles = 10*['-o', '--o', '-.o', ':o']
     (ff, ax) = plut.create_empty_figure(1)
     j = 0
@@ -131,7 +137,8 @@ def plot_multi_x_vs_y_log_scale(y, x, ylabel, xlabel='Number of time steps', log
             j += 1
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
-    ax.set_xscale('log')
+    if(logx):
+        ax.set_xscale('log')
     if(logy):
         ax.set_yscale('log')
     leg = ax.legend(loc='best')
