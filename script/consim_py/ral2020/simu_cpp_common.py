@@ -113,7 +113,7 @@ def compute_integration_errors(data, robot, dt):
         res.ndt[d.method_name] += [d.ndt]
         res.dt[d.method_name] += [dt/d.ndt]
         try:
-            comp_time = d.computation_times['inner-step'].avg * d.ndt
+            comp_time = d.computation_times['substep'].avg * d.ndt
         except:
             comp_time = np.nan
         res.comp_time[d.method_name] += [comp_time]
