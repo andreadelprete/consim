@@ -32,9 +32,16 @@ comp_times_exp    = ['exponential_simulator::step',
                      'exponential_simulator::forwardDynamics',
                      'exponential_simulator::resizeVectorsAndMatrices']
 comp_times_euler = ['euler_simulator::step',
-                    'euler_simulator::step']
+                    'euler_simulator::substep']
+                    
+comp_times_exp_dict = {}
+comp_times_euler_dict = {}
+for s in comp_times_exp:
+    comp_times_exp_dict[s] = s.split('::')[-1]
+for s in comp_times_euler:
+    comp_times_euler_dict[s] = s.split('::')[-1]
 
-plut.SAVE_FIGURES = 0
+plut.SAVE_FIGURES = 1
 PLOT_FORCES = 0
 PLOT_CONTACT_POINTS = 0
 PLOT_VELOCITY_NORM = 0
@@ -46,13 +53,14 @@ PLOT_MATRIX_MULTIPLICATIONS = 0
 PLOT_MATRIX_NORMS = 0
 
 LOAD_GROUND_TRUTH_FROM_FILE = 0
-SAVE_GROUND_TRUTH_TO_FILE = 1
+SAVE_GROUND_TRUTH_TO_FILE = 0
 RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
 
 #TEST_NAME = 'solo-squat'
-TEST_NAME = 'solo-trot'
+#TEST_NAME = 'solo-trot'
 #TEST_NAME = 'solo-jump'
-#TEST_NAME = 'romeo-walk'
+TEST_NAME = 'romeo-walk'
+#TEST_NAME = 'talos-walk'
 
 LINE_WIDTH = 100
 print("".center(LINE_WIDTH, '#'))
@@ -87,6 +95,11 @@ elif(TEST_NAME=='romeo-walk'):
     motionName = 'walk'
     ctrl_type = 'tsid-biped'
     dt = 0.04
+elif(TEST_NAME=='talos-walk'):
+    robot_name = 'talos'
+    motionName = 'walk'
+    ctrl_type = 'tsid-biped'
+    dt = 0.03
 
 # ground truth computed with time step 1/64 ms
 ground_truth_dt = 1e-3/64
@@ -106,8 +119,8 @@ SIMU_PARAMS = []
 
 # EXPONENTIAL INTEGRATOR WITH STANDARD SETTINGS
 for i in range(i_min, i_max):
-    for m in [0, 1, 2, 3, 4, -1]:
-#    for m in [-1]:
+#    for m in [0, 1, 2, 3, 4, -1]:
+    for m in [-1]:
         SIMU_PARAMS += [{
             'name': 'exp %4d mmm%2d'%(2**i,m),
             'method_name': 'exp mmm%2d'%(m),
@@ -176,8 +189,11 @@ unilateral_contacts = 1
 if(robot_name=='solo'):
     import conf_solo_cpp as conf
     robot = loadSolo(False)
-elif(robot_name=='romeo'):
-    import conf_romeo_cpp as conf
+elif(robot_name=='romeo' or robot_name=='talos'):
+    if(robot_name=='romeo'):
+        import conf_romeo_cpp as conf
+    elif(robot_name=='talos'):
+        import conf_talos_cpp as conf
     robot = RobotWrapper.BuildFromURDF(conf.urdf, [conf.modelPath], pin.JointModelFreeFlyer())
     
     contact_point = np.ones((3,4)) * conf.lz
@@ -190,6 +206,7 @@ elif(robot_name=='romeo'):
         for i in range(4):
             frame_name = cf+"_"+str(i)
             placement = pin.XYZQUATToSE3(list(contact_point[:,i])+[0, 0, 0, 1.])
+            placement = robot.model.frames[parentFrameId].placement * placement
             fr = pin.Frame(frame_name, parentJointId, parentFrameId, placement, pin.FrameType.OP_FRAME)
             robot.model.addFrame(fr)
             contact_frames += [frame_name]
@@ -252,9 +269,10 @@ for simu_params in SIMU_PARAMS:
     print("\nStart simulation", name)
     if(simu_params['use_exp_int']):
         data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, 
-                                    data['ground-truth-exp'], comp_times_exp)
+                                    data['ground-truth-exp'], comp_times_exp_dict)
     else:
-        data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, data['ground-truth-euler'])
+        data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, 
+                            data['ground-truth-euler'], comp_times_euler_dict)
 
 # COMPUTE INTEGRATION ERRORS:
 res = compute_integration_errors(data, robot, dt)
