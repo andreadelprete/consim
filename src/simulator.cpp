@@ -312,21 +312,20 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     throw std::runtime_error("resetState() must be called first !");
   }
 
+  // \brief add input control 
+  tau_ = tau;
+  // \brief joint damping 
+  if (joint_friction_flag_){
+    tau_ -= joint_friction_.cwiseProduct(v_);
+  }
+
   for (unsigned int i = 0; i < n_integration_steps_; i++){
-    CONSIM_START_PROFILER("exponential_simulator::substep");
-    // \brief add input control 
-    tau_ += tau;
-    // \brief joint damping 
-    if (joint_friction_flag_){
-      tau_ -= joint_friction_.cwiseProduct(v_);
-    } 
-  
+    CONSIM_START_PROFILER("exponential_simulator::substep"); 
     if (nactive_> 0){
       Eigen::internal::set_is_malloc_allowed(false);
       CONSIM_START_PROFILER("exponential_simulator::computeExpLDS");
       computeExpLDS();
       CONSIM_STOP_PROFILER("exponential_simulator::computeExpLDS");
-
 
       CONSIM_START_PROFILER("exponential_simulator::computeIntegralsXt");
       utilDense_.ComputeIntegrals(A, a_, x0_, sub_dt, intxt_, int2xt_);
@@ -336,16 +335,20 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
       checkFrictionCone();
       CONSIM_STOP_PROFILER("exponential_simulator::checkFrictionCone");
 
+      CONSIM_START_PROFILER("exponential_simulator::integrateState");
       /*!< f projection is computed then anchor point is updated */ 
       dvMean_ = dv_bar + MinvJcT_*fpr_; 
       dvMean2_.noalias() =  dv_bar + MinvJcT_*fpr2_;  
       vMean_ =  v_ +  .5 * sub_dt * dvMean2_; 
     } /*!< active contacts */
     else{
+      CONSIM_START_PROFILER("exponential_simulator::noContactsForwardDynamics");
       forwardDynamics(tau_, dvMean_); 
+      CONSIM_STOP_PROFILER("exponential_simulator::noContactsForwardDynamics");
+      CONSIM_START_PROFILER("exponential_simulator::integrateState");
       vMean_ = v_ + .5 * sub_dt*dvMean_;
     } /*!< no active contacts */
- 
+    
     v_ += sub_dt*dvMean_;
     if(semi_implicit_ && nactive_==0){
       pinocchio::integrate(*model_, q_, v_ * sub_dt, qnext_);
@@ -355,13 +358,16 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     }
     q_ = qnext_;
     dv_ = dvMean_; 
+    CONSIM_STOP_PROFILER("exponential_simulator::integrateState");
     
-    //
-    tau_.fill(0);
+    CONSIM_START_PROFILER("exponential_simulator::computeContactForces");
+    // tau_.fill(0);
     computeContactForces();
-    CONSIM_STOP_PROFILER("exponential_simulator::substep");
     Eigen::internal::set_is_malloc_allowed(true);
     elapsedTime_ += sub_dt; 
+    CONSIM_STOP_PROFILER("exponential_simulator::computeContactForces");
+
+    CONSIM_STOP_PROFILER("exponential_simulator::substep");
   }  // sub_dt loop
   CONSIM_STOP_PROFILER("exponential_simulator::step");
 } // ExponentialSimulator::step
@@ -388,9 +394,9 @@ void ExponentialSimulator::computeExpLDS(){
   }
   JcT_.noalias() = Jc_.transpose(); 
 
-  CONSIM_START_PROFILER("ExponentialSimulator::forwardDynamics");
+  CONSIM_START_PROFILER("exponential_simulator::forwardDynamics");
   forwardDynamics(tau_, dv_bar);  
-  CONSIM_STOP_PROFILER("ExponentialSimulator::forwardDynamics");
+  CONSIM_STOP_PROFILER("exponential_simulator::forwardDynamics");
 
   
   if(whichFD_==1 || whichFD_==2){
@@ -434,14 +440,15 @@ void ExponentialSimulator::computeExpLDS(){
    * compute the contact forces of the active contacts 
    **/  
   
-  CONSIM_START_PROFILER("pinocchio::kinematics");
+  CONSIM_START_PROFILER("exponential_simulator::kinematics");
   pinocchio::forwardKinematics(*model_, *data_, q_, v_, fkDv_);
   pinocchio::computeJointJacobians(*model_, *data_);
   pinocchio::updateFramePlacements(*model_, *data_);
-  CONSIM_STOP_PROFILER("pinocchio::kinematics");
+  CONSIM_STOP_PROFILER("exponential_simulator::kinematics");
 
-  CONSIM_START_PROFILER("ExponentialSimulator::contactDetection+ForceComputation");
+  CONSIM_START_PROFILER("exponential_simulator::contactDetection");
   detectContacts(); /*!<inactive contacts get automatically filled with zero here */
+  CONSIM_STOP_PROFILER("exponential_simulator::contactDetection");
 
   if (nactive_>0){
     if (f_.size()!=3*nactive_){
@@ -449,6 +456,8 @@ void ExponentialSimulator::computeExpLDS(){
       resizeVectorsAndMatrices();
       CONSIM_STOP_PROFILER("exponential_simulator::resizeVectorsAndMatrices");
     }
+    
+    CONSIM_START_PROFILER("exponential_simulator::contactKinematics");
     i_active_ = 0; 
     for(auto &cp : contacts_){
       if (!cp->active) continue;
@@ -463,8 +472,8 @@ void ExponentialSimulator::computeExpLDS(){
       //   std::cout<<cp->name_<<" p ["<< cp->x.transpose() << "] v ["<< cp->v.transpose() << "] f ["<<  cp->f.transpose() <<"]"<<std::endl; 
       // }
     }
+    CONSIM_STOP_PROFILER("exponential_simulator::contactKinematics");
   }
-  CONSIM_STOP_PROFILER("ExponentialSimulator::contactDetection+ForceComputation");
 } // ExponentialSimulator::computeContactForces
 
 
@@ -701,9 +710,9 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
 
 
     //
-    expAdt_.resize(6 * nactive_, 6 * nactive_); expAdt_.setZero();
-    util_eDtA.resize(6 * nactive_);
-    inteAdt_.resize(6 * nactive_, 6 * nactive_); inteAdt_.setZero();
+    // expAdt_.resize(6 * nactive_, 6 * nactive_); expAdt_.setZero();
+    // util_eDtA.resize(6 * nactive_);
+    // inteAdt_.resize(6 * nactive_, 6 * nactive_); inteAdt_.setZero();
     // fillout K & B only needed whenever number of active contacts changes 
     i_active_ = 0; 
     for(unsigned int i=0; i<nc_; i++){
