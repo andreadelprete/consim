@@ -145,7 +145,7 @@ def plot_multi_x_vs_y_log_scale(y, x, ylabel, xlabel='Number of time steps', log
     if(leg): leg.get_frame().set_alpha(0.5)
     
     
-def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_truth=None):  
+def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_truth=None, comp_times=None):  
     import consim
     compute_predicted_forces = False     
     nq, nv = robot.nq, robot.nv
@@ -192,8 +192,10 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
     t = 0.0    
     nc = len(conf.contact_frames)
     results = Empty()
-    results.q = np.zeros((nq, N+1))
+    results.q = np.zeros((nq, N+1))*np.nan
     results.v = np.zeros((nv, N+1))
+    results.com_pos = np.zeros((3, N+1))*np.nan
+    results.com_vel = np.zeros((3, N+1))
     results.u = np.zeros((nv, N+1))
     results.f = np.zeros((3, nc, N+1))
     results.p = np.zeros((3, nc, N+1))
@@ -204,11 +206,11 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
     if(use_exp_int):
         results.mat_mult = np.zeros(N+1)
         results.mat_norm = np.zeros(N+1)
-    results.computation_times = {'inner-step': Empty(), 
-                                 'compute-integrals': Empty()}
+    results.computation_times = {}
     
     results.q[:,0] = np.copy(q0)
     results.v[:,0] = np.copy(v0)
+    results.com_pos[:,0] = robot.com(results.q[:,0])
     for ci, cp in enumerate(cpts):
         results.f[:,ci,0] = cp.f
         results.p[:,ci,0] = cp.x
@@ -223,6 +225,7 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
         consim.stop_watch_reset_all()
         time_start = time.time()
         for i in range(0, N):
+#            robot.display(results.q[:,i])
             if(ground_truth):                
                 # first reset to ensure active contact points are correctly marked because otherwise the second
                 # time I reset the state the anchor points could be overwritten
@@ -240,6 +243,8 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
                 
             results.q[:,i+1] = simu.get_q()
             results.v[:,i+1] = simu.get_v()
+            results.com_pos[:,i+1] = robot.com(results.q[:,i+1])
+#            results.com_vel[:,i+1] = robot.com_vel()
             
             if(use_exp_int):
                 results.mat_mult[i] = simu.getMatrixMultiplications()
@@ -265,23 +270,27 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
         
 #        print("Real-time factor:", t/(time.time() - time_start))
 #        consim.stop_watch_report(3)
-        if(use_exp_int):
-            results.computation_times['inner-step'].avg = \
-                consim.stop_watch_get_average_time("exponential_simulator::substep")
-            results.computation_times['compute-integrals'].avg = \
-                consim.stop_watch_get_average_time("exponential_simulator::computeIntegralsXt")
-        else:
-            results.computation_times['inner-step'].avg = \
-                consim.stop_watch_get_average_time("euler_simulator::substep")
-            results.computation_times['compute-integrals'].avg = 0
+        if(comp_times):
+            for s_key, s_value in comp_times.items():
+#                print(s)
+                results.computation_times[s_value] = Empty()
+                try:
+                    results.computation_times[s_value].avg = consim.stop_watch_get_average_time(s_key)                
+                    results.computation_times[s_value].tot = consim.stop_watch_get_total_time(s_key)
+                except:
+                    results.computation_times[s_value].avg = np.nan
+                    results.computation_times[s_value].tot = np.nan
 #        for key in results.computation_times.keys():
 #            print("%20s: %.1f us"%(key, results.computation_times[key].avg*1e6))
             
     except Exception as e:
 #        raise e
         print("Exception while running simulation", e)
-        results.computation_times['inner-step'].avg = np.nan
-        results.computation_times['compute-integrals'].avg = np.nan
+        if(comp_times):
+            for s_key, s in comp_times.items():
+                results.computation_times[s] = Empty()
+                results.computation_times[s].avg = np.nan
+                results.computation_times[s].tot = np.nan
 
     if conf.use_viewer:
         play_motion(robot, results.q, dt)

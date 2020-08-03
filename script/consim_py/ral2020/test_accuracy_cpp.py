@@ -23,26 +23,36 @@ from consim_py.ral2020.tsid_biped import TsidBiped
 
 def ndprint(a, format_string ='{0:.2f}'):
     print([format_string.format(v,i) for i,v in enumerate(a)])
+    
+comp_times_exp    = ['exponential_simulator::step',
+                     'exponential_simulator::substep',
+                     'exponential_simulator::computeExpLDS',
+                     'exponential_simulator::computeIntegralsXt',
+                     'exponential_simulator::kinematics',
+                     'exponential_simulator::forwardDynamics',
+                     'exponential_simulator::resizeVectorsAndMatrices']
+comp_times_euler = ['euler_simulator::step',
+                    'euler_simulator::step']
 
-plut.SAVE_FIGURES = 1
+plut.SAVE_FIGURES = 0
 PLOT_FORCES = 0
 PLOT_CONTACT_POINTS = 0
-PLOT_VELOCITY_NORM = 1
-PLOT_SLIPPING = 1
+PLOT_VELOCITY_NORM = 0
+PLOT_SLIPPING = 0
 PLOT_BASE_POS = 0
 PLOT_INTEGRATION_ERRORS = 1
-PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
-PLOT_MATRIX_MULTIPLICATIONS = 1
-PLOT_MATRIX_NORMS = 1
+PLOT_INTEGRATION_ERROR_TRAJECTORIES = 0
+PLOT_MATRIX_MULTIPLICATIONS = 0
+PLOT_MATRIX_NORMS = 0
 
 LOAD_GROUND_TRUTH_FROM_FILE = 0
 SAVE_GROUND_TRUTH_TO_FILE = 1
 RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
 
 #TEST_NAME = 'solo-squat'
-#TEST_NAME = 'solo-trot'
+TEST_NAME = 'solo-trot'
 #TEST_NAME = 'solo-jump'
-TEST_NAME = 'romeo-walk'
+#TEST_NAME = 'romeo-walk'
 
 LINE_WIDTH = 100
 print("".center(LINE_WIDTH, '#'))
@@ -241,7 +251,8 @@ for simu_params in SIMU_PARAMS:
     name = simu_params['name']
     print("\nStart simulation", name)
     if(simu_params['use_exp_int']):
-        data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, data['ground-truth-exp'])
+        data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, 
+                                    data['ground-truth-exp'], comp_times_exp)
     else:
         data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, data['ground-truth-euler'])
 
