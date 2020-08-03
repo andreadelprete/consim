@@ -119,7 +119,7 @@ PLOT_MAT_NORM_EXPM = 0
 ASSUME_A_INVERTIBLE = 0
 USE_CONTROLLER = 1
 dt = 0.02                      # controller time step
-T = 0.1
+T = 0.02
 
 offset = np.array([0.0, -0.0, 0.0])
 amp = np.array([0.0, 0.0, 0.05])
@@ -137,9 +137,9 @@ q0, v0 = np.copy(simu.q), np.copy(simu.v)
 
 # DEBUG
 #q0[2] += 1.0
-q0[2] += 1e-2
+#q0[2] += 2.5e-2
 
-#q0[2] -= 6e-6
+q0[2] -= 6e-6
 #v0[2] -= 10e-2
 
 for name in conf.contact_frames:
