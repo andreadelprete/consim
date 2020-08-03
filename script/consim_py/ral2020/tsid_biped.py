@@ -24,9 +24,13 @@ class TsidBiped:
         self.robot = tsid.RobotWrapper(urdf, vector, se3.JointModelFreeFlyer(), False)
         robot = self.robot
         self.model = robot.model()
-        pin.loadReferenceConfigurations(self.model, srdf, False)
-#        self.q0 = q = self.model.referenceConfigurations["half_sitting"]
-        self.q0 = q = conf.q0
+        pin.loadReferenceConfigurations(self.model, srdf, False)        
+        try:
+            self.q0 = conf.q0
+            q = np.copy(conf.q0)
+        except:
+            self.q0 = self.model.referenceConfigurations["half_sitting"]
+            q = np.copy(self.q0)
         self.v0 = v = np.zeros(robot.nv)
         
         assert self.model.existFrame(conf.rf_frame_name)
@@ -43,14 +47,16 @@ class TsidBiped:
                                   conf.contact_normal, conf.mu, conf.fMin, conf.fMax)
         contactRF.setKp(conf.kp_contact * np.ones(6))
         contactRF.setKd(2.0 * np.sqrt(conf.kp_contact) * np.ones(6))
-        self.RF = robot.model().getJointId(conf.rf_frame_name)
-        H_rf_ref = robot.position(data, self.RF)
+        self.RF = robot.model().getFrameId(conf.rf_frame_name)
+        H_rf_ref = robot.framePosition(formulation.data(), self.RF)
+#        print('H RF\n', H_rf_ref.translation)
         
         # modify initial robot configuration so that foot is on the ground (z=0)
         q[2] -= H_rf_ref.translation[2] + conf.lz
         formulation.computeProblemData(0.0, q, v)
         data = formulation.data()
-        H_rf_ref = robot.position(data, self.RF)
+        H_rf_ref = robot.framePosition(data, self.RF)
+#        print('H RF\n', H_rf_ref)
         contactRF.setReference(H_rf_ref)
         if(conf.w_contact>=0.0):
             formulation.addRigidContact(contactRF, conf.w_forceRef, conf.w_contact, 1)
@@ -61,8 +67,9 @@ class TsidBiped:
                                   conf.contact_normal, conf.mu, conf.fMin, conf.fMax)
         contactLF.setKp(conf.kp_contact * np.ones(6))
         contactLF.setKd(2.0 * np.sqrt(conf.kp_contact) * np.ones(6))
-        self.LF = robot.model().getJointId(conf.lf_frame_name)
-        H_lf_ref = robot.position(data, self.LF)
+        self.LF = robot.model().getFrameId(conf.lf_frame_name)
+        H_lf_ref = robot.framePosition(formulation.data(), self.LF)
+#        print('H LF\n', H_lf_ref)
         contactLF.setReference(H_lf_ref)
         if(conf.w_contact>=0.0):
             formulation.addRigidContact(contactLF, conf.w_forceRef, conf.w_contact, 1)
@@ -72,25 +79,43 @@ class TsidBiped:
         comTask = tsid.TaskComEquality("task-com", robot)
         comTask.setKp(conf.kp_com * np.ones(3))
         comTask.setKd(2.0 * np.sqrt(conf.kp_com) * np.ones(3))
-        formulation.addMotionTask(comTask, conf.w_com, 1, 0.0)
+        if(conf.w_com>0):
+            formulation.addMotionTask(comTask, conf.w_com, 1, 0.0)
         
         postureTask = tsid.TaskJointPosture("task-posture", robot)
-        postureTask.setKp(conf.kp_posture * np.ones(robot.nv-6))
-        postureTask.setKd(2.0 * np.sqrt(conf.kp_posture) * np.ones(robot.nv-6))
-        formulation.addMotionTask(postureTask, conf.w_posture, 1, 0.0)
+        try:
+            postureTask.setKp(conf.kp_posture)
+            postureTask.setKd(2.0 * np.sqrt(conf.kp_posture))
+        except:
+            postureTask.setKp(conf.kp_posture * np.ones(robot.nv-6))
+            postureTask.setKd(2.0 * np.sqrt(conf.kp_posture) * np.ones(robot.nv-6))
+        if(conf.w_posture>0):
+            formulation.addMotionTask(postureTask, conf.w_posture, 1, 0.0)
         
         self.leftFootTask = tsid.TaskSE3Equality("task-left-foot", self.robot, self.conf.lf_frame_name)
         self.leftFootTask.setKp(self.conf.kp_foot * np.ones(6))
         self.leftFootTask.setKd(2.0 * np.sqrt(self.conf.kp_foot) * np.ones(6))
         self.trajLF = tsid.TrajectorySE3Constant("traj-left-foot", H_lf_ref)
-        formulation.addMotionTask(self.leftFootTask, self.conf.w_foot, 1, 0.0)
+        if(conf.w_foot>0):
+            formulation.addMotionTask(self.leftFootTask, self.conf.w_foot, 1, 0.0)
 #        
         self.rightFootTask = tsid.TaskSE3Equality("task-right-foot", self.robot, self.conf.rf_frame_name)
         self.rightFootTask.setKp(self.conf.kp_foot * np.ones(6))
         self.rightFootTask.setKd(2.0 * np.sqrt(self.conf.kp_foot) * np.ones(6))
         self.trajRF = tsid.TrajectorySE3Constant("traj-right-foot", H_rf_ref)
-        formulation.addMotionTask(self.rightFootTask, self.conf.w_foot, 1, 0.0)
-        
+        if(conf.w_foot>0):
+            formulation.addMotionTask(self.rightFootTask, self.conf.w_foot, 1, 0.0)
+
+        self.waistTask = tsid.TaskSE3Equality("task-waist", self.robot, self.conf.waist_frame_name)
+        self.waistTask.setKp(self.conf.kp_waist * np.ones(6))
+        self.waistTask.setKd(2.0 * np.sqrt(self.conf.kp_waist) * np.ones(6))
+        self.waistTask.setMask(np.array([0,0,0,1,1,1.]))
+        waistID = robot.model().getFrameId(conf.waist_frame_name)
+        H_waist_ref = robot.framePosition(formulation.data(), waistID)
+        self.trajWaist = tsid.TrajectorySE3Constant("traj-waist", H_waist_ref)
+        if(conf.w_waist>0):
+            formulation.addMotionTask(self.waistTask, self.conf.w_waist, 1, 0.0)
+                
         self.tau_max = conf.tau_max_scaling*robot.model().effortLimit[-robot.na:]
         self.tau_min = -self.tau_max
         actuationBoundsTask = tsid.TaskActuationBounds("task-actuation-bounds", robot)
@@ -105,7 +130,7 @@ class TsidBiped:
         if(conf.w_joint_bounds>0.0):
             formulation.addMotionTask(jointBoundsTask, conf.w_joint_bounds, 0, 0.0)
         
-        com_ref = robot.com(data)
+        com_ref = robot.com(formulation.data())
         self.trajCom = tsid.TrajectoryEuclidianConstant("traj_com", com_ref)
         self.sample_com = self.trajCom.computeNext()
         
@@ -135,6 +160,7 @@ class TsidBiped:
         self.formulation = formulation
         self.q = q
         self.v = v
+        self.q0 = np.copy(self.q)
         
         self.contact_LF_active = True
         self.contact_RF_active = True
@@ -161,6 +187,7 @@ class TsidBiped:
         
         x_rf   = self.get_placement_RF().translation
         offset = x_rf - self.x_RF_ref[:,0]
+#        print("offset", offset)
         for i in range(self.N):
             self.com_pos_ref[:,i] += offset
             self.x_RF_ref[:,i] += offset
@@ -211,7 +238,7 @@ class TsidBiped:
             return None
 
         u = self.formulation.getActuatorForces(sol)
-#        print('u', u)
+        
         self.i += 1
         self.t += self.dt
         return u
@@ -223,10 +250,10 @@ class TsidBiped:
         return q,v
         
     def get_placement_LF(self):
-        return self.robot.position(self.formulation.data(), self.LF)
+        return self.robot.framePosition(self.formulation.data(), self.LF)
         
     def get_placement_RF(self):
-        return self.robot.position(self.formulation.data(), self.RF)
+        return self.robot.framePosition(self.formulation.data(), self.RF)
         
     def set_com_ref(self, pos, vel, acc):
         self.sample_com.pos(pos)
@@ -254,36 +281,39 @@ class TsidBiped:
         
     def get_LF_3d_pos_vel_acc(self, dv):
         data = self.formulation.data()
-        H  = self.robot.position(data, self.LF)
-        v  = self.robot.velocity(data, self.LF)
+        H  = self.robot.framePosition(data, self.LF)
+        v  = self.robot.frameVelocity(data, self.LF)
         a = self.leftFootTask.getAcceleration(dv)
         return H.translation, v.linear, a[:3]
         
     def get_RF_3d_pos_vel_acc(self, dv):
         data = self.formulation.data()
-        H  = self.robot.position(data, self.RF)
-        v  = self.robot.velocity(data, self.RF)
+        H  = self.robot.framePosition(data, self.RF)
+        v  = self.robot.frameVelocity(data, self.RF)
         a = self.rightFootTask.getAcceleration(dv)
         return H.translation, v.linear, a[:3]
         
     def remove_contact_RF(self, transition_time=0.0):
-        H_rf_ref = self.robot.position(self.formulation.data(), self.RF)
+#        print("Time %.3f remove contact RF"%self.t)
+        H_rf_ref = self.robot.framePosition(self.formulation.data(), self.RF)
         self.trajRF.setReference(H_rf_ref)
         self.rightFootTask.setReference(self.trajRF.computeNext())
     
         self.formulation.removeRigidContact(self.contactRF.name, transition_time)
         self.contact_RF_active = False
         
-    def remove_contact_LF(self, transition_time=0.0):        
-        H_lf_ref = self.robot.position(self.formulation.data(), self.LF)
+    def remove_contact_LF(self, transition_time=0.0):   
+#        print("Time %.3f remove contact LF"%self.t)
+        H_lf_ref = self.robot.framePosition(self.formulation.data(), self.LF)
         self.trajLF.setReference(H_lf_ref)
         self.leftFootTask.setReference(self.trajLF.computeNext())
         
         self.formulation.removeRigidContact(self.contactLF.name, transition_time)
         self.contact_LF_active = False
         
-    def add_contact_RF(self, transition_time=0.0):       
-        H_rf_ref = self.robot.position(self.formulation.data(), self.RF)
+    def add_contact_RF(self, transition_time=0.0):   
+#        print("Time %.3f add contact RF"%self.t)
+        H_rf_ref = self.robot.framePosition(self.formulation.data(), self.RF)
         self.contactRF.setReference(H_rf_ref)
         if(self.conf.w_contact>=0.0):
             self.formulation.addRigidContact(self.contactRF, self.conf.w_forceRef, self.conf.w_contact, 1)
@@ -292,8 +322,9 @@ class TsidBiped:
         
         self.contact_RF_active = True
         
-    def add_contact_LF(self, transition_time=0.0):        
-        H_lf_ref = self.robot.position(self.formulation.data(), self.LF)
+    def add_contact_LF(self, transition_time=0.0):      
+#        print("Time %.3f add contact LF"%self.t)
+        H_lf_ref = self.robot.framePosition(self.formulation.data(), self.LF)
         self.contactLF.setReference(H_lf_ref)
         if(self.conf.w_contact>=0.0):
             self.formulation.addRigidContact(self.contactLF, self.conf.w_forceRef, self.conf.w_contact, 1)
