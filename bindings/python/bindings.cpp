@@ -111,6 +111,11 @@ long double stop_watch_get_max_time(const std::string & perf_name)
   return getProfiler().get_max_time(perf_name);
 }
 
+long double stop_watch_get_total_time(const std::string & perf_name)
+{
+  return getProfiler().get_total_time(perf_name);
+}
+
 void stop_watch_reset_all()
 {
   getProfiler().reset_all();
@@ -150,6 +155,9 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
 
     bp::def("stop_watch_get_max_time", stop_watch_get_max_time,
             "Get the max time measured by the shared stop-watch for the specified task.");
+
+    bp::def("stop_watch_get_total_time", stop_watch_get_total_time,
+            "Get the total time measured by the shared stop-watch for the specified task.");
 
     bp::def("stop_watch_reset_all", stop_watch_reset_all,
             "Reset the shared stop-watch.");
