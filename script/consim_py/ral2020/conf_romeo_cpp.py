@@ -38,6 +38,7 @@ fMin = 0.0                          # minimum normal force
 fMax = 1e6                       # maximum normal force
 rf_frame_name = "RAnkleRoll"        # right foot frame name
 lf_frame_name = "LAnkleRoll"        # left foot frame name
+waist_frame_name = 'base_link' #'torso_2_link'
 
 
 # configuration for TSID
@@ -49,6 +50,7 @@ T_post = 1.5                    # simulation time after walking
 w_com = 1.0                     # weight of center of mass task
 w_foot = 1e0                    # weight of the foot motion task
 w_contact = -1e2                 # weight of the foot in contact
+w_waist = 1e-2
 w_posture = 1e-4                # weight of joint posture task
 w_forceRef = 1e-5               # weight of force regularization task
 w_torque_bounds = 0.0           # weight of the torque bounds
@@ -60,6 +62,7 @@ v_max_scaling = 0.8
 kp_contact = 10.0               # proportional gain of contact constraint
 kp_foot = 10.0                  # proportional gain of contact constraint
 kp_com = 10.0                   # proportional gain of center of mass task
+kp_waist = 10.0
 kp_posture = 10.0               # proportional gain of joint posture task
 
 # configuration for viewer
