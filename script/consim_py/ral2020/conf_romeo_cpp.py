@@ -71,3 +71,5 @@ PRINT_T = 1.0                   # print every PRINT_T seconds
 use_viewer = 0
 DISPLAY_N = 20                  # update robot configuration in viwewer every DISPLAY_N time steps
 CAMERA_TRANSFORM = [3.578777551651001, 1.2937744855880737, 0.8885031342506409, 0.4116811454296112, 0.5468055009841919, 0.6109083890914917, 0.3978860676288605]
+SPHERE_RADIUS = 0.01
+SPHERE_COLOR  = (1, 0., 0, 1)
