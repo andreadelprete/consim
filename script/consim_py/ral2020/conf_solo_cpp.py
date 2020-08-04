@@ -13,7 +13,7 @@ LINE_WIDTH = 60
 
 fMin = 1
 fMax = 1e4
-mu = 1.0*1e3                            # friction coefficient
+mu = .7                            # friction coefficient
 contact_frames = ['HL_FOOT', 'HR_FOOT', 'FL_FOOT', 'FR_FOOT']
 # direction of the normal to the contact surface
 contact_normal = np.array([0., 0., 1.])
@@ -44,3 +44,5 @@ v0 = np.zeros(18)
 use_viewer = 0
 CAMERA_TRANSFORM = [1.0910934209823608, -1.4611519575119019, 0.9074661731719971,
                     0.5040678381919861, 0.17712827026844025, 0.24428671598434448, 0.8092374205589294]
+SPHERE_RADIUS = 0.01
+SPHERE_COLOR  = (1, 0., 0, 1)
