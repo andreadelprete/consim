@@ -154,16 +154,6 @@ if(PLOT_INTEGRATION_ERROR_TRAJECTORIES):
     ax.set_yscale('log')
     leg = ax.legend()
     if(leg): leg.get_frame().set_alpha(0.5)
-    
-def get_empty_figure(n):
-    if(n<5):
-        (ff, ax) = plut.create_empty_figure(n, 1)
-        if n==1:
-            ax = [ax]
-    else:
-        (ff, ax) = plut.create_empty_figure(int(n/2), 2)
-        ax = ax.reshape(ax.shape[0]*ax.shape[1])
-    return ax
         
 # PLOT THE CONTACT FORCES OF ALL INTEGRATION METHODS ON THE SAME PLOT
 if(PLOT_FORCES):        

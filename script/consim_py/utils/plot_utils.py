@@ -81,7 +81,16 @@ def create_empty_figure(nRows=1, nCols=1, spinesPos=None, sharex=True, name=None
             movePlotSpines(ax, spinesPos)
     return (f, ax)
 
-
+def get_empty_figure(n_plots, max_plots_per_col=4):
+    if(n_plots<=max_plots_per_col):
+        (ff, ax) = create_empty_figure(n_plots, 1)
+        if n_plots==1:
+            ax = [ax]
+    else:
+        (ff, ax) = create_empty_figure(int(n_plots/2), 2)
+        ax = ax.reshape(ax.shape[0]*ax.shape[1])
+    return ax
+    
 def movePlotSpines(ax, spinesPos):
     ax.spines['right'].set_color('none')
     ax.spines['top'].set_color('none')

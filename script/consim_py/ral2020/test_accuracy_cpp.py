@@ -48,7 +48,7 @@ PLOT_VELOCITY_NORM = 0
 PLOT_SLIPPING = 0
 PLOT_BASE_POS = 0
 PLOT_INTEGRATION_ERRORS = 1
-PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
+PLOT_INTEGRATION_ERROR_TRAJECTORIES = 0
 PLOT_MATRIX_MULTIPLICATIONS = 0
 PLOT_MATRIX_NORMS = 0
 
@@ -105,13 +105,8 @@ elif(TEST_NAME=='talos-walk'):
 ground_truth_dt = 1e-3/64
 i_ground_truth = int(np.log2(dt / ground_truth_dt))
 
-#i_ground_truth += 3 # TEMP
 i_min = 0
 i_max = i_ground_truth - 2
-
-# DEBUG
-#i_max += 2
-#i_min = i_max-1
 
 GROUND_TRUTH_EXP_SIMU_PARAMS = {
     'name': 'ground-truth %d'%(2**i_ground_truth),
@@ -354,11 +349,7 @@ if(PLOT_MATRIX_NORMS):
 if(PLOT_FORCES):        
     nc = len(conf.contact_frames)
     for (name, d) in data.items():
-        if(nc<5):
-            (ff, ax) = plut.create_empty_figure(nc, 1)
-        else:
-            (ff, ax) = plut.create_empty_figure(int(nc/2), 2)
-            ax = ax.reshape(ax.shape[0]*ax.shape[1])
+        ax = plut.get_empty_figure(nc)
         for i in range(nc):
 #            ax[i].plot(tt, norm(d.f[0:2,i,:], axis=0) / (1e-3+d.f[2,i,:]), alpha=0.7, label=name)
             ax[i].plot(tt, d.f[2,i,:], alpha=0.7, label=name)
@@ -370,11 +361,7 @@ if(PLOT_FORCES):
 if(PLOT_CONTACT_POINTS):
     nc = len(conf.contact_frames)
     for (name, d) in data.items():
-        if(nc<5):
-            (ff, ax) = plut.create_empty_figure(nc, 1)
-        else:
-            (ff, ax) = plut.create_empty_figure(int(nc/2), 2)
-            ax = ax.reshape(ax.shape[0]*ax.shape[1])
+        ax = plut.get_empty_figure(nc)
         for i in range(nc):
             ax[i].plot(tt, d.p[2,i,:], alpha=0.7, label=name+' p')
             ax[i].plot(tt, d.p0[2,i,:], alpha=0.7, label=name+' p0')
@@ -398,25 +385,18 @@ if(PLOT_VELOCITY_NORM):
 # PLOT THE SLIPPING FLAG OF ALL INTEGRATION METHODS ON THE SAME PLOT
 if(PLOT_SLIPPING):
     nc = len(conf.contact_frames)
-    if(nc<5):
-        (ff, ax) = plut.create_empty_figure(nc, 1)
-    else:
-        (ff, ax) = plut.create_empty_figure(int(nc/2), 2)
-        ax = ax.reshape(ax.shape[0]*ax.shape[1])
+#    ax = plut.get_empty_figure(nc)
     for (name, d) in data.items():        
+        ax = plut.get_empty_figure(nc)
         for i in range(nc):
             ax[i].plot(tt, d.slipping[i,:tt.shape[0]], alpha=0.7, label=name)
             ax[i].set_xlabel('Time [s]')
-    ax[0].set_ylabel('Contact Slipping Flag')
-    leg = ax[0].legend()
-    if(leg): leg.get_frame().set_alpha(0.5)
+        ax[0].set_ylabel('Contact Slipping Flag')
+        leg = ax[0].legend()
+        if(leg): leg.get_frame().set_alpha(0.5)
     plut.saveFigure("slipping_flag_"+descr_str)
 
-    if(nc<5):
-        (ff, ax) = plut.create_empty_figure(nc, 1)
-    else:
-        (ff, ax) = plut.create_empty_figure(int(nc/2), 2)
-        ax = ax.reshape(ax.shape[0]*ax.shape[1])
+    ax = plut.get_empty_figure(nc)
     for (name, d) in data.items():
         for i in range(nc):
             ax[i].plot(tt, d.active[i,:tt.shape[0]], alpha=0.7, label=name)
