@@ -181,6 +181,10 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
         .ADD_PROPERTY_RETURN_BY_VALUE("tangent", &ContactPoint::tangent)
         .ADD_PROPERTY_RETURN_BY_VALUE("tanvel", &ContactPoint::tanvel)
         .ADD_PROPERTY_RETURN_BY_VALUE("f", &ContactPoint::f)
+        .ADD_PROPERTY_RETURN_BY_VALUE("f_avg", &ContactPoint::f_avg)
+        .ADD_PROPERTY_RETURN_BY_VALUE("f_avg2", &ContactPoint::f_avg2)
+        .ADD_PROPERTY_RETURN_BY_VALUE("f_prj", &ContactPoint::f_prj)
+        .ADD_PROPERTY_RETURN_BY_VALUE("f_prj2", &ContactPoint::f_prj2)
         .ADD_PROPERTY_RETURN_BY_VALUE("predicted_f", &ContactPoint::predictedF_)
         .ADD_PROPERTY_RETURN_BY_VALUE("predicted_x", &ContactPoint::predictedX_)
         .ADD_PROPERTY_RETURN_BY_VALUE("predicted_v", &ContactPoint::predictedV_)
@@ -231,7 +235,8 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
         .def("get_v", &ExponentialSimulator::get_v,bp::return_value_policy<bp::copy_const_reference>(), "tangent vector to configuration")
         .def("get_dv", &ExponentialSimulator::get_dv,bp::return_value_policy<bp::copy_const_reference>(), "time derivative of tangent vector to configuration")
         .def("getMatrixMultiplications", &ExponentialSimulator::getMatrixMultiplications)
-        .def("getMatrixExpL1Norm", &ExponentialSimulator::getMatrixExpL1Norm);
+        .def("getMatrixExpL1Norm", &ExponentialSimulator::getMatrixExpL1Norm)
+        .def("assumeSlippageContinues", &ExponentialSimulator::assumeSlippageContinues);
 }
 
 }

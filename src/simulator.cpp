@@ -292,7 +292,8 @@ ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocc
                                             slipping_method_(slipping_method),
                                             compute_predicted_forces_(compute_predicted_forces), 
                                             expMaxMatMul_(exp_max_mat_mul),
-                                            ldsMaxMatMul_(lds_max_mat_mul)
+                                            ldsMaxMatMul_(lds_max_mat_mul),
+                                            assumeSlippageContinues_(true)
 {
   dvMean_.resize(model_->nv);
   dvMean2_.resize(model_->nv);
@@ -361,7 +362,6 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     CONSIM_STOP_PROFILER("exponential_simulator::integrateState");
     
     CONSIM_START_PROFILER("exponential_simulator::computeContactForces");
-    // tau_.fill(0);
     computeContactForces();
     Eigen::internal::set_is_malloc_allowed(true);
     elapsedTime_ += sub_dt; 
@@ -380,16 +380,18 @@ void ExponentialSimulator::computeExpLDS(){
    * computes A and b 
    **/   
   // Do we need to compute M before computing M inverse?
-  
+  B_copy = B;
   i_active_ = 0; 
   for(auto &cp : contacts_){
     if (!cp->active) continue;
     Jc_.block(3*i_active_,0,3,model_->nv) = cp->world_J_;
     dJv_.segment<3>(3*i_active_) = cp->dJv_; 
     p0_.segment<3>(3*i_active_)  = cp->x_anchor; 
+    dp0_.segment<3>(3*i_active_)  = cp->v_anchor; 
     p_.segment<3>(3*i_active_)   = cp->x; 
     dp_.segment<3>(3*i_active_)  = cp->v;  
-    kp0_.segment<3>(3*i_active_).noalias() = cp->optr->contact_model_->stiffness_.cwiseProduct(p0_.segment<3>(3*i_active_));
+    if (cp->slipping)
+        B_copy.diagonal().segment<3>(3*i_active_).setZero();
     i_active_ += 1;  
   }
   JcT_.noalias() = Jc_.transpose(); 
@@ -420,13 +422,16 @@ void ExponentialSimulator::computeExpLDS(){
   Upsilon_.noalias() =  Jc_*MinvJcT_;
   tempStepMat_.noalias() =  Upsilon_ * K;
   A.bottomLeftCorner(3*nactive_, 3*nactive_).noalias() = -tempStepMat_;  
-  tempStepMat_.noalias() = Upsilon_ * B; 
+  if(assumeSlippageContinues_)
+    tempStepMat_.noalias() = Upsilon_ * B_copy; 
+  else
+    tempStepMat_.noalias() = Upsilon_ * B; 
   A.bottomRightCorner(3*nactive_, 3*nactive_).noalias() = -tempStepMat_; 
   temp04_.noalias() = Jc_* dv_bar;  
   b_.noalias() = temp04_ + dJv_; 
   a_.tail(3*nactive_) = b_;
   x0_.head(3*nactive_) = p_-p0_; 
-  x0_.tail(3*nactive_) = dp_; 
+  x0_.tail(3*nactive_) = dp_;
 }
 
 
@@ -511,11 +516,12 @@ void ExponentialSimulator::computePredictedXandF(){
     }
     //  prediction terms also have memory allocation 
     predictedXf_ = expAdt_*x0_ + inteAdt_*a_; 
-    predictedForce_ = kp0_ + D*predictedXf_;
+    predictedForce_ =  D*predictedXf_;
   }
   else{
     predictedXf_ = x0_;
-    predictedForce_ = kp0_; // this doesnt seem correct ?
+    predictedForce_ = p0_;
+    // predictedForce_ = kp0_; // this doesnt seem correct ?
   }
   Eigen::internal::set_is_malloc_allowed(false);
 }
@@ -546,8 +552,6 @@ void ExponentialSimulator::checkFrictionCone(){
   f_avg2.noalias() = temp03_/(0.5*sub_dt*sub_dt);
   
   i_active_ = 0;
-  cone_flag_ = false; 
-
   for(unsigned int i=0; i<nc_; i++){
     if (!contacts_[i]->active) continue;
 
@@ -555,9 +559,14 @@ void ExponentialSimulator::checkFrictionCone(){
     contacts_[i]->predictedV_ = predictedXf_.segment<3>(3*nactive_+3*i_active_);
     contacts_[i]->predictedF_ = predictedForce_.segment<3>(3*i_active_); 
 
+    contacts_[i]->f_avg  = f_avg.segment<3>(3*i_active_);
+    contacts_[i]->f_avg2 = f_avg2.segment<3>(3*i_active_);
+
     if (!contacts_[i]->unilateral) {
       fpr_.segment<3>(3*i_active_) = f_avg.segment<3>(3*i_active_); 
       fpr2_.segment<3>(3*i_active_) = f_avg2.segment<3>(3*i_active_); 
+      contacts_[i]->f_prj  = fpr_.segment<3>(3*i_active_);
+      contacts_[i]->f_prj2 = fpr2_.segment<3>(3*i_active_);
       contacts_[i]->predictedF_ = fpr_.segment<3>(3*i_active_);
       i_active_ += 1; 
       continue;
@@ -571,7 +580,8 @@ void ExponentialSimulator::checkFrictionCone(){
     contacts_[i]->projectForceInCone(f_tmp);
     fpr2_.segment<3>(3*i_active_) = f_tmp;
 
-    cone_flag_ = true; 
+    contacts_[i]->f_prj  = fpr_.segment<3>(3*i_active_);
+    contacts_[i]->f_prj2 = fpr2_.segment<3>(3*i_active_);
 
     i_active_ += 1; 
   }
@@ -654,6 +664,7 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
   if (nactive_>0){
     f_.resize(3 * nactive_); f_.setZero();
     p0_.resize(3 * nactive_); p0_.setZero();
+    dp0_.resize(3 * nactive_); dp0_.setZero();
     p_.resize(3 * nactive_); p_.setZero();
     dp_.resize(3 * nactive_); dp_.setZero();
     a_.resize(6 * nactive_); a_.setZero();
@@ -662,7 +673,6 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
     predictedXf_.resize(6 * nactive_); predictedXf_.setZero();
     intxt_.resize(6 * nactive_); intxt_.setZero();
     int2xt_.resize(6 * nactive_); int2xt_.setZero();
-    kp0_.resize(3 * nactive_); kp0_.setZero();
     K.resize(3 * nactive_); K.setZero();
     B.resize(3 * nactive_); B.setZero();
     D.resize(3 * nactive_, 6 * nactive_); D.setZero();
@@ -671,7 +681,6 @@ void ExponentialSimulator::resizeVectorsAndMatrices()
     Jc_.resize(3 * nactive_, model_->nv); Jc_.setZero();
     JcT_.resize(model_->nv, 3 * nactive_); JcT_.setZero();
     Upsilon_.resize(3 * nactive_, 3 * nactive_); Upsilon_.setZero();
-    // JMinv_.resize(3 * nactive_, model_->nv); JMinv_.setZero();
     MinvJcT_.resize(model_->nv, 3*nactive_); MinvJcT_.setZero();
     dJv_.resize(3 * nactive_); dJv_.setZero();
     utilDense_.resize(6 * nactive_);

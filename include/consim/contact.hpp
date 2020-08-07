@@ -60,7 +60,11 @@ class ContactPoint {
     Eigen::Vector3d     normvel;                /*!< normal velocity vector */
     Eigen::Vector3d     tangent;                /*!< tangential displacement vector */
     Eigen::Vector3d     tanvel;                 /*!< tangential velocity vector */
-    Eigen::Vector3d     f;                      /*!< contact forces in world coordinates */
+    Eigen::Vector3d     f;                      /*!< contact force in world coordinates */
+    Eigen::Vector3d     f_avg;                  /*!< average contact force during time step */
+    Eigen::Vector3d     f_avg2;                 /*!< average of average contact force during time step */
+    Eigen::Vector3d     f_prj;                  /*!< projection of f_avg in friction cone */
+    Eigen::Vector3d     f_prj2;                 /*!< projection of f_avg2 in friction cone */
     Eigen::Vector3d     predictedF_;            /*!< contact forces predicted through exponential integration */
     Eigen::Vector3d     predictedX_;
     Eigen::Vector3d     predictedV_;
