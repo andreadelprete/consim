@@ -25,6 +25,9 @@ q0 = np.array([0., 0., -1e-4, 0., 0., 0., 1.])
 v0 = np.array([0., 0., 0., 0., 0., 0.])
 
 anchor_slipping_method = 1
+unilateral_contacts = 1
+
+T_pre = 0.0
 
 PRINT_T = 0.2                   # print every PRINT_T
 DISPLAY_T = 0.005                 # update robot configuration in viwewer every DISPLAY_T
@@ -33,6 +36,6 @@ p0 = np.zeros(3)
 
 urdf_path = os.path.abspath('../models/urdf/free_flyer.urdf')
 mesh_path = os.path.abspath('../models')
-use_viewer = 1
+use_viewer = 0
 CAMERA_TRANSFORM = [1.0910934209823608, -1.4611519575119019, 0.9074661731719971,
                     0.5040678381919861, 0.17712827026844025, 0.24428671598434448, 0.8092374205589294]

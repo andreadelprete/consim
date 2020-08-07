@@ -41,25 +41,25 @@ for s in comp_times_exp:
 for s in comp_times_euler:
     comp_times_euler_dict[s] = s.split('::')[-1]
 
-plut.SAVE_FIGURES = 1
+plut.SAVE_FIGURES = 0
 PLOT_FORCES = 0
 PLOT_CONTACT_POINTS = 0
 PLOT_VELOCITY_NORM = 0
 PLOT_SLIPPING = 0
 PLOT_BASE_POS = 0
 PLOT_INTEGRATION_ERRORS = 1
-PLOT_INTEGRATION_ERROR_TRAJECTORIES = 0
+PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
 PLOT_MATRIX_MULTIPLICATIONS = 0
 PLOT_MATRIX_NORMS = 0
 
 LOAD_GROUND_TRUTH_FROM_FILE = 0
-SAVE_GROUND_TRUTH_TO_FILE = 0
+SAVE_GROUND_TRUTH_TO_FILE = 1
 RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
 
-#TEST_NAME = 'solo-squat'
+TEST_NAME = 'solo-squat'
 #TEST_NAME = 'solo-trot'
 #TEST_NAME = 'solo-jump'
-TEST_NAME = 'romeo-walk'
+#TEST_NAME = 'romeo-walk'
 #TEST_NAME = 'talos-walk'
 
 LINE_WIDTH = 100
@@ -104,9 +104,14 @@ elif(TEST_NAME=='talos-walk'):
 # ground truth computed with time step 1/64 ms
 ground_truth_dt = 1e-3/64
 i_ground_truth = int(np.log2(dt / ground_truth_dt))
+
+#i_ground_truth += 3 # TEMP
 i_min = 0
 i_max = i_ground_truth - 2
 
+# DEBUG
+#i_max += 2
+#i_min = i_max-1
 
 GROUND_TRUTH_EXP_SIMU_PARAMS = {
     'name': 'ground-truth %d'%(2**i_ground_truth),
@@ -436,4 +441,4 @@ if(PLOT_BASE_POS):
         leg = ax[0].legend()
         if(leg): leg.get_frame().set_alpha(0.5)
         
-#plt.show()
+plt.show()

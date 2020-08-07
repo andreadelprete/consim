@@ -241,7 +241,7 @@ class TsidBiped:
         
         self.i += 1
         self.t += self.dt
-        return u
+        return np.concatenate((np.zeros(6),u))
         
     def integrate_dv(self, q, v, dv, dt):
         v_mean = v + 0.5*dt*dv

@@ -36,9 +36,9 @@ RESET_STATE_ON_GROUND_TRUTH = 0  # reset the state of the system on the ground t
 
 #TEST_NAME = 'solo-squat'
 #TEST_NAME = 'solo-trot'
-#TEST_NAME = 'solo-jump'
+TEST_NAME = 'solo-jump'
 #TEST_NAME = 'romeo-walk'
-TEST_NAME = 'talos-walk'
+#TEST_NAME = 'talos-walk'
 
 LINE_WIDTH = 100
 print("".center(LINE_WIDTH, '#'))
@@ -95,7 +95,7 @@ for i in range(i_min, i_max):
         'forward_dyn_method': 3
     }]
 
-i_max = 6
+i_max = 8
 
 # EULER INTEGRATOR WITH EXPLICIT INTEGRATION
 for i in range(i_min, i_max):
