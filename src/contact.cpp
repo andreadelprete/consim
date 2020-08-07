@@ -72,7 +72,8 @@ void LinearPenaltyContactModel::computeForce(ContactPoint& cp)
     cp.v_anchor = cp.v - (cp.v.dot(cp.contactNormal_))*cp.contactNormal_;
   }
 
-  cp.f = stiffness_.cwiseProduct(cp.delta_x) + damping_.cwiseProduct(cp.v_anchor - cp.v); 
+  // cp.f = stiffness_.cwiseProduct(cp.delta_x) + damping_.cwiseProduct(cp.v_anchor - cp.v); 
+  cp.f = stiffness_.cwiseProduct(cp.delta_x) - damping_.cwiseProduct(cp.v); 
   /*!< force along normal to contact object */ 
   normalNorm_ = cp.f.dot(cp.contactNormal_);
   /*!< unilateral force, no pulling into contact object */ 
