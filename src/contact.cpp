@@ -66,14 +66,14 @@ LinearPenaltyContactModel::LinearPenaltyContactModel(Eigen::Vector3d &stiffness,
 
 void LinearPenaltyContactModel::computeForce(ContactPoint& cp)
 {
-  
   if(cp.slipping){
     // assume that if you were slipping at previous iteration you're still slipping
     // TODO: could be better to check whether velocity has changed direction
     cp.v_anchor = cp.v - (cp.v.dot(cp.contactNormal_))*cp.contactNormal_;
   }
 
-  cp.f = stiffness_.cwiseProduct(cp.delta_x) + damping_.cwiseProduct(cp.v_anchor - cp.v); 
+  // cp.f = stiffness_.cwiseProduct(cp.delta_x) + damping_.cwiseProduct(cp.v_anchor - cp.v); 
+  cp.f = stiffness_.cwiseProduct(cp.delta_x) - damping_.cwiseProduct(cp.v); 
   /*!< force along normal to contact object */ 
   normalNorm_ = cp.f.dot(cp.contactNormal_);
   /*!< unilateral force, no pulling into contact object */ 
@@ -100,8 +100,8 @@ void LinearPenaltyContactModel::computeForce(ContactPoint& cp)
     cp.x_anchor = cp.x + stiffnessInverse_.cwiseProduct(cp.f - damping_.cwiseProduct(cp.v_anchor-cp.v));
     return;
   } 
-    
-  cp.slipping = false;
+  else
+    cp.slipping = false;
 }
 
 void LinearPenaltyContactModel::projectForceInCone(Eigen::Vector3d &f, ContactPoint& cp)

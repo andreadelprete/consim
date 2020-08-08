@@ -171,12 +171,17 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
         use_balancing = simu_params['use_balancing']
     except:
         use_balancing = True
+    try:
+        slippageContinues = simu_params['assumeSlippageContinues']
+    except:
+        slippageContinues = False
         
     if(use_exp_int):
         simu = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
                                     conf.K, conf.B, conf.mu, conf.anchor_slipping_method,
                                     compute_predicted_forces, forward_dyn_method, semi_implicit,
                                     max_mat_mult, max_mat_mult, use_balancing)
+        simu.assumeSlippageContinues(slippageContinues)
     else:
         simu = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
                                         conf.K, conf.B, conf.mu, forward_dyn_method, semi_implicit)
@@ -198,6 +203,10 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
     results.com_vel = np.zeros((3, N+1))
     results.u = np.zeros((nv, N+1))
     results.f = np.zeros((3, nc, N+1))
+    results.f_avg = np.zeros((3, nc, N+1))
+    results.f_avg2 = np.zeros((3, nc, N+1))
+    results.f_prj = np.zeros((3, nc, N+1))
+    results.f_prj2 = np.zeros((3, nc, N+1))
     results.p = np.zeros((3, nc, N+1))
     results.dp = np.zeros((3, nc, N+1))
     results.p0 = np.zeros((3, nc, N+1))
@@ -238,7 +247,7 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
                 reset_anchor_points = False
                 simu.reset_state(ground_truth.q[:,i], ground_truth.v[:,i], reset_anchor_points)
                     
-            results.u[6:,i] = controller.compute_control(simu.get_q(), simu.get_v())
+            results.u[:,i] = controller.compute_control(simu.get_q(), simu.get_v())
             simu.step(results.u[:,i])
                 
             results.q[:,i+1] = simu.get_q()
@@ -252,6 +261,10 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
             
             for ci, cp in enumerate(cpts):
                 results.f[:,ci,i+1] = cp.f
+                results.f_avg[:,ci,i+1] = cp.f_avg
+                results.f_avg2[:,ci,i+1] = cp.f_avg2
+                results.f_prj[:,ci,i+1] = cp.f_prj
+                results.f_prj2[:,ci,i+1] = cp.f_prj2
                 results.p[:,ci,i+1] = cp.x
                 results.p0[:,ci,i+1] = cp.x_anchor
                 results.dp[:,ci,i+1] = cp.v

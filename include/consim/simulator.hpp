@@ -180,6 +180,7 @@ namespace consim {
       // Return the L1 norm of the last matrix used for computing the matrix exponential
       double getMatrixExpL1Norm(){ return utilDense_.getL1Norm(); }
       void useMatrixBalancing(bool flag){ utilDense_.useBalancing(flag); }
+      void assumeSlippageContinues(bool flag){ assumeSlippageContinues_=flag; }
 
     protected:
       /**
@@ -201,26 +202,27 @@ namespace consim {
 
       int slipping_method_; 
       bool compute_predicted_forces_;
+      bool assumeSlippageContinues_; // flag deciding whether dp0 is used in force computation 
       
-      Eigen::VectorXd f_;  // total force 
-      Eigen::MatrixXd Jc_; // contact jacobian for all contacts 
-      Eigen::VectorXd p0_; // reference position for contact 
-      Eigen::VectorXd p_; // current contact position 
-      Eigen::VectorXd dp_; // contact velocity
+      Eigen::VectorXd f_;  // contact forces
+      Eigen::MatrixXd Jc_; // contact Jacobian for all contacts 
+      Eigen::VectorXd p0_;  // anchor point positions
+      Eigen::VectorXd dp0_; // anchor point velocities
+      Eigen::VectorXd p_;   // contact point positions
+      Eigen::VectorXd dp_;  // contact point velocities
       Eigen::VectorXd x0_;
       Eigen::VectorXd a_;
       Eigen::VectorXd b_;
       Eigen::VectorXd intxt_;
       Eigen::VectorXd int2xt_;
-      Eigen::VectorXd kp0_; 
       Eigen::VectorXd dv_bar; 
       // contact acceleration components 
       Eigen::VectorXd dJv_;  
       DiagonalMatrixXd K;
       DiagonalMatrixXd B;
+      DiagonalMatrixXd B_copy;
       Eigen::MatrixXd D;
       Eigen::MatrixXd A; 
-      // Eigen::MatrixXd JMinv_;
       Eigen::MatrixXd MinvJcT_;
       Eigen::MatrixXd Upsilon_;
       Eigen::MatrixXd JcT_; 
@@ -255,7 +257,6 @@ namespace consim {
       Eigen::VectorXd f_avg2;  // average of average force for cone 
       Eigen::VectorXd fpr_;   // projected force on cone boundaries 
       Eigen::VectorXd fpr2_;   // projected force on cone boundaries
-      bool cone_flag_ = false; // cone violation status 
       double cone_direction_; // angle of tangential(to contact surface) force 
 
       // Eigen::Vector3d f_avg_i; 

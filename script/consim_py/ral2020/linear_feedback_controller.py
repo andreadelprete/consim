@@ -20,4 +20,4 @@ class LinearFeedbackController:
         diff = state_diff(self.robot, xact, self.refX[self.i])
         u = self.refU[self.i] + self.feedBack[self.i].dot(diff)        
         self.i += 1
-        return u
+        return np.concatenate((np.zeros(6),u))

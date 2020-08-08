@@ -13,7 +13,7 @@ LINE_WIDTH = 60
 
 fMin = 1
 fMax = 1e4
-mu = .7                            # friction coefficient
+mu = 1.0                            # friction coefficient
 contact_frames = ['HL_FOOT', 'HR_FOOT', 'FL_FOOT', 'FR_FOOT']
 # direction of the normal to the contact surface
 contact_normal = np.array([0., 0., 1.])
