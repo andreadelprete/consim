@@ -84,8 +84,13 @@ class Visualizer(object):
 
 
 class ConsimVisual(object):
-    def __init__(self, name, filename, package_dirs, root_joint, consimVisualizer):
+    def __init__(self, name, filename, package_dirs, root_joint, consimVisualizer, visualOptions):
         self.name = name 
+        self.contactNames= visualOptions["contact_names"] 
+        self.robotColor = visualOptions["robot_color"]
+        self.forceColor = visualOptions["force_color"]
+        self.coneColor = visualOptions["cone_color"]
+
         self.urdfDir = filename
         self.meshDir = package_dirs
         self.viewer = consimVisualizer.viewer
@@ -96,25 +101,30 @@ class ConsimVisual(object):
         self.visual_model = visual_model 
         self.display_collisions = False 
         self.display_visuals    = True 
+        self.display_forces = True
+        self.display_cones = True 
         self.data, self.collision_data, self.visual_data = createDatas(model,collision_model,visual_model)
 
-        self.viewerRootNodeName = self.sceneName + "/" + rootNodeName+ "_" + self.name
-
-        self.forceGroup = self.viewerRootNodeName + "/contact_forces"
-        self.frictionGroup = self.viewerRootNodeName + "/friction_cone"
+        self.rootNodeName="pinocchio"
+        self.viewerRootNodeName = self.sceneName + "/" + self.rootNodeName+ "_" + self.name
 
 
-        self.viewer.gui.createGroup(self.forceGroup)  ### display active contact forces 
-        self.viewer.gui.createGroup(self.frictionGroup)  ### display active friction cones 
+
+
+        
+        
     
 
     def addCones(self):
         """ add cone visuals for all defined contacts """
-        pass 
+        for cn in self.contactNames:
+            pass 
     
     def addForces(self):
         """ add force vector visuals for all defined contacts """
-        pass 
+        for cn in self.contactNames:
+            self.viewer.gui.addArrow(self.forceGroup+"/"+cn, .1, 1., self.forceColor)
+            
 
     def displayContact(self, name, force, visibility="ON"):
         if visibility =="OFF":
@@ -122,8 +132,9 @@ class ConsimVisual(object):
             self.viewer.gui.setVisibility(self.frictionGroup + "/" + name, "OFF")
         else:
             pose = self.data.oMf[self.model.getFrameId(name)] # get pose of current contact 
-            # cone and force vector orientation 
-
+            self.viewer.gui.applyConfiguration(self.forceGroup + "/" + name, 
+            pin.SE3ToXYZQUATtuple(pose))
+            self.viewer.gui.setVisibility(self.forceGroup + "/" + name, "ALWAYS_ON_TOP")
             # cone scaling 
 
             # force vector scaling 
@@ -138,42 +149,6 @@ class ConsimVisual(object):
  
 
 
-    def loadPrimitive(self, meshName, geometry_object):
-
-        gui = self.viewer.gui
-
-        meshColor = geometry_object.meshColor
-
-        geom = geometry_object.geometry
-        if isinstance(geom, hppfcl.Capsule):
-            return gui.addCapsule(meshName, geom.radius, 2. * geom.halfLength, npToTuple(meshColor))
-        elif isinstance(geom, hppfcl.Cylinder):
-            return gui.addCylinder(meshName, geom.radius, 2. * geom.halfLength, npToTuple(meshColor))
-        elif isinstance(geom, hppfcl.Box):
-            w, h, d = npToTuple(2. * geom.halfSide)
-            return gui.addBox(meshName, w, h, d, npToTuple(meshColor))
-        elif isinstance(geom, hppfcl.Sphere):
-            return gui.addSphere(meshName, geom.radius, npToTuple(meshColor))
-        elif isinstance(geom, hppfcl.Cone):
-            return gui.addCone(meshName, geom.radius, 2. * geom.halfLength, npToTuple(meshColor))
-        elif isinstance(geom, hppfcl.Convex):
-            pts = [ npToTuple(geom.points(geom.polygons(f)[i])) for f in range(geom.num_polygons) for i in range(3) ]
-            gui.addCurve(meshName, pts, npToTuple(meshColor))
-            gui.setCurveMode(meshName, "TRIANGLES")
-            gui.setLightingMode(meshName, "ON")
-            gui.setBoolProperty(meshName, "BackfaceDrawing", True)
-            return True
-        elif isinstance(geom, hppfcl.ConvexBase):
-            pts = [ npToTuple(geom.points(i)) for i in range(geom.num_points) ]
-            gui.addCurve(meshName, pts, npToTuple(meshColor))
-            gui.setCurveMode(meshName, "POINTS")
-            gui.setLightingMode(meshName, "OFF")
-            return True
-        else:
-            msg = "Unsupported geometry type for %s (%s)" % (geometry_object.name, type(geom) )
-            warnings.warn(msg, category=UserWarning, stacklevel=2)
-            return False
-
     def loadViewerGeometryObject(self, geometry_object, geometry_type):
         """Load a single geometry object"""
 
@@ -186,14 +161,11 @@ class ConsimVisual(object):
         meshColor = geometry_object.meshColor
 
         try:
-            if WITH_HPP_FCL_BINDINGS and isinstance(geometry_object.geometry, hppfcl.ShapeBase):
-                success = self.loadPrimitive(meshName, geometry_object)
-            else:
-                if meshName == "":
-                    msg = "Display of geometric primitives is supported only if pinocchio is build with HPP-FCL bindings."
-                    warnings.warn(msg, category=UserWarning, stacklevel=2)
-                    return
-                success = gui.addMesh(meshName, meshPath)
+            if meshName == "":
+                msg = "Display of geometric primitives is supported only if pinocchio is build with HPP-FCL bindings."
+                warnings.warn(msg, category=UserWarning, stacklevel=2)
+                return
+            success = gui.addMesh(meshName, meshPath)
             if not success:
                 return
         except Exception as e:
@@ -207,51 +179,37 @@ class ConsimVisual(object):
             if meshTexturePath != '':
                 gui.setTexture(meshName, meshTexturePath)
 
-    def loadViewerModel(self, rootNodeName="pinocchio"):
+    def loadViewerModel(self):
         """Create the scene displaying the robot meshes in gepetto-viewer"""
-
-        # Start a new "scene" in this window, named "world", with just a floor.
         gui = self.viewer.gui
-        
-
+    
         if not gui.nodeExists(self.viewerRootNodeName):
             gui.createGroup(self.viewerRootNodeName)
-
-        self.viewerCollisionGroupName = self.viewerRootNodeName + "/" + "collisions"
-        if not gui.nodeExists(self.viewerCollisionGroupName):
-            gui.createGroup(self.viewerCollisionGroupName)
 
         self.viewerVisualGroupName = self.viewerRootNodeName + "/" + "visuals"
         if not gui.nodeExists(self.viewerVisualGroupName):
             gui.createGroup(self.viewerVisualGroupName)
-
-        # iterate over visuals and create the meshes in the viewer
-        if self.collision_model is not None:
-            for collision in self.collision_model.geometryObjects:
-                self.loadViewerGeometryObject(collision,pin.GeometryType.COLLISION)
-        # Display collision if we have them and there is no visual
-        self.displayCollisions(self.collision_model is not None and self.visual_model is None)
-
+            
         if self.visual_model is not None:
             for visual in self.visual_model.geometryObjects:
                 self.loadViewerGeometryObject(visual,pin.GeometryType.VISUAL)
         self.displayVisuals(self.visual_model is not None)
 
-        # Finally, refresh the layout to obtain your first rendering.
+        self.forceGroup = self.viewerRootNodeName + "/contact_forces"
+        self.frictionGroup = self.viewerRootNodeName + "/friction_cone"        
+        self.viewer.gui.createGroup(self.forceGroup)  ### display active contact forces 
+        self.viewer.gui.createGroup(self.frictionGroup)  ### display active friction cones 
+
+        self.addForces()
+
         gui.refresh()
 
     def display(self, q):
         """Display the robot at configuration q in the viewer by placing all the bodies."""
         gui = self.viewer.gui
         # Update the robot kinematics and geometry.
-        pin.forwardKinematics(self.model,self.data,q)
+        pin.framesForwardKinematics(self.model,self.data,q)
         #
-        if self.display_collisions:
-                pin.updateGeometryPlacements(self.model, self.data, self.collision_model, self.collision_data)
-                gui.applyConfigurations (
-                        [ self.getViewerNodeName(collision,pin.GeometryType.COLLISION) for collision in self.collision_model.geometryObjects ],
-                        [ pin.SE3ToXYZQUATtuple(self.collision_data.oMg[self.collision_model.getGeometryId(collision.name)]) for collision in self.collision_model.geometryObjects ]
-                        )
 
         if self.display_visuals:
             pin.updateGeometryPlacements(self.model, self.data, self.visual_model, self.visual_data)
@@ -260,24 +218,14 @@ class ConsimVisual(object):
                     [ pin.SE3ToXYZQUATtuple(self.visual_data.oMg[self.visual_model.getGeometryId(visual.name)]) for visual in self.visual_model.geometryObjects ]
                     )
 
+
+        for cn in self.contactNames:
+            fvalue = np.array([0.,0.,1.]) # only a test for now
+            forceVisiblity = "ON"
+            self.displayContact(cn, fvalue, forceVisiblity) 
+
+
         gui.refresh()
-
-
-    def displayCollisions(self,visibility):
-        """Set whether to display collision objects or not"""
-        gui = self.viewer.gui
-        self.display_collisions = visibility
-        if self.collision_model is None: return
-
-        if visibility:
-            visibility_mode = "ON"
-        else:
-            visibility_mode = "OFF"
-
-        for collision in self.collision_model.geometryObjects:
-            nodeName = self.getViewerNodeName(collision,pin.GeometryType.COLLISION)
-            gui.setVisibility(nodeName,visibility_mode)
-
 
 
     def displayVisuals(self,visibility):
@@ -294,4 +242,4 @@ class ConsimVisual(object):
         for visual in self.visual_model.geometryObjects:
             nodeName = self.getViewerNodeName(visual,pin.GeometryType.VISUAL)
             gui.setVisibility(nodeName,visibility_mode)
-
+            gui.setColor(nodeName, self.robotColor)
