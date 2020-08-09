@@ -108,36 +108,61 @@ class ConsimVisual(object):
         self.rootNodeName="pinocchio"
         self.viewerRootNodeName = self.sceneName + "/" + self.rootNodeName+ "_" + self.name
 
+        self.forceGroup = self.viewerRootNodeName + "/contact_forces"
+        self.frictionGroup = self.viewerRootNodeName + "/friction_cone" 
 
+        self.x_axis = np.array([1., 0., 0.])
+        self.z_axis = np.array([0., 0., 1.])
 
+        self.totalWeight = sum(m.mass for m in self.model.inertias) * np.linalg.norm(self.model.gravity.linear)
 
-        
-        
-    
 
     def addCones(self):
         """ add cone visuals for all defined contacts """
         for cn in self.contactNames:
-            pass 
+            self.viewer.gui.addCone(self.frictionGroup+"/"+cn, .05, .1, self.coneColor)
     
     def addForces(self):
         """ add force vector visuals for all defined contacts """
         for cn in self.contactNames:
-            self.viewer.gui.addArrow(self.forceGroup+"/"+cn, .1, 1., self.forceColor)
+            self.viewer.gui.addArrow(self.forceGroup+"/"+cn, .004, .025, self.forceColor)
             
+
+    def forcePose(self, name, force):
+        """ computes unit vectors describing the force and populates the pose matrix  """
+        unit_force = force / np.linalg.norm(force)
+        res = np.cross(self.x_axis, unit_force, axis=0)
+        res_norm = np.linalg.norm(res)
+        if res_norm <= 1.e-8:
+            return np.eye(3)
+        projection = np.dot(self.x_axis, unit_force)
+        res_skew = pin.skew(res)
+        rotation = np.eye(3) + res_skew + np.dot(res_skew, res_skew) * (1 - projection) / res_norm**2
+        pose = self.data.oMf[self.model.getFrameId(name)] 
+        return pin.SE3ToXYZQUATtuple(pin.SE3(rotation, pose.translation))
+
 
     def displayContact(self, name, force, visibility="ON"):
         if visibility =="OFF":
             self.viewer.gui.setVisibility(self.forceGroup + "/" + name, "OFF")
             self.viewer.gui.setVisibility(self.frictionGroup + "/" + name, "OFF")
         else:
-            pose = self.data.oMf[self.model.getFrameId(name)] # get pose of current contact 
-            self.viewer.gui.applyConfiguration(self.forceGroup + "/" + name, 
-            pin.SE3ToXYZQUATtuple(pose))
-            self.viewer.gui.setVisibility(self.forceGroup + "/" + name, "ALWAYS_ON_TOP")
-            # cone scaling 
+            forcePose = self.forcePose(name, force)
+            # force magnitude 
+            forceMagnitude = np.linalg.norm(force) # / self.totalWeight
+            forceName = self.forceGroup + "/" + name
+            self.viewer.gui.setVector3Property(forceName, "Scale", [1. * forceMagnitude, 1., 1.])
 
-            # force vector scaling 
+            # force vector 
+            self.viewer.gui.applyConfiguration(forceName, forcePose)
+            self.viewer.gui.setVisibility(self.forceGroup + "/" + name, "ALWAYS_ON_TOP")
+            # friction cone 
+             
+            # self.viewer.gui.applyConfiguration(self.frictionGroup + "/" + name, 
+            # pin.SE3ToXYZQUATtuple(pose))
+            # self.viewer.gui.setVisibility(self.frictionGroup + "/" + name, "ON")
+
+
 
 
     def getViewerNodeName(self, geometry_object, geometry_type):
@@ -195,12 +220,12 @@ class ConsimVisual(object):
                 self.loadViewerGeometryObject(visual,pin.GeometryType.VISUAL)
         self.displayVisuals(self.visual_model is not None)
 
-        self.forceGroup = self.viewerRootNodeName + "/contact_forces"
-        self.frictionGroup = self.viewerRootNodeName + "/friction_cone"        
+        # create force and cone groups       
         self.viewer.gui.createGroup(self.forceGroup)  ### display active contact forces 
         self.viewer.gui.createGroup(self.frictionGroup)  ### display active friction cones 
 
         self.addForces()
+        self.addCones()
 
         gui.refresh()
 
@@ -220,7 +245,7 @@ class ConsimVisual(object):
 
 
         for cn in self.contactNames:
-            fvalue = np.array([0.,0.,1.]) # only a test for now
+            fvalue = np.array([0.,0.,5.]) # only a test for now
             forceVisiblity = "ON"
             self.displayContact(cn, fvalue, forceVisiblity) 
 
