@@ -23,7 +23,12 @@ if  __name__=="__main__":
     visual_options = {'contact_names': ['HL_FOOT', 'HR_FOOT', 'FL_FOOT', 'FR_FOOT'], 
                       'robot_color': [.7,.7,.7,.4],
                       'force_color': [1., 0., 0., .75],
-                      'cone_color': [0., 1., 0., .3]}
+                      'force_radius': .002, 
+                      'force_length': .025,
+                      'cone_color': [0., 1., 0., .3],
+                      'cone_length': .02,
+                      'friction_coeff': .7
+                      }
 
 
     viz_object = visualize.ConsimVisual("solo-Euler", modelPath + URDF_SUBPATH, 
