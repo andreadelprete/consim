@@ -27,7 +27,7 @@ if  __name__=="__main__":
                       'force_length': .025,
                       'cone_color': [0., 1., 0., .3],
                       'cone_length': .02,
-                      'friction_coeff': .7
+                      'friction_coeff': .5
                       }
 
 

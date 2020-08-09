@@ -174,8 +174,7 @@ class ConsimVisual(object):
             normalNorm = force.dot(self.z_axis)
             conePose = self.conePose(name, forcePose, normalNorm)
             coneName = self.frictionGroup  + "/" + name  
-            tangentScale = self.friction_coeff*normalNorm
-            self.viewer.gui.setVector3Property(coneName, "Scale", [tangentScale, tangentScale, normalNorm])
+            self.viewer.gui.setVector3Property(coneName, "Scale", [normalNorm, normalNorm, normalNorm])
             self.viewer.gui.applyConfiguration(coneName, pin.SE3ToXYZQUATtuple(conePose))
             self.viewer.gui.setVisibility(coneName, "ON")
 
