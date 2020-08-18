@@ -38,7 +38,7 @@ if  __name__=="__main__":
     q = np.zeros(viz_object.model.nq)
     q[6] = 1 # quaternion 
     q[2] = 1. 
-    viz_object.loadViewerModel()
+    
     viz_object.display(q)
     #
     hyq_urdf_file = "hyq_no_sensors.urdf"

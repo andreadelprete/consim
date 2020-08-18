@@ -1,7 +1,7 @@
 ''' Linear feedback controller
 '''
 import numpy as np
-from simu_cpp_common import state_diff
+from consim_py.ral2020.simu_cpp_common import state_diff
 
 class LinearFeedbackController:
 

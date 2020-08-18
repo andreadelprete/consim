@@ -35,7 +35,7 @@ def getVisualPath(modelPath):
 
 
 class Visualizer(object):
-    def __init__(self, windowName="consim_Window", sceneName="world", cameraTF=None):
+    def __init__(self, windowName="consim_Window", sceneName="world", showFloor=True, cameraTF=None):
         """ initialze gepetto viewer, loads gui and displays the sceene """
         try:
             self.viewer = gepetto.corbaserver.Client()
@@ -72,14 +72,16 @@ class Visualizer(object):
         self.viewer.gui.setBackgroundColor1(self.windowID, self.backgroundColor)
         self.viewer.gui.setBackgroundColor2(self.windowID, self.backgroundColor)
 
-        self.enableFloor = True 
-        if self.enableFloor:
+        self.showFloor = showFloor 
+        if self.showFloor:
             self.viewer.gui.createGroup(self.floorGroup)
             self.viewer.gui.addFloor(self.floorGroup + "/flat")
             self.viewer.gui.setScale(self.floorGroup + "/flat", self.floorScale)
             self.viewer.gui.setColor(self.floorGroup + "/flat", self.floorColor)
             self.viewer.gui.setLightingMode(self.floorGroup + "/flat", "OFF")
 
+    def captureFrame(self, name="Default"):
+        self.viewer.gui.captureFrame(self.windowID, name)
 
 
 
@@ -238,7 +240,7 @@ class ConsimVisual(object):
 
         gui.refresh()
 
-    def display(self, q):
+    def display(self, q, force):
         """Display the robot at configuration q in the viewer by placing all the bodies."""
         gui = self.viewer.gui
         pin.framesForwardKinematics(self.model,self.data,q)
@@ -250,10 +252,14 @@ class ConsimVisual(object):
                     [ pin.SE3ToXYZQUATtuple(self.visual_data.oMg[self.visual_model.getGeometryId(visual.name)]) for visual in self.visual_model.geometryObjects ]
                     )
 
-        for contactName in self.contactNames:
-            fvalue = np.array([1.,0.,5.]) # only a test for now
-            forceVisiblity = "ON"
-            self.displayContact(contactName, fvalue, forceVisiblity) 
+        for contactIndex, contactName in enumerate(self.contactNames):
+            forceVector =force[:,contactIndex]
+            forceNorm = np.linalg.norm(forceVector)
+            if forceNorm<=1.e-3:
+                forceVisiblity = "OFF"
+            else:
+                forceVisiblity = "ON"
+            self.displayContact(contactName, forceVector, forceVisiblity) 
         gui.refresh()
 
     def displayVisuals(self,visibility):

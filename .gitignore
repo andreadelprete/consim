@@ -6,3 +6,6 @@ build*/
 _build*/
 .vscode/
 *.DS_Store
+*.png
+*.PNG
+script/consim_py/ral2020/.ipynb_checkpoints/*

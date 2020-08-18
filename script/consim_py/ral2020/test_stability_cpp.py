@@ -182,6 +182,7 @@ if conf.use_viewer:
     robot.initViewer(loadModel=True)
     robot.viewer.gui.createSceneWithFloor('world')
     robot.viewer.gui.setLightingMode('world/floor', 'OFF')
+    robot.viewer.gui.setCameraTransform(robot.viz.windowID, conf.CAMERA_TRANSFORM)
     
     robot.display(q0)
     for cf in conf.contact_frames:
