@@ -174,11 +174,19 @@ class ConsimVisual(object):
             self.viewer.gui.setVisibility(self.forceGroup + "/" + name, "ALWAYS_ON_TOP")
             # friction cone 
             normalNorm = force.dot(self.z_axis)
-            conePose = self.conePose(name, forcePose, normalNorm)
-            coneName = self.frictionGroup  + "/" + name  
-            self.viewer.gui.setVector3Property(coneName, "Scale", [normalNorm, normalNorm, normalNorm])
-            self.viewer.gui.applyConfiguration(coneName, pin.SE3ToXYZQUATtuple(conePose))
-            self.viewer.gui.setVisibility(coneName, "ON")
+            try:
+                
+                if normalNorm>1.:
+                    normalNorm = 1.  
+                conePose = self.conePose(name, forcePose, normalNorm)
+                coneName = self.frictionGroup  + "/" + name
+                
+                self.viewer.gui.setVector3Property(coneName, "Scale", [normalNorm, normalNorm, normalNorm])
+                self.viewer.gui.applyConfiguration(coneName, pin.SE3ToXYZQUATtuple(conePose))
+                self.viewer.gui.setVisibility(coneName, "ON")
+            except:
+                print("normal norm %s"%normalNorm)
+                raise BaseException("failed")
 
 
     def getViewerNodeName(self, geometry_object, geometry_type):

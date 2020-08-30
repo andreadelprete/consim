@@ -36,7 +36,10 @@ def load_solo_ref_traj(robot, dt, motionName='trot'):
     refX_ = np.load('../demo/references/'+motionName+'_reference_states.npy').squeeze()
     refU_ = np.load('../demo/references/'+motionName+'_reference_controls.npy').squeeze() 
     feedBack_ = np.load('../demo/references/'+motionName+'_feedback.npy').squeeze() 
-    refX_[:,2] -= 15.37e-3   # ensure contact points are inside the ground at t=0
+    if motionName[-4:] == 'jump':
+        refX_[:,2] -= 1.e-6
+    else:
+        refX_[:,2] -= 15.37e-3   # ensure contact points are inside the ground at t=0
     N = refU_.shape[0]     
     
     # interpolate reference traj
