@@ -149,7 +149,7 @@ class ConsimVisual(object):
         pose = self.data.oMf[self.model.getFrameId(name)] 
         return pin.SE3(rotation, pose.translation)
 
-    def conePose(self, name, force_pose, scale):
+    def conePose(self, force_pose, scale):
         """ computes unit vectors describing the force and populates the pose matrix  """
         poseInitial = pin.SE3.Identity()
         poseInitial.translation += np.array([0., 0., -.75 * self.cone_length * scale])
@@ -171,22 +171,20 @@ class ConsimVisual(object):
             forceName = self.forceGroup + "/" + name
             self.viewer.gui.setVector3Property(forceName, "Scale", [1. * forceMagnitude, 1., 1.])
             self.viewer.gui.applyConfiguration(forceName, pin.SE3ToXYZQUATtuple(forcePose))
-            self.viewer.gui.setVisibility(self.forceGroup + "/" + name, "ALWAYS_ON_TOP")
+            self.viewer.gui.setVisibility(forceName, "ALWAYS_ON_TOP")
             # friction cone 
             normalNorm = force.dot(self.z_axis)
-            try:
-                
-                if normalNorm>1.:
-                    normalNorm = 1.  
-                conePose = self.conePose(name, forcePose, normalNorm)
-                coneName = self.frictionGroup  + "/" + name
-                
-                self.viewer.gui.setVector3Property(coneName, "Scale", [normalNorm, normalNorm, normalNorm])
-                self.viewer.gui.applyConfiguration(coneName, pin.SE3ToXYZQUATtuple(conePose))
-                self.viewer.gui.setVisibility(coneName, "ON")
-            except:
-                print("normal norm %s"%normalNorm)
-                raise BaseException("failed")
+
+            if normalNorm > .25:
+                normalNorm = .25
+ 
+            conePose = self.conePose(forcePose, normalNorm)
+            coneName = self.frictionGroup  + "/" + name
+            
+            self.viewer.gui.setVector3Property(coneName, "Scale", [normalNorm, normalNorm, normalNorm])
+            self.viewer.gui.applyConfiguration(coneName, pin.SE3ToXYZQUATtuple(conePose))
+            self.viewer.gui.setVisibility(coneName, "ON")
+
 
 
     def getViewerNodeName(self, geometry_object, geometry_type):
