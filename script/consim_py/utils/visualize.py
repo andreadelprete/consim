@@ -165,25 +165,32 @@ class ConsimVisual(object):
             self.viewer.gui.setVisibility(self.forceGroup + "/" + name, "OFF")
             self.viewer.gui.setVisibility(self.frictionGroup + "/" + name, "OFF")
         else:
-            forcePose = self.forcePose(name, force)
-            # force vector 
-            forceMagnitude = np.linalg.norm(force) 
-            forceName = self.forceGroup + "/" + name
-            self.viewer.gui.setVector3Property(forceName, "Scale", [1. * forceMagnitude, 1., 1.])
-            self.viewer.gui.applyConfiguration(forceName, pin.SE3ToXYZQUATtuple(forcePose))
-            self.viewer.gui.setVisibility(forceName, "ALWAYS_ON_TOP")
-            # friction cone 
-            normalNorm = force.dot(self.z_axis)
+            try:
+                forcePose = self.forcePose(name, force)
+                # force vector 
+                forceMagnitude = np.linalg.norm(force) 
+                if forceMagnitude > 25.:
+                    forceMagnitude = 25.
+                forceName = self.forceGroup + "/" + name
+                self.viewer.gui.setVector3Property(forceName, "Scale", [1. * forceMagnitude, 1., 1.])
+                self.viewer.gui.applyConfiguration(forceName, pin.SE3ToXYZQUATtuple(forcePose))
+                self.viewer.gui.setVisibility(forceName, "ALWAYS_ON_TOP")
+                # friction cone 
+                normalNorm = force.dot(self.z_axis)
 
-            if normalNorm > .25:
-                normalNorm = .25
- 
-            conePose = self.conePose(forcePose, normalNorm)
-            coneName = self.frictionGroup  + "/" + name
-            
-            self.viewer.gui.setVector3Property(coneName, "Scale", [normalNorm, normalNorm, normalNorm])
-            self.viewer.gui.applyConfiguration(coneName, pin.SE3ToXYZQUATtuple(conePose))
-            self.viewer.gui.setVisibility(coneName, "ON")
+                if normalNorm > 7.5:
+                    normalNorm = 7.5
+    
+                conePose = self.conePose(forcePose, normalNorm)
+                coneName = self.frictionGroup  + "/" + name
+                
+                self.viewer.gui.setVector3Property(coneName, "Scale", [normalNorm, normalNorm, normalNorm])
+                self.viewer.gui.applyConfiguration(coneName, pin.SE3ToXYZQUATtuple(conePose))
+                self.viewer.gui.setVisibility(coneName, "ON")
+            except:
+                self.viewer.gui.setVisibility(self.forceGroup + "/" + name, "OFF")
+                self.viewer.gui.setVisibility(self.frictionGroup + "/" + name, "OFF")   
+
 
 
 
