@@ -24,9 +24,11 @@ unilateral_contacts = 1
 DATA_FILE_TSID = '../demo/references/talos_walking_traj_tsid.npz'
 urdf = "/talos_data/robots/talos_reduced.urdf"
 modelPath = getModelPath(urdf)
+print(modelPath)
 urdf = modelPath + urdf
 srdf = modelPath + '/talos_data/srdf/talos.srdf'
 path = os.path.join(modelPath, '../..')
+print(path)
 
 dt_ref = 0.002
 

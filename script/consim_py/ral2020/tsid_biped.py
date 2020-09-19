@@ -92,27 +92,27 @@ class TsidBiped:
         if(conf.w_posture>0):
             formulation.addMotionTask(postureTask, conf.w_posture, 1, 0.0)
         
-        self.leftFootTask = tsid.TaskpinEquality("task-left-foot", self.robot, self.conf.lf_frame_name)
+        self.leftFootTask = tsid.TaskSE3Equality("task-left-foot", self.robot, self.conf.lf_frame_name)
         self.leftFootTask.setKp(self.conf.kp_foot * np.ones(6))
         self.leftFootTask.setKd(2.0 * np.sqrt(self.conf.kp_foot) * np.ones(6))
-        self.trajLF = tsid.TrajectorypinConstant("traj-left-foot", H_lf_ref)
+        self.trajLF = tsid.TrajectorySE3Constant("traj-left-foot", H_lf_ref)
         if(conf.w_foot>0):
             formulation.addMotionTask(self.leftFootTask, self.conf.w_foot, 1, 0.0)
 #        
-        self.rightFootTask = tsid.TaskpinEquality("task-right-foot", self.robot, self.conf.rf_frame_name)
+        self.rightFootTask = tsid.TaskSE3Equality("task-right-foot", self.robot, self.conf.rf_frame_name)
         self.rightFootTask.setKp(self.conf.kp_foot * np.ones(6))
         self.rightFootTask.setKd(2.0 * np.sqrt(self.conf.kp_foot) * np.ones(6))
-        self.trajRF = tsid.TrajectorypinConstant("traj-right-foot", H_rf_ref)
+        self.trajRF = tsid.TrajectorySE3Constant("traj-right-foot", H_rf_ref)
         if(conf.w_foot>0):
             formulation.addMotionTask(self.rightFootTask, self.conf.w_foot, 1, 0.0)
 
-        self.waistTask = tsid.TaskpinEquality("task-waist", self.robot, self.conf.waist_frame_name)
+        self.waistTask = tsid.TaskSE3Equality("task-waist", self.robot, self.conf.waist_frame_name)
         self.waistTask.setKp(self.conf.kp_waist * np.ones(6))
         self.waistTask.setKd(2.0 * np.sqrt(self.conf.kp_waist) * np.ones(6))
         self.waistTask.setMask(np.array([0,0,0,1,1,1.]))
         waistID = robot.model().getFrameId(conf.waist_frame_name)
         H_waist_ref = robot.framePosition(formulation.data(), waistID)
-        self.trajWaist = tsid.TrajectorypinConstant("traj-waist", H_waist_ref)
+        self.trajWaist = tsid.TrajectorySE3Constant("traj-waist", H_waist_ref)
         if(conf.w_waist>0):
             formulation.addMotionTask(self.waistTask, self.conf.w_waist, 1, 0.0)
                 
