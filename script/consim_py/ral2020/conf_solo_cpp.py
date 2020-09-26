@@ -46,3 +46,10 @@ CAMERA_TRANSFORM = [1.0910934209823608, -1.4611519575119019, 0.9074661731719971,
                     0.5040678381919861, 0.17712827026844025, 0.24428671598434448, 0.8092374205589294]
 SPHERE_RADIUS = 0.01
 SPHERE_COLOR  = (1, 0., 0, 1)
+
+
+#
+modelPath = '/opt/openrobots/share/example-robot-data/robots/solo_description/robots' # '/home/student/devel/src/tsid/models/romeo'
+urdf = modelPath+'/solo12.urdf'
+srdf = modelPath+'/srdf/solo.srdf'
+
