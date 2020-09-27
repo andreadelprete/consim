@@ -12,7 +12,10 @@ np.set_printoptions(precision=3, linewidth=200, suppress=True)
 LINE_WIDTH = 60
 
 mu = .3                            # friction coefficient
-contact_frames = ['RAnkleRoll', 'LAnkleRoll']
+parent_frames = ['LAnkleRoll', 'RAnkleRoll']
+parent_frame_index = [0,0,0,0,1,1,1,1]
+contact_frames = ['l_sole_0', 'l_sole_1', 'l_sole_2', 'l_sole_3', 'r_sole_0', 'r_sole_1', 'r_sole_2', 'r_sole_3']
+ 
 contact_normal = np.array([0., 0., 1.])
 K = 1e5*np.ones(3)
 B = 3e2*np.ones(3)
@@ -20,7 +23,8 @@ anchor_slipping_method = 1
 unilateral_contacts = 1
 
 DATA_FILE_TSID = '../demo/references/romeo_walking_traj_tsid.npz'
-modelPath = '/home/bhammoud/devel/consim_dev/tsid/models/romeo' # '/home/student/devel/src/tsid/models/romeo'
+# modelPath = '/home/bhammoud/devel/consim_dev/tsid/models/romeo' # '/home/student/devel/src/tsid/models/romeo'
+modelPath = '/home/zeus/devel/consim_dev/tsid/models/romeo'
 urdf = modelPath+'/urdf/romeo.urdf'
 srdf = modelPath+'/srdf/romeo_collision.srdf'
 dt_ref = 0.002
@@ -73,3 +77,6 @@ DISPLAY_N = 20                  # update robot configuration in viwewer every DI
 CAMERA_TRANSFORM = [3.578777551651001, 1.2937744855880737, 0.8885031342506409, 0.4116811454296112, 0.5468055009841919, 0.6109083890914917, 0.3978860676288605]
 SPHERE_RADIUS = 0.01
 SPHERE_COLOR  = (1, 0., 0, 1)
+
+
+TYPE="Biped" # used to decide on how to display friction cones 

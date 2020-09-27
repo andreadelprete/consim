@@ -14,6 +14,8 @@ LINE_WIDTH = 60
 fMin = 1
 fMax = 1e4
 mu = 1.0                            # friction coefficient
+parent_frames = ['HL_FOOT', 'HR_FOOT', 'FL_FOOT', 'FR_FOOT']
+parent_frame_index = [0,1,2,3]
 contact_frames = ['HL_FOOT', 'HR_FOOT', 'FL_FOOT', 'FR_FOOT']
 # direction of the normal to the contact surface
 contact_normal = np.array([0., 0., 1.])
@@ -53,3 +55,4 @@ modelPath = '/opt/openrobots/share/example-robot-data/robots/solo_description/ro
 urdf = modelPath+'/solo12.urdf'
 srdf = modelPath+'/srdf/solo.srdf'
 
+TYPE="Quadruped"

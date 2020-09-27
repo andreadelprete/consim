@@ -86,7 +86,7 @@ class Visualizer(object):
 
 
 class ConsimVisual(object):
-    def __init__(self, name, filename, package_dirs, root_joint, consimVisualizer, visualOptions):
+    def __init__(self, name, filename, package_dirs, root_joint, consimVisualizer, visualOptions, conf):
         self.name = name 
         self.contactNames= visualOptions["contact_names"] 
         self.robotColor = visualOptions["robot_color"]
@@ -96,6 +96,7 @@ class ConsimVisual(object):
         self.force_length = visualOptions["force_length"]
         self.cone_length = visualOptions["cone_length"]
         self.friction_coeff = visualOptions["friction_coeff"]
+        self.wireframeMode = visualOptions["wireframe_mode"]#  "FILL", "WIREFRAME" or "FILL_AND_WIREFRAME".
         self.cone_radius = self.cone_length * self.friction_coeff
 
 
@@ -103,15 +104,12 @@ class ConsimVisual(object):
         self.meshDir = package_dirs
         self.viewer = consimVisualizer.viewer
         self.sceneName = consimVisualizer.sceneName
-        model, collision_model, visual_model = buildModelsFromUrdf(filename, package_dirs, root_joint)
-        self.model = model
-        self.collision_model = collision_model
-        self.visual_model = visual_model 
+        self.model, self.collision_model, self.visual_model = buildModelsFromUrdf(filename, package_dirs, root_joint)
         self.display_collisions = False 
         self.display_visuals    = True 
         self.display_forces = True
         self.display_cones = True 
-        self.data, self.collision_data, self.visual_data = createDatas(model,collision_model,visual_model)
+        self.data, self.collision_data, self.visual_data = createDatas(self.model,self.collision_model,self.visual_model)
 
         self.rootNodeName="pinocchio"
         self.viewerRootNodeName = self.sceneName + "/" + self.rootNodeName+ "_" + self.name
@@ -123,6 +121,31 @@ class ConsimVisual(object):
         self.z_axis = np.array([0., 0., 1.])
 
         self.totalWeight = sum(m.mass for m in self.model.inertias) * np.linalg.norm(self.model.gravity.linear)
+
+        self.parentIndex = conf.parent_frame_index
+
+        self.type=conf.TYPE 
+        if (self.type=="Biped"):
+            contact_point = np.ones((3,4)) * conf.lz
+            contact_point[0, :] = [-conf.lxn, -conf.lxn, conf.lxp, conf.lxp]
+            contact_point[1, :] = [-conf.lyn, conf.lyp, -conf.lyn, conf.lyp]
+            for j,cf in enumerate(conf.parent_frames):
+                parentFrameId = self.model.getFrameId(cf)
+                parentJointId = self.model.frames[parentFrameId].parent
+                for i in range(4):
+                    frame_name = conf.contact_frames[4*j + i]
+                    placement = pin.XYZQUATToSE3(list(contact_point[:,i])+[0, 0, 0, 1.])
+                    placement = self.model.frames[parentFrameId].placement * placement
+                    fr = pin.Frame(frame_name, parentJointId, parentFrameId, placement, pin.FrameType.OP_FRAME)
+                    self.model.addFrame(fr)
+            self.data = self.model.createData()
+        elif(self.type=="Quadruped"):
+            pass 
+        else:
+            pass 
+
+
+        
 
 
     def addCones(self):
@@ -165,31 +188,32 @@ class ConsimVisual(object):
             self.viewer.gui.setVisibility(self.forceGroup + "/" + name, "OFF")
             self.viewer.gui.setVisibility(self.frictionGroup + "/" + name, "OFF")
         else:
-            try:
-                forcePose = self.forcePose(name, force)
-                # force vector 
-                forceMagnitude = np.linalg.norm(force) 
-                if forceMagnitude > 25.:
-                    forceMagnitude = 25.
-                forceName = self.forceGroup + "/" + name
-                self.viewer.gui.setVector3Property(forceName, "Scale", [1. * forceMagnitude, 1., 1.])
-                self.viewer.gui.applyConfiguration(forceName, pin.SE3ToXYZQUATtuple(forcePose))
-                self.viewer.gui.setVisibility(forceName, "ALWAYS_ON_TOP")
-                # friction cone 
-                normalNorm = force.dot(self.z_axis)
+            # try:
+            forcePose = self.forcePose(name, force)
+            # force vector 
+            forceMagnitude = np.linalg.norm(force) 
+            if forceMagnitude > 25.:
+                forceMagnitude = 25.
+            forceName = self.forceGroup + "/" + name
+            self.viewer.gui.setVector3Property(forceName, "Scale", [1. * forceMagnitude, 1., 1.])
+            self.viewer.gui.applyConfiguration(forceName, pin.SE3ToXYZQUATtuple(forcePose))
+            self.viewer.gui.setVisibility(forceName, "ALWAYS_ON_TOP")
+            # friction cone 
+            normalNorm = force.dot(self.z_axis)
 
-                if normalNorm > 7.5:
-                    normalNorm = 7.5
-    
-                conePose = self.conePose(forcePose, normalNorm)
-                coneName = self.frictionGroup  + "/" + name
-                
-                self.viewer.gui.setVector3Property(coneName, "Scale", [normalNorm, normalNorm, normalNorm])
-                self.viewer.gui.applyConfiguration(coneName, pin.SE3ToXYZQUATtuple(conePose))
-                self.viewer.gui.setVisibility(coneName, "ON")
-            except:
-                self.viewer.gui.setVisibility(self.forceGroup + "/" + name, "OFF")
-                self.viewer.gui.setVisibility(self.frictionGroup + "/" + name, "OFF")   
+            if normalNorm > 7.5:
+                normalNorm = 7.5
+
+            conePose = self.conePose(forcePose, normalNorm)
+            coneName = self.frictionGroup  + "/" + name
+            
+            self.viewer.gui.setVector3Property(coneName, "Scale", [normalNorm, normalNorm, normalNorm])
+            self.viewer.gui.applyConfiguration(coneName, pin.SE3ToXYZQUATtuple(conePose))
+            self.viewer.gui.setVisibility(coneName, "ON")
+            # except:
+            #     raise BaseException("failed to display contact visuals")
+                # self.viewer.gui.setVisibility(self.forceGroup + "/" + name, "OFF")
+                # self.viewer.gui.setVisibility(self.frictionGroup + "/" + name, "OFF")   
 
 
 
@@ -224,11 +248,13 @@ class ConsimVisual(object):
             warnings.warn(msg, category=UserWarning, stacklevel=2)
             return
 
+        gui.setWireFrameMode(meshName, self.wireframeMode)
         gui.setScale(meshName, npToTuple(meshScale))
-        if geometry_object.overrideMaterial:
-            gui.setColor(meshName, npToTuple(meshColor))
-            if meshTexturePath != '':
-                gui.setTexture(meshName, meshTexturePath)
+        gui.setColor(meshName, self.robotColor)
+        # if geometry_object.overrideMaterial:
+        #     gui.setColor(meshName, npToTuple(meshColor))
+        #     if meshTexturePath != '':
+        #         gui.setTexture(meshName, meshTexturePath)
 
     def loadViewerModel(self):
         """Create the scene displaying the robot meshes in gepetto-viewer"""
@@ -237,7 +263,7 @@ class ConsimVisual(object):
         if not gui.nodeExists(self.viewerRootNodeName):
             gui.createGroup(self.viewerRootNodeName)
 
-        self.viewerVisualGroupName = self.viewerRootNodeName + "/" + "visuals"
+        self.viewerVisualGroupName = self.viewerRootNodeName + "/visuals"
         if not gui.nodeExists(self.viewerVisualGroupName):
             gui.createGroup(self.viewerVisualGroupName)
             
@@ -258,6 +284,7 @@ class ConsimVisual(object):
         gui = self.viewer.gui
         pin.framesForwardKinematics(self.model,self.data,q)
 
+
         if self.display_visuals:
             pin.updateGeometryPlacements(self.model, self.data, self.visual_model, self.visual_data)
             gui.applyConfigurations (
@@ -266,7 +293,12 @@ class ConsimVisual(object):
                     )
 
         for contactIndex, contactName in enumerate(self.contactNames):
-            forceVector =force[:,contactIndex]
+            forceVector = np.zeros(3)
+            if(self.type=="Biped"):
+                for i in range(4):
+                     forceVector += force[:,4*contactIndex+i]
+            elif(self.type=="Quadruped"):
+                forceVector =force[:,contactIndex]
             forceNorm = np.linalg.norm(forceVector)
             if forceNorm<=1.e-3:
                 forceVisiblity = "OFF"
