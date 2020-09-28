@@ -234,6 +234,7 @@ class ConsimVisual(object):
         meshTexturePath = geometry_object.meshTexturePath
         meshScale = geometry_object.meshScale
         meshColor = geometry_object.meshColor
+        print("meshColor is ", meshColor)
 
         try:
             if meshName == "":
