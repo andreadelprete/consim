@@ -4,7 +4,7 @@ from pinocchio.shortcuts import buildModelsFromUrdf, createDatas
 from pinocchio.utils import npToTuple
 from os.path import dirname, exists, join
 import os, sys
-import gepetto.corbaserver
+from gepetto.corbaserver import gui_client
 
 try:
     import hppfcl
@@ -12,52 +12,30 @@ try:
 except:
     WITH_HPP_FCL_BINDINGS = False
 
-def getModelPath(subpath, printmsg=False):
-    paths = [
-        join(dirname(dirname(dirname(dirname(__file__)))), 'robots'),
-        join(dirname(dirname(dirname(__file__))), 'robots')
-    ]
-    try:
-        from .path import EXAMPLE_ROBOT_DATA_MODEL_DIR
-        paths.append(EXAMPLE_ROBOT_DATA_MODEL_DIR)
-    except ImportError:
-        pass
-    paths += [join(p, '/opt/openrobots/share/example-robot-data/robots') for p in sys.path]
-    for path in paths:
-        if exists(join(path, subpath.strip('/'))):
-            if printmsg:
-                print("using %s as modelPath" % path)
-            return path
-    raise IOError('%s not found' % subpath)
-
-def getVisualPath(modelPath):
-    return join(modelPath, '../..')
 
 
 class Visualizer(object):
     def __init__(self, windowName="consim_Window", sceneName="world", showFloor=True, cameraTF=None):
         """ initialze gepetto viewer, loads gui and displays the sceene """
         try:
-            self.viewer = gepetto.corbaserver.Client()
-            gui = self.viewer.gui
+            # self = gepetto.corbaserver.Client()
+            self.gui = gui_client(window_name=windowName)
             # Create window
             window_l = gui.getWindowList()
             if not windowName in window_l:
-                self.windowID = self.viewer.gui.createWindow(windowName)
+                self.windowID = self.gui.createWindow(windowName)
             else:
-                self.windowID = self.viewer.gui.getWindowID(windowName)
-            # Create scene if needed
-            scene_l = gui.getSceneList()
+                self.windowID = self.gui.getWindowID(windowName)
+            Create scene if needed
+            scene_l = self.gui.getSceneList()
             if sceneName not in scene_l:
-                gui.createScene(sceneName)
-            self.sceneName = sceneName
-            gui.addSceneToWindow(sceneName, self.windowID)
+                self.gui.createScene(sceneName)
+                self.sceneName = sceneName
+                self.gui.addSceneToWindow(sceneName, self.windowID)
         except:
-            import warnings
-            msg = ("Error while starting the viewer client.\n"
+            raise BaseException("Error while starting the viewer client.\n"
                    "Check whether gepetto-viewer is properly started"
                   )
-            warnings.warn(msg, category=UserWarning, stacklevel=2)
 
         self.floorGroup = "world/floor"
         self.backgroundColor = [1.,1.,1.,1.]
@@ -66,22 +44,22 @@ class Visualizer(object):
         self.cameraTF = cameraTF 
 
         if self.cameraTF is not None:
-            self.viewer.gui.setCameraTransform(self.windowID, cameraTF)
+            self.gui.setCameraTransform(self.windowID, cameraTF)
         
 
-        self.viewer.gui.setBackgroundColor1(self.windowID, self.backgroundColor)
-        self.viewer.gui.setBackgroundColor2(self.windowID, self.backgroundColor)
+        self.gui.setBackgroundColor1(self.windowID, self.backgroundColor)
+        self.gui.setBackgroundColor2(self.windowID, self.backgroundColor)
 
         self.showFloor = showFloor 
         if self.showFloor:
-            self.viewer.gui.createGroup(self.floorGroup)
-            self.viewer.gui.addFloor(self.floorGroup + "/flat")
-            self.viewer.gui.setScale(self.floorGroup + "/flat", self.floorScale)
-            self.viewer.gui.setColor(self.floorGroup + "/flat", self.floorColor)
-            self.viewer.gui.setLightingMode(self.floorGroup + "/flat", "OFF")
+            self.gui.createGroup(self.floorGroup)
+            self.gui.addFloor(self.floorGroup + "/flat")
+            self.gui.setScale(self.floorGroup + "/flat", self.floorScale)
+            self.gui.setColor(self.floorGroup + "/flat", self.floorColor)
+            self.gui.setLightingMode(self.floorGroup + "/flat", "OFF")
 
     def captureFrame(self, name="Default"):
-        self.viewer.gui.captureFrame(self.windowID, name)
+        self.gui.captureFrame(self.windowID, name)
 
 
 
@@ -98,11 +76,10 @@ class ConsimVisual(object):
         self.friction_coeff = visualOptions["friction_coeff"]
         self.wireframeMode = visualOptions["wireframe_mode"]#  "FILL", "WIREFRAME" or "FILL_AND_WIREFRAME".
         self.cone_radius = self.cone_length * self.friction_coeff
-
-
+        #
         self.urdfDir = filename
         self.meshDir = package_dirs
-        self.viewer = consimVisualizer.viewer
+        self.gui = consimVisualizer.gui 
         self.sceneName = consimVisualizer.sceneName
         self.model, self.collision_model, self.visual_model = buildModelsFromUrdf(filename, package_dirs, root_joint)
         self.display_collisions = False 
@@ -112,10 +89,10 @@ class ConsimVisual(object):
         self.data, self.collision_data, self.visual_data = createDatas(self.model,self.collision_model,self.visual_model)
 
         self.rootNodeName="pinocchio"
-        self.viewerRootNodeName = self.sceneName + "/" + self.rootNodeName+ "_" + self.name
+        self.RootNodeName = self.sceneName + "/" + self.rootNodeName+ "_" + self.name
 
-        self.forceGroup = self.viewerRootNodeName + "/contact_forces"
-        self.frictionGroup = self.viewerRootNodeName + "/friction_cone" 
+        self.forceGroup = self.RootNodeName + "/contact_forces"
+        self.frictionGroup = self.RootNodeName + "/friction_cone" 
 
         self.x_axis = np.array([1., 0., 0.])
         self.z_axis = np.array([0., 0., 1.])
@@ -151,12 +128,12 @@ class ConsimVisual(object):
     def addCones(self):
         """ add cone visuals for all defined contacts """
         for contactName in self.contactNames:
-            self.viewer.gui.addCone(self.frictionGroup+"/"+contactName, self.cone_radius, self.cone_length, self.coneColor)
+            self.gui.addCone(self.frictionGroup+"/"+contactName, self.cone_radius, self.cone_length, self.coneColor)
     
     def addForces(self):
         """ add force vector visuals for all defined contacts """
         for contactName in self.contactNames:
-            self.viewer.gui.addArrow(self.forceGroup+"/"+contactName, self.force_radius, self.force_length, self.forceColor)
+            self.gui.addArrow(self.forceGroup+"/"+contactName, self.force_radius, self.force_length, self.forceColor)
             
 
     def forcePose(self, name, force):
@@ -185,50 +162,47 @@ class ConsimVisual(object):
 
     def displayContact(self, name, force, visibility="ON"):
         if visibility =="OFF":
-            self.viewer.gui.setVisibility(self.forceGroup + "/" + name, "OFF")
-            self.viewer.gui.setVisibility(self.frictionGroup + "/" + name, "OFF")
+            self.gui.setVisibility(self.forceGroup + "/" + name, "OFF")
+            self.gui.setVisibility(self.frictionGroup + "/" + name, "OFF")
         else:
-            # try:
-            forcePose = self.forcePose(name, force)
-            # force vector 
-            forceMagnitude = np.linalg.norm(force) 
-            if forceMagnitude > 25.:
-                forceMagnitude = 25.
-            forceName = self.forceGroup + "/" + name
-            self.viewer.gui.setVector3Property(forceName, "Scale", [1. * forceMagnitude, 1., 1.])
-            self.viewer.gui.applyConfiguration(forceName, pin.SE3ToXYZQUATtuple(forcePose))
-            self.viewer.gui.setVisibility(forceName, "ALWAYS_ON_TOP")
-            # friction cone 
-            normalNorm = force.dot(self.z_axis)
+            try:
+                forcePose = self.forcePose(name, force)
+                # force vector 
+                forceMagnitude = np.linalg.norm(force) 
+                if forceMagnitude > 25.:
+                    forceMagnitude = 25.
+                forceName = self.forceGroup + "/" + name
+                self.gui.setVector3Property(forceName, "Scale", [1. * forceMagnitude, 1., 1.])
+                self.gui.applyConfiguration(forceName, pin.SE3ToXYZQUATtuple(forcePose))
+                self.gui.setVisibility(forceName, "ALWAYS_ON_TOP")
+                # friction cone 
+                normalNorm = force.dot(self.z_axis)
 
-            if normalNorm > 7.5:
-                normalNorm = 7.5
+                if normalNorm > 7.5:
+                    normalNorm = 7.5
 
-            conePose = self.conePose(forcePose, normalNorm)
-            coneName = self.frictionGroup  + "/" + name
-            
-            self.viewer.gui.setVector3Property(coneName, "Scale", [normalNorm, normalNorm, normalNorm])
-            self.viewer.gui.applyConfiguration(coneName, pin.SE3ToXYZQUATtuple(conePose))
-            self.viewer.gui.setVisibility(coneName, "ON")
-            # except:
-            #     raise BaseException("failed to display contact visuals")
-                # self.viewer.gui.setVisibility(self.forceGroup + "/" + name, "OFF")
-                # self.viewer.gui.setVisibility(self.frictionGroup + "/" + name, "OFF")   
-
+                conePose = self.conePose(forcePose, normalNorm)
+                coneName = self.frictionGroup  + "/" + name
+                
+                self.gui.setVector3Property(coneName, "Scale", [normalNorm, normalNorm, normalNorm])
+                self.gui.applyConfiguration(coneName, pin.SE3ToXYZQUATtuple(conePose))
+                self.gui.setVisibility(coneName, "ON")
+            except:
+                raise BaseException("failed to display contact visuals")
 
 
 
     def getViewerNodeName(self, geometry_object, geometry_type):
         """Return the name of the geometry object inside the viewer"""
         if geometry_type is pin.GeometryType.VISUAL:
-            return self.viewerVisualGroupName + '/' + geometry_object.name
+            return self.VisualGroupName + '/' + geometry_object.name
         elif geometry_type is pin.GeometryType.COLLISION:
-            return self.viewerCollisionGroupName + '/' + geometry_object.name
+            return self.CollisionGroupName + '/' + geometry_object.name
  
     def loadViewerGeometryObject(self, geometry_object, geometry_type):
         """Load a single geometry object"""
 
-        gui = self.viewer.gui
+        gui = self.gui
         meshName = self.getViewerNodeName(geometry_object,geometry_type)
         meshPath = geometry_object.meshPath
         meshTexturePath = geometry_object.meshTexturePath
@@ -259,22 +233,22 @@ class ConsimVisual(object):
 
     def loadViewerModel(self):
         """Create the scene displaying the robot meshes in gepetto-viewer"""
-        gui = self.viewer.gui
+        gui = self.gui
     
-        if not gui.nodeExists(self.viewerRootNodeName):
-            gui.createGroup(self.viewerRootNodeName)
+        if not gui.nodeExists(self.RootNodeName):
+            gui.createGroup(self.RootNodeName)
 
-        self.viewerVisualGroupName = self.viewerRootNodeName + "/visuals"
-        if not gui.nodeExists(self.viewerVisualGroupName):
-            gui.createGroup(self.viewerVisualGroupName)
+        self.VisualGroupName = self.RootNodeName + "/visuals"
+        if not gui.nodeExists(self.VisualGroupName):
+            gui.createGroup(self.VisualGroupName)
             
         if self.visual_model is not None:
             for visual in self.visual_model.geometryObjects:
                 self.loadViewerGeometryObject(visual,pin.GeometryType.VISUAL)
         self.displayVisuals(self.visual_model is not None)
         # create force and cone groups       
-        self.viewer.gui.createGroup(self.forceGroup) 
-        self.viewer.gui.createGroup(self.frictionGroup) 
+        self.gui.createGroup(self.forceGroup) 
+        self.gui.createGroup(self.frictionGroup) 
         self.addForces()
         self.addCones()
 
@@ -282,7 +256,7 @@ class ConsimVisual(object):
 
     def display(self, q, force):
         """Display the robot at configuration q in the viewer by placing all the bodies."""
-        gui = self.viewer.gui
+        gui = self.gui
         pin.framesForwardKinematics(self.model,self.data,q)
 
 
@@ -310,7 +284,7 @@ class ConsimVisual(object):
 
     def displayVisuals(self,visibility):
         """Set whether to display visual objects or not"""
-        gui = self.viewer.gui
+        gui = self.gui
         self.display_visuals = visibility
         if self.visual_model is None: return
 
