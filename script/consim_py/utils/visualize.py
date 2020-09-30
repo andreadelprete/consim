@@ -21,12 +21,12 @@ class Visualizer(object):
             # self = gepetto.corbaserver.Client()
             self.gui = gui_client(window_name=windowName)
             # Create window
-            window_l = gui.getWindowList()
+            window_l = self.gui.getWindowList()
             if not windowName in window_l:
                 self.windowID = self.gui.createWindow(windowName)
             else:
                 self.windowID = self.gui.getWindowID(windowName)
-            Create scene if needed
+            # Create scene if needed
             scene_l = self.gui.getSceneList()
             if sceneName not in scene_l:
                 self.gui.createScene(sceneName)
@@ -45,7 +45,6 @@ class Visualizer(object):
 
         if self.cameraTF is not None:
             self.gui.setCameraTransform(self.windowID, cameraTF)
-        
 
         self.gui.setBackgroundColor1(self.windowID, self.backgroundColor)
         self.gui.setBackgroundColor2(self.windowID, self.backgroundColor)
@@ -208,7 +207,7 @@ class ConsimVisual(object):
         meshTexturePath = geometry_object.meshTexturePath
         meshScale = geometry_object.meshScale
         meshColor = geometry_object.meshColor
-        print("meshColor is ", meshColor)
+        # print("meshColor is ", meshColor)
 
         try:
             if meshName == "":
