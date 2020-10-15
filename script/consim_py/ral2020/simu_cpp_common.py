@@ -146,6 +146,7 @@ def plot_multi_x_vs_y_log_scale(y, x, ylabel, xlabel='Number of time steps', log
         ax.set_yscale('log')
     leg = ax.legend(loc='best')
     if(leg): leg.get_frame().set_alpha(0.5)
+    return (ff, ax)
     
     
 def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_truth=None, comp_times=None):  

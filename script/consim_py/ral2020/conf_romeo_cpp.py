@@ -11,11 +11,12 @@ import os
 np.set_printoptions(precision=3, linewidth=200, suppress=True)
 LINE_WIDTH = 60
 
-mu = .3                            # friction coefficient
-parent_frames = ['LAnkleRoll', 'RAnkleRoll']
-parent_frame_index = [0,0,0,0,1,1,1,1]
-contact_frames = ['l_sole_0', 'l_sole_1', 'l_sole_2', 'l_sole_3', 'r_sole_0', 'r_sole_1', 'r_sole_2', 'r_sole_3']
+#parent_frames = ['LAnkleRoll', 'RAnkleRoll']
+#parent_frame_index = [0,0,0,0,1,1,1,1]
+#contact_frames = ['l_sole_0', 'l_sole_1', 'l_sole_2', 'l_sole_3', 'r_sole_0', 'r_sole_1', 'r_sole_2', 'r_sole_3']
  
+mu = 1.0                            # friction coefficient
+contact_frames = ['RAnkleRoll', 'LAnkleRoll']
 contact_normal = np.array([0., 0., 1.])
 K = 1e5*np.ones(3)
 B = 3e2*np.ones(3)

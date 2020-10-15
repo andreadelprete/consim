@@ -24,10 +24,21 @@ from consim_py.ral2020.tsid_biped import TsidBiped
 def ndprint(a, format_string ='{0:.2f}'):
     print([format_string.format(v,i) for i,v in enumerate(a)])
 
+comp_times_exp    = ['exponential_simulator::step',
+                     'exponential_simulator::substep']
+comp_times_euler = ['euler_simulator::step',
+                    'euler_simulator::substep']
+comp_times_exp_dict = {}
+comp_times_euler_dict = {}
+for s in comp_times_exp:
+    comp_times_exp_dict[s] = s.split('::')[-1]
+for s in comp_times_euler:
+    comp_times_euler_dict[s] = s.split('::')[-1]
+                    
 plut.SAVE_FIGURES = 1
 PLOT_INTEGRATION_ERRORS = 1
 PLOT_INTEGRATION_ERROR_TRAJECTORIES = 0
-USE_VIEWER = 1
+USE_VIEWER = 0
 LOAD_DATA_FROM_FILE = 0
 RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
 SAVE_DATA = 1
@@ -78,8 +89,8 @@ ndt_ground_truth = int(dt / ground_truth_dt)
 ndt_exp = 4
 ndt_euler = 16
 maxMatMult = 0
-#test = 'stiffness'
-test = 'damping'
+test = 'stiffness'
+#test = 'damping'
 
 if(test=='stiffness'):
     stiffnesses    = np.logspace(3, 8, 11)
@@ -98,7 +109,7 @@ for ik in stiffnesses:
     for dr in damping_ratios:
         SIMU_PARAMS += [{
             'name': 'exp %3.1f-%3.1f'%(np.log10(ik),dr),
-            'method_name': 'exp',
+            'method_name': 'Expo',
             'use_exp_int': 1,
             'ndt': ndt_exp,
             'forward_dyn_method': 3,
@@ -112,11 +123,25 @@ for ik in stiffnesses:
     for dr in damping_ratios:
         SIMU_PARAMS += [{
             'name': 'euler %3.1f-%3.1f'%(np.log10(ik),dr),
-            'method_name': 'euler',
+            'method_name': 'Eul-exp',
             'use_exp_int': 0,
             'ndt': ndt_euler,
             'forward_dyn_method': 3,
             'semi_implicit': 0,
+            'K': ik,
+            'damping_ratio': dr
+        }]
+        
+# EULER INTEGRATOR WITH SEMI-IMPLICIT INTEGRATION
+for ik in stiffnesses:
+    for dr in damping_ratios:
+        SIMU_PARAMS += [{
+            'name': 'eul-semi %3.1f-%3.1f'%(np.log10(ik),dr),
+            'method_name': 'Eul-semi',
+            'use_exp_int': 0,
+            'ndt': ndt_euler,
+            'forward_dyn_method': 3,
+            'semi_implicit': 1,
             'K': ik,
             'damping_ratio': dr
         }]
@@ -188,7 +213,11 @@ else:
         simu_params['ndt'] = ndt_ground_truth
         data_gt[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params)
         simu_params['ndt'] = ndt
-        data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, data_gt[name])
+        if(simu_params['use_exp_int']==1):
+            comp_times = comp_times_exp_dict
+        else:
+            comp_times = comp_times_euler_dict
+        data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, data_gt[name], comp_times)
 
 if(SAVE_DATA):
     pickle.dump(data, open( data_file_name, "wb" ) )
@@ -225,7 +254,7 @@ def compute_integration_errors_vs_k_b(data, data_gt, robot, dt):
         res.err_traj_infnorm[name] = err_per_time_inf
         res.k[d.method_name] += [d.K]
         res.damping_ratio[d.method_name] += [d.damping_ratio]
-        comp_time = d.computation_times['inner-step'].avg * d.ndt
+        comp_time = d.computation_times['substep'].avg * d.ndt
         res.comp_time[d.method_name] += [comp_time]
         res.realtime_factor[d.method_name] += [dt/comp_time]
         try:
