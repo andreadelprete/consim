@@ -256,6 +256,8 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
       }
       
       forwardDynamics(tau_, dv_); 
+    
+      CONSIM_START_PROFILER("euler_simulator::integration");
       /*!< integrate twice */ 
       v_ += dv_ * sub_dt;
       if(semi_implicit_){
@@ -266,6 +268,7 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
         pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
       }
       q_ = qnext_;
+      CONSIM_STOP_PROFILER("euler_simulator::integration");
       
       
       tau_.fill(0);
