@@ -282,6 +282,144 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
   CONSIM_STOP_PROFILER("euler_simulator::step");
 }
 
+
+/* ____________________________________________________________________________________________*/
+/** 
+ * RK4 Simulator Class
+ * for one integration step, once cotact status and forces are determined they don't change 
+ *  
+*/
+
+RK4Simulator::RK4Simulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD, bool semi_implicit):
+AbstractSimulator(model, data, dt, n_integration_steps, whichFD, semi_implicit) {
+  for(int i = 0; i<4; i++){
+    qi_.push_back(Eigen::VectorXd::Zero(model.nq));
+    vi_.push_back(Eigen::VectorXd::Zero(model.nv));
+    dvi_.push_back(Eigen::VectorXd::Zero(model.nv)); 
+  }
+
+  rk_factors_.push_back(1.); rk_factors_.push_back(.5); rk_factors_.push_back(.5); rk_factors_.push_back(1.); 
+
+}
+
+void RK4Simulator::forwardDynamics(Eigen::VectorXd &tau, Eigen::VectorXd &q , Eigen::VectorXd &v, Eigen::VectorXd &dv){
+  /**
+   * Solving the Forward Dynamics  
+   *  1: pinocchio::computeMinverse()
+   *  2: pinocchio::aba()
+   *  3: cholesky decompostion 
+   **/  
+  switch (whichFD_)
+      {
+        case 1: // slower than ABA
+          pinocchio::nonLinearEffects(*model_, *data_, q, v);
+          mDv_ = tau - data_->nle;
+          inverseM_ = pinocchio::computeMinverse(*model_, *data_, q);
+          inverseM_.triangularView<Eigen::StrictlyLower>()
+          = inverseM_.transpose().triangularView<Eigen::StrictlyLower>(); // need to fill the Lower part of the matrix
+          dv.noalias() = inverseM_*mDv_;
+          break;
+          
+        case 2: // fast
+          pinocchio::aba(*model_, *data_, q, v, tau);
+          dv = data_-> ddq;
+          break;
+          
+        case 3: // fast if some results are reused
+          pinocchio::nonLinearEffects(*model_, *data_, q, v);
+          dv = tau - data_->nle; 
+          // Sparse Cholesky factorization
+          pinocchio::crba(*model_, *data_, q);
+          pinocchio::cholesky::decompose(*model_, *data_);
+          pinocchio::cholesky::solve(*model_,*data_,dv);
+          break;
+          
+        default:
+          throw std::runtime_error("Forward Dynamics Method not recognized");
+      }
+}
+
+
+void RK4Simulator::computeContactForces() 
+{
+  
+  CONSIM_START_PROFILER("pinocchio::computeAllTerms");
+  pinocchio::forwardKinematics(*model_, *data_, q_, v_);
+  pinocchio::computeJointJacobians(*model_, *data_);
+  pinocchio::updateFramePlacements(*model_, *data_);
+  /*!< loops over all contacts and objects to detect contacts and update contact positions*/
+  
+  detectContacts();
+  CONSIM_START_PROFILER("compute_contact_forces");
+  for (auto &cp : contacts_) {
+    if (!cp->active) continue;
+    cp->firstOrderContactKinematics(*data_); /*!<  must be called before computePenetration() it updates cp.v and jacobian*/   
+    cp->optr->computePenetration(*cp); 
+    cp->optr->contact_model_->computeForce(*cp);
+    tau_.noalias() += cp->world_J_.transpose() * cp->f; 
+    // if (contactChange_){
+    //     std::cout<<cp->name_<<" p ["<< cp->x.transpose() << "] v ["<< cp->v.transpose() << "] f ["<<  cp->f.transpose() <<"]"<<std::endl; 
+    //   }
+  }
+  CONSIM_STOP_PROFILER("compute_contact_forces");
+}
+
+
+void RK4Simulator::step(const Eigen::VectorXd &tau) 
+{
+  
+  if(!resetflag_){
+    throw std::runtime_error("resetState() must be called first !");
+  }
+  CONSIM_START_PROFILER("rk4_simulator::step");
+  assert(tau.size() == model_->nv);
+  for (int i = 0; i < n_integration_steps_; i++)
+    {
+      // Eigen::internal::set_is_malloc_allowed(false);
+      CONSIM_START_PROFILER("rk4_simulator::substep");
+      // \brief add input control 
+      tau_ += tau;
+      // \brief joint damping 
+      if (joint_friction_flag_){
+        tau_ -= joint_friction_.cwiseProduct(v_);
+      }
+
+      qi_[0] = q_; 
+      vi_[0] = v_; 
+
+      vMean_.setZero(); dv_.setZero();
+
+      for(int j = 0; j<3; j++){
+        forwardDynamics(tau_, qi_[j], vi_[j], dvi_[j]); 
+        pinocchio::integrate(*model_,  q_, vi_[j] * sub_dt * rk_factors_[j+1], qi_[j+1]);
+        vi_[j+1] = v_ +  dvi_[j] * sub_dt * rk_factors_[j+1]  ; 
+        vMean_.noalias() += vi_[j]/(rk_factors_[j]*6) ; 
+        dv_.noalias() += dvi_[j]/(rk_factors_[j]*6) ; 
+      }
+
+      forwardDynamics(tau_, qi_[3], vi_[3], dvi_[3]); 
+
+      vMean_.noalias() += vi_[3]/(rk_factors_[3]*6) ; 
+      dv_.noalias() += dvi_[3]/(rk_factors_[3]*6) ; 
+
+      v_ += dv_ * sub_dt;
+      pinocchio::integrate(*model_, q_, vMean_ * sub_dt, q_);
+      
+      tau_.fill(0);
+      // \brief adds contact forces to tau_
+      
+      computeContactForces(); 
+      // Eigen::internal::set_is_malloc_allowed(true);
+      CONSIM_STOP_PROFILER("rk4_simulator::substep");
+      elapsedTime_ += sub_dt; 
+    }
+  CONSIM_STOP_PROFILER("rk4_simulator::step");
+}
+
+
+
+
+
 /* ____________________________________________________________________________________________*/
 /** 
  * ExponentialSimulator Class 

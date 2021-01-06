@@ -158,6 +158,39 @@ namespace consim {
 
   }; // class EulerSimulator
 
+
+  /*_______________________________________________________________________________*/
+
+
+  class RK4Simulator : public AbstractSimulator
+  {
+    public: 
+      RK4Simulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD, bool semi_implicit);  
+      ~RK4Simulator(){};
+
+    /**
+     * Runge Kutta 4th order, only applied for integrating acceleration to velocity 
+    */
+
+      void step(const Eigen::VectorXd &tau) override;
+
+    protected:
+      void forwardDynamics(Eigen::VectorXd &tau, Eigen::VectorXd &q , Eigen::VectorXd &v, Eigen::VectorXd &dv); 
+      void computeContactForces() override;
+
+    private: 
+      //\brief : vectors for the RK4 integration will be allocated in the constructor, depends on state dimension
+      std::vector<Eigen::VectorXd> qi_;
+      std::vector<Eigen::VectorXd> vi_;
+      std::vector<Eigen::VectorXd> dvi_;
+      std::vector<double> rk_factors_;
+
+      // std::vector<Eigen::VectorXd> dyi_;
+
+      
+
+  }; // class RK4Simulator
+
 /*_______________________________________________________________________________*/
 
   class ExponentialSimulator : public AbstractSimulator
