@@ -29,10 +29,11 @@
 
 
 namespace consim {
+  enum EulerIntegrationType{ EXPLICIT=0, SEMI_IMPLICIT=1, CLASSIC_EXPLICIT=2};
 
   class AbstractSimulator {
     public:
-      AbstractSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD, bool semi_implicit); 
+      AbstractSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD, EulerIntegrationType type); 
       ~AbstractSimulator(){};
 
       /**
@@ -102,7 +103,8 @@ namespace consim {
       double elapsedTime_;  
       bool resetflag_ = false;
       bool contactChange_; 
-      bool semi_implicit_; // flag to activate semi-implicit Euler integration scheme
+      EulerIntegrationType integration_type_;   
+      // bool semi_implicit_; // flag to activate semi-implicit Euler integration scheme
 
       /**
         * loops over contact points, checks active contacts and sets reference contact positions 
@@ -139,11 +141,10 @@ namespace consim {
 
 /*_______________________________________________________________________________*/
 
-
   class EulerSimulator : public AbstractSimulator
   {
     public: 
-      EulerSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD, bool semi_implicit); 
+      EulerSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD, EulerIntegrationType type); 
       ~EulerSimulator(){};
 
     /**
@@ -165,7 +166,7 @@ namespace consim {
   class RK4Simulator : public AbstractSimulator
   {
     public: 
-      RK4Simulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD, bool semi_implicit);  
+      RK4Simulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD);  
       ~RK4Simulator(){};
 
     /**
@@ -204,7 +205,8 @@ namespace consim {
        * 2: a QP method to update the anchor point velocity, then average force is computed 
        **/  
       ExponentialSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps,
-              int whichFD, bool semi_implicit, int slipping_method=1, bool compute_predicted_forces=false, int exp_max_mat_mul=100, int lds_max_mat_mul=100); 
+              int whichFD, EulerIntegrationType type, int slipping_method=1, bool compute_predicted_forces=false, 
+              int exp_max_mat_mul=100, int lds_max_mat_mul=100); 
 
       ~ExponentialSimulator(){};
       void step(const Eigen::VectorXd &tau) override;

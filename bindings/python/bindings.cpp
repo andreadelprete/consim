@@ -32,8 +32,8 @@ class AbstractSimulatorWrapper : public AbstractSimulator, public boost::python:
 {
   public: 
     AbstractSimulatorWrapper(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD,
-    bool semi_implicit) : 
-              AbstractSimulator(model, data, dt, n_integration_steps, whichFD, semi_implicit), boost::python::wrapper<AbstractSimulator>() {}
+    EulerIntegrationType type) : 
+              AbstractSimulator(model, data, dt, n_integration_steps, whichFD, type), boost::python::wrapper<AbstractSimulator>() {}
 
     void step(const Eigen::VectorXd &tau){
       this->get_override("step")(tau);
@@ -47,7 +47,7 @@ class AbstractSimulatorWrapper : public AbstractSimulator, public boost::python:
 
 EulerSimulator* build_euler_simulator(
     float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data,
-    Eigen::Vector3d stifness, Eigen::Vector3d damping, double frictionCoefficient, int whichFD, bool semi_implicit)
+    Eigen::Vector3d stifness, Eigen::Vector3d damping, double frictionCoefficient, int whichFD, int type)
 {
   LinearPenaltyContactModel *contact_model = new LinearPenaltyContactModel(
       stifness, damping, frictionCoefficient);
@@ -59,7 +59,7 @@ EulerSimulator* build_euler_simulator(
     std::cout<<"[build_euler_simulator] Data is not consistent with specified model\n";
     data = pinocchio::Data(model);
   }
-  EulerSimulator* sim = new EulerSimulator(model, data, dt, n_integration_steps, whichFD, semi_implicit);
+  EulerSimulator* sim = new EulerSimulator(model, data, dt, n_integration_steps, whichFD, (EulerIntegrationType)type);
   sim->addObject(*obj);
 
   return sim;
@@ -68,7 +68,7 @@ EulerSimulator* build_euler_simulator(
 
 RK4Simulator* build_rk4_simulator(
     float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data,
-    Eigen::Vector3d stifness, Eigen::Vector3d damping, double frictionCoefficient, int whichFD, bool semi_implicit)
+    Eigen::Vector3d stifness, Eigen::Vector3d damping, double frictionCoefficient, int whichFD)
 {
   LinearPenaltyContactModel *contact_model = new LinearPenaltyContactModel(
       stifness, damping, frictionCoefficient);
@@ -80,7 +80,7 @@ RK4Simulator* build_rk4_simulator(
     std::cout<<"[build_euler_simulator] Data is not consistent with specified model\n";
     data = pinocchio::Data(model);
   }
-  RK4Simulator* sim = new RK4Simulator(model, data, dt, n_integration_steps, whichFD, semi_implicit);
+  RK4Simulator* sim = new RK4Simulator(model, data, dt, n_integration_steps, whichFD);
   sim->addObject(*obj);
 
   return sim;
@@ -102,7 +102,8 @@ ExponentialSimulator* build_exponential_simulator(
     std::cout<<"[build_exponential_simulator] Data is not consistent with specified model\n";
     data = pinocchio::Data(model);
   }
-  ExponentialSimulator* sim = new ExponentialSimulator(model, data, dt, n_integration_steps, whichFD, semi_implicit, which_slipping, 
+  EulerIntegrationType type = semi_implicit ? EulerIntegrationType::SEMI_IMPLICIT : EulerIntegrationType::EXPLICIT;
+  ExponentialSimulator* sim = new ExponentialSimulator(model, data, dt, n_integration_steps, whichFD, type, which_slipping, 
                                   compute_predicted_forces, exp_max_mat_mul, lds_max_mat_mul);
   sim->useMatrixBalancing(useMatrixBalancing);
   sim->addObject(*obj);
@@ -217,7 +218,7 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
 
 
     bp::class_<AbstractSimulatorWrapper, boost::noncopyable>("AbstractSimulator", "Abstract Simulator Class", 
-                         bp::init<pinocchio::Model &, pinocchio::Data &, float, int, int, bool>())
+                         bp::init<pinocchio::Model &, pinocchio::Data &, float, int, int, EulerIntegrationType>())
         .def("add_contact_point", &AbstractSimulatorWrapper::addContactPoint, return_internal_reference<>())
         .def("get_contact", &AbstractSimulatorWrapper::getContact, return_internal_reference<>())
         .def("add_object", &AbstractSimulatorWrapper::addObject)
@@ -233,7 +234,7 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
 
     bp::class_<EulerSimulator, bases<AbstractSimulatorWrapper>>("EulerSimulator",
                           "Euler Simulator class",
-                          bp::init<pinocchio::Model &, pinocchio::Data &, float, int, int, bool>())
+                          bp::init<pinocchio::Model &, pinocchio::Data &, float, int, int, EulerIntegrationType>())
         .def("add_contact_point", &EulerSimulator::addContactPoint, return_internal_reference<>())
         .def("get_contact", &EulerSimulator::getContact, return_internal_reference<>())
         .def("add_object", &EulerSimulator::addObject)
@@ -247,7 +248,7 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
 
     bp::class_<RK4Simulator, bases<AbstractSimulatorWrapper>>("RK4Simulator",
                       "Runge-Kutta 4 Simulator class",
-                      bp::init<pinocchio::Model &, pinocchio::Data &, float, int, int, bool>())
+                      bp::init<pinocchio::Model &, pinocchio::Data &, float, int, int>())
         .def("add_contact_point", &RK4Simulator::addContactPoint, return_internal_reference<>())
         .def("get_contact", &RK4Simulator::getContact, return_internal_reference<>())
         .def("add_object", &RK4Simulator::addObject)
@@ -262,7 +263,7 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
 
     bp::class_<ExponentialSimulator, bases<AbstractSimulatorWrapper>>("ExponentialSimulator",
                           "Exponential Simulator class",
-                          bp::init<pinocchio::Model &, pinocchio::Data &, float, int, int, bool, int, bool, int, int>())
+                          bp::init<pinocchio::Model &, pinocchio::Data &, float, int, int, EulerIntegrationType, int, bool, int, int>())
         .def("add_contact_point", &ExponentialSimulator::addContactPoint, return_internal_reference<>())
         .def("get_contact", &ExponentialSimulator::getContact, return_internal_reference<>())
         .def("add_object", &ExponentialSimulator::addObject)

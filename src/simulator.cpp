@@ -25,9 +25,9 @@ namespace consim {
  * AbstractSimulator Class 
 */
 
-AbstractSimulator::AbstractSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD, bool semi_implicit): 
+AbstractSimulator::AbstractSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD, EulerIntegrationType type): 
 model_(&model), data_(&data), dt_(dt), n_integration_steps_(n_integration_steps), sub_dt(dt / ((double)n_integration_steps)), 
-whichFD_(whichFD), semi_implicit_(semi_implicit) {
+whichFD_(whichFD), integration_type_(type) {
   q_.resize(model.nq); q_.setZero();
   v_.resize(model.nv); v_.setZero();
   dv_.resize(model.nv); dv_.setZero();
@@ -207,8 +207,8 @@ void AbstractSimulator::forwardDynamics(Eigen::VectorXd &tau, Eigen::VectorXd &d
  * EulerSimulator Class 
 */
 
-EulerSimulator::EulerSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD, bool semi_implicit):
-AbstractSimulator(model, data, dt, n_integration_steps, whichFD, semi_implicit) {}
+EulerSimulator::EulerSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD, EulerIntegrationType type):
+AbstractSimulator(model, data, dt, n_integration_steps, whichFD, type) {}
 
 
 void EulerSimulator::computeContactForces() 
@@ -259,14 +259,20 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
     
       CONSIM_START_PROFILER("euler_simulator::integration");
       /*!< integrate twice */ 
-      v_ += dv_ * sub_dt;
-      if(semi_implicit_){
-        pinocchio::integrate(*model_, q_, v_ * sub_dt, qnext_);
-      } 
-      else{
-        vMean_ = v_ - .5 * sub_dt*dv_;
-        pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
+      switch(integration_type_)
+      {
+        case SEMI_IMPLICIT: 
+          vMean_ = v_ + sub_dt*dv_;
+          break;
+        case EXPLICIT:
+          vMean_ = v_ + 0.5*sub_dt*dv_;
+          break;
+        case CLASSIC_EXPLICIT:
+          vMean_ = v_;
+          break;
       }
+      pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
+      v_ += dv_ * sub_dt;
       q_ = qnext_;
       CONSIM_STOP_PROFILER("euler_simulator::integration");
       
@@ -290,8 +296,8 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
  *  
 */
 
-RK4Simulator::RK4Simulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD, bool semi_implicit):
-AbstractSimulator(model, data, dt, n_integration_steps, whichFD, semi_implicit) {
+RK4Simulator::RK4Simulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD):
+AbstractSimulator(model, data, dt, n_integration_steps, whichFD, EXPLICIT) {
   for(int i = 0; i<4; i++){
     qi_.push_back(Eigen::VectorXd::Zero(model.nq));
     vi_.push_back(Eigen::VectorXd::Zero(model.nv));
@@ -426,10 +432,10 @@ void RK4Simulator::step(const Eigen::VectorXd &tau)
 */
 
 ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, 
-                                            int n_integration_steps, int whichFD, bool semi_implicit,
+                                            int n_integration_steps, int whichFD, EulerIntegrationType type,
                                             int slipping_method, bool compute_predicted_forces, 
                                             int exp_max_mat_mul, int lds_max_mat_mul) : 
-                                            AbstractSimulator(model, data, dt, n_integration_steps, whichFD, semi_implicit), 
+                                            AbstractSimulator(model, data, dt, n_integration_steps, whichFD, type), 
                                             slipping_method_(slipping_method),
                                             compute_predicted_forces_(compute_predicted_forces), 
                                             expMaxMatMul_(exp_max_mat_mul),
@@ -492,7 +498,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     } /*!< no active contacts */
     
     v_ += sub_dt*dvMean_;
-    if(semi_implicit_ && nactive_==0){
+    if(integration_type_==SEMI_IMPLICIT && nactive_==0){
       pinocchio::integrate(*model_, q_, v_ * sub_dt, qnext_);
     }
     else{
