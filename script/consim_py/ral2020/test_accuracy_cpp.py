@@ -56,10 +56,10 @@ LOAD_GROUND_TRUTH_FROM_FILE = 1
 SAVE_GROUND_TRUTH_TO_FILE = 1
 RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
 
-TEST_NAME = 'solo-squat'
+#TEST_NAME = 'solo-squat'
 #TEST_NAME = 'solo-trot'
 #TEST_NAME = 'solo-jump'
-#TEST_NAME = 'romeo-walk'
+TEST_NAME = 'romeo-walk'
 #TEST_NAME = 'talos-walk'
 
 LINE_WIDTH = 100
@@ -104,9 +104,6 @@ elif(TEST_NAME=='talos-walk'):
 # ground truth computed with time step 1/64 ms
 ground_truth_dt = 1e-3/64
 i_ground_truth = int(np.log2(dt / ground_truth_dt))
-
-# TEMP
-#i_ground_truth *= 8
 
 i_min = 0
 i_max = i_ground_truth - 2
