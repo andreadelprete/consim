@@ -148,6 +148,24 @@ def plot_multi_x_vs_y_log_scale(y, x, ylabel, xlabel='Number of time steps', log
     if(leg): leg.get_frame().set_alpha(0.5)
     return (ff, ax)
     
+def plot_multi_x_vs_y_rate_of_change(y, x, ylabel, xlabel='Number of time steps', logy=True, logx=True):
+    line_styles = 10*['-o', '--o', '-.o', ':o']
+    (ff, ax) = plut.create_empty_figure(1)
+    j = 0
+    for name in sorted(y.keys()):
+        if(len(y[name])>0):
+            ax.plot(x[name][:-1], np.diff(y[name])/np.diff(x[name]), line_styles[j], alpha=0.7, markerSize=10, label=name)
+            j += 1
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    if(logx):
+        ax.set_xscale('log')
+    if(logy):
+        ax.set_yscale('log')
+    leg = ax.legend(loc='best')
+    if(leg): leg.get_frame().set_alpha(0.5)
+    return (ff, ax)
+    
     
 def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_truth=None, comp_times=None):  
     import consim
@@ -164,9 +182,10 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
         #  3: Cholesky factorization 
         forward_dyn_method = 1
     try:
-        semi_implicit = simu_params['semi_implicit']
+        #0: explicit, 1: semi_implicit, 2: classic-explicit
+        integration_type = simu_params['integration_type']
     except:
-        semi_implicit = 0
+        integration_type = 0
     try:
         max_mat_mult = simu_params['max_mat_mult']
     except:
@@ -183,12 +202,12 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
     if(use_exp_int):
         simu = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
                                     conf.K, conf.B, conf.mu, conf.anchor_slipping_method,
-                                    compute_predicted_forces, forward_dyn_method, semi_implicit,
+                                    compute_predicted_forces, forward_dyn_method, integration_type,
                                     max_mat_mult, max_mat_mult, use_balancing)
         simu.assumeSlippageContinues(slippageContinues)
     else:
         simu = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
-                                        conf.K, conf.B, conf.mu, forward_dyn_method, semi_implicit)
+                                        conf.K, conf.B, conf.mu, forward_dyn_method, integration_type)
                                         
     cpts = []
     for cf in conf.contact_frames:
