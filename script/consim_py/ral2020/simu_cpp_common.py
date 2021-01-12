@@ -86,8 +86,10 @@ def compute_integration_errors(data, robot, dt):
     for name in sorted(data.keys()):
         if('ground-truth' in name): continue
         d = data[name]
-        if(d.use_exp_int==0): data_ground_truth = data['ground-truth-euler']
-        else:                 data_ground_truth = data['ground-truth-exp']
+        if('exp' in name): data_ground_truth = data['ground-truth-exp']
+        elif('euler' in name): data_ground_truth = data['ground-truth-euler']
+        elif('rk4' in name): data_ground_truth = data['ground-truth-rk4']
+        else: raise BaseException('Ground truth method not recognized ')
         
         err_vec = np.empty((2*robot.nv, d.q.shape[1]))
         err_per_time_2 = np.empty(d.q.shape[1])
@@ -173,6 +175,7 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
     nq, nv = robot.nq, robot.nv
     ndt = simu_params['ndt']
     use_exp_int = simu_params['use_exp_int']
+    name = simu_params['name']
     try:
         forward_dyn_method = simu_params['forward_dyn_method']
     except:
@@ -199,15 +202,18 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
     except:
         slippageContinues = False
         
-    if(use_exp_int):
+    if('exp' in name):
         simu = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
                                     conf.K, conf.B, conf.mu, conf.anchor_slipping_method,
                                     compute_predicted_forces, forward_dyn_method, integration_type,
                                     max_mat_mult, max_mat_mult, use_balancing)
         simu.assumeSlippageContinues(slippageContinues)
-    else:
+    elif('euler' in name):
         simu = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
                                         conf.K, conf.B, conf.mu, forward_dyn_method, integration_type)
+    elif('rk4' in name):
+        simu = consim.build_rk4_simulator(dt, ndt, robot.model, robot.data,
+                                        conf.K, conf.B, conf.mu, forward_dyn_method)
                                         
     cpts = []
     for cf in conf.contact_frames:

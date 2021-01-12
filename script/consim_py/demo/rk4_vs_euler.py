@@ -1,4 +1,4 @@
-
+import numpy as np 
 from example_robot_data.robots_loader import loadSolo, loadRomeo, getModelPath
 
 import matplotlib.pyplot as plt 
@@ -14,7 +14,7 @@ from consim_py.ral2020.simu_cpp_common import Empty, dt_ref, play_motion, load_s
 from consim_py.ral2020.linear_feedback_controller import LinearFeedbackController
 from consim_py.tsid_quadruped import TsidQuadruped
 from consim_py.ral2020.tsid_biped import TsidBiped
-
+import time 
 
 
 
@@ -54,9 +54,9 @@ SAVE_GROUND_TRUTH_TO_FILE = 1
 RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
 
 # TEST_NAME = 'solo-squat'
-# TEST_NAME = 'solo-trot'
+TEST_NAME = 'solo-trot'
 # TEST_NAME = 'solo-jump'
-TEST_NAME = 'romeo-walk'
+# TEST_NAME = 'romeo-walk'
 #TEST_NAME = 'talos-walk'
 
 LINE_WIDTH = 100
@@ -105,34 +105,44 @@ i_ground_truth = int(np.log2(dt / ground_truth_dt))
 i_min = 0
 i_max = i_ground_truth - 2
 
-GROUND_TRUTH_EXP_SIMU_PARAMS = {
-    'name': 'ground-truth %d'%(2**i_ground_truth),
-    'method_name': 'ground-truth-exp',
-    'use_exp_int': 1,
-    'ndt': 2**i_ground_truth,
-}
+# GROUND_TRUTH_EXP_SIMU_PARAMS = {
+#     'name': 'ground-truth-exp %d'%(2**i_ground_truth),
+#     'method_name': 'ground-truth-exp',
+#     'use_exp_int': 1,
+#     'ndt': 2**i_ground_truth,
+# }
 
 SIMU_PARAMS = []
 
 # EXPONENTIAL INTEGRATOR WITH STANDARD SETTINGS
-for i in range(i_min, i_max):
-#    for m in [0, 1, 2, 3, 4, -1]:
-    for m in [-1]:
-        SIMU_PARAMS += [{
-            'name': 'exp %4d mmm%2d'%(2**i,m),
-            'method_name': 'exp mmm%2d'%(m),
-            'use_exp_int': 1,
-            'ndt': 2**i,
-            'forward_dyn_method': 3,
-            'max_mat_mult': m
-        }]
+# for i in range(i_min, i_max):
+# #    for m in [0, 1, 2, 3, 4, -1]:
+#     for m in [-1]:
+#         SIMU_PARAMS += [{
+#             'name': 'exp %4d mmm%2d'%(2**i,m),
+#             'method_name': 'exp mmm%2d'%(m),
+#             'use_exp_int': 1,
+#             'ndt': 2**i,
+#             'forward_dyn_method': 3,
+#             'max_mat_mult': m
+#         }]
+
+
 
 i_min += 0
 i_max += 3
 i_ground_truth = i_max+2
 GROUND_TRUTH_EULER_SIMU_PARAMS = {
-    'name': 'ground-truth %d'%(2**i_ground_truth),
-    'method_name': 'ground-truth-euler-semi',
+    'name': 'ground-truth-euler %d'%(2**i_ground_truth),
+    'method_name': 'ground-truth-euler',
+    'use_exp_int': 0,
+    'ndt': 2**i_ground_truth,
+    'semi_implicit': 0
+}
+
+GROUND_TRUTH_RK4_SIMU_PARAMS = {
+    'name': 'ground-truth-rk4 %d'%(2**i_ground_truth),
+    'method_name': 'ground-truth-rk4',
     'use_exp_int': 0,
     'ndt': 2**i_ground_truth,
     'semi_implicit': 0
@@ -150,17 +160,28 @@ for i in range(i_min, i_max):
         'forward_dyn_method': 3,
         'semi_implicit': 0
     }]
-    
-# EULER INTEGRATOR WITH SEMI-IMPLICIT INTEGRATION
+
 for i in range(i_min, i_max):
-   SIMU_PARAMS += [{
-       'name': 'euler semi%4d'%(2**i),
-       'method_name': 'euler semi',
-       'use_exp_int': 0,
-       'ndt': 2**i,
-       'forward_dyn_method': 1,
-       'semi_implicit': 1
-   }]
+#    for m in [0, 1, 2, 3, 4, -1]:
+    for m in [-1]:
+        SIMU_PARAMS += [{
+            'name': 'rk4 %d'%(2**i),
+            'method_name': 'rk4',
+            'use_exp_int': 0,
+            'ndt': 2**i,
+            'forward_dyn_method': 3,
+            'semi_implicit': 0
+        }]
+# EULER INTEGRATOR WITH SEMI-IMPLICIT INTEGRATION
+# for i in range(i_min, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'euler semi%4d'%(2**i),
+#        'method_name': 'euler semi',
+#        'use_exp_int': 0,
+#        'ndt': 2**i,
+#        'forward_dyn_method': 1,
+#        'semi_implicit': 1
+#    }]
 
 #for i in range(i_min, i_max):
 #    SIMU_PARAMS += [{
@@ -184,8 +205,7 @@ for i in range(i_min, i_max):
     
 unilateral_contacts = 1
 
-if __name__ == "__main__": 
-    
+if __name__ == "__main__":
     if(robot_name=='solo'):
         import consim_py.ral2020.conf_solo_cpp as conf
         robot = loadSolo(False)
@@ -221,10 +241,9 @@ if __name__ == "__main__":
 
 
 
-    if conf.use_viewer:
-        robot.initViewer(loadModel=True)
-        robot.viewer.gui.createSceneWithFloor('world')
-        robot.viewer.gui.setLightingMode('world/floor', 'OFF')
+    # robot.initViewer(loadModel=True)
+    # robot.viewer.gui.createSceneWithFloor('world')
+    # robot.viewer.gui.setLightingMode('world/floor', 'OFF')
 
     # create feedback controller
     if(ctrl_type=='linear'):
@@ -248,8 +267,9 @@ if __name__ == "__main__":
         data = {}
         print("\nStart simulation ground truth")
         
-        data['ground-truth-exp'] = run_simulation(conf, dt, N, robot, controller, q0, v0, GROUND_TRUTH_EXP_SIMU_PARAMS)
+        # data['ground-truth-exp'] = run_simulation(conf, dt, N, robot, controller, q0, v0, GROUND_TRUTH_EXP_SIMU_PARAMS)
         data['ground-truth-euler'] = run_simulation(conf, dt, N, robot, controller, q0, v0, GROUND_TRUTH_EULER_SIMU_PARAMS)
+        data['ground-truth-rk4'] = run_simulation(conf, dt, N, robot, controller, q0, v0, GROUND_TRUTH_RK4_SIMU_PARAMS)
         if(SAVE_GROUND_TRUTH_TO_FILE):
             pickle.dump( data, open( ground_truth_file_name, "wb" ) )
 
@@ -257,20 +277,36 @@ if __name__ == "__main__":
     for simu_params in SIMU_PARAMS:
         name = simu_params['name']
         print("\nStart simulation", name)
-        if(simu_params['use_exp_int']):
+
+        if ('exp' in simu_params['name']):
             data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, 
                                         data['ground-truth-exp'], comp_times_exp_dict)
-        else:
+        
+        elif ('rk4' in simu_params['name']):
+            data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, 
+                                data['ground-truth-rk4'], comp_times_euler_dict)
+
+        elif ('euler' in simu_params['name']):
             data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, 
                                 data['ground-truth-euler'], comp_times_euler_dict)
 
-
-
+        else:
+            raise BaseException("Simulator type not recognized")
 
 
 
     # COMPUTE INTEGRATION ERRORS:
     res = compute_integration_errors(data, robot, dt)
+
+
+
+    #DISPLAY TRAJECTORY 
+    # for simu_params in SIMU_PARAMS:
+    #     name = simu_params['name']
+    #     print("\nDisplaying simulation ", name)
+    #     for t in range(data[name].q.shape[1]):
+    #         robot.display(data[name].q[:,t])
+    #         time.sleep(1.e-2)
 
 
 
@@ -291,10 +327,10 @@ if __name__ == "__main__":
         plut.saveFigure("local_err_vs_comp_time_"+descr_str)
         
         plot_multi_x_vs_y_log_scale(res.err_infnorm_avg, res.realtime_factor, 'Mean error inf-norm', 'Real-time factor')
-        plut.saveFigure("local_err_vs_realtime_factor_"+descr_str)
+        # plut.saveFigure("local_err_vs_realtime_factor_"+descr_str)
 
 
-
+    
 
     if(PLOT_INTEGRATION_ERROR_TRAJECTORIES):
     #    (ff, ax) = plut.create_empty_figure(1)
@@ -315,4 +351,6 @@ if __name__ == "__main__":
         ax.set_yscale('log')
         leg = ax.legend()
         if(leg): leg.get_frame().set_alpha(0.5)
-        plut.saveFigure("local_err_traj_"+descr_str)
+    #     plut.saveFigure("local_err_traj_"+descr_str)
+
+    plt.show()
