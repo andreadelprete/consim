@@ -84,8 +84,15 @@ class ContactModel {
 public:
   ContactModel(){};
   ~ContactModel(){};
+  
+  // COmpute contact force and updates the contact point state
   virtual void computeForce(ContactPoint &cp) = 0;
+  
+  // Compute contact force without updating the contact point state
+  virtual void computeForceNoUpdate(const ContactPoint &cp, Eigen::Vector3d& f) = 0;
+  
   virtual void projectForceInCone(Eigen::Vector3d &f, ContactPoint& cp) = 0;
+  
   Eigen::Vector3d  stiffness_; 
   Eigen::Vector3d  stiffnessInverse_; 
   Eigen::Vector3d  damping_; 
@@ -97,7 +104,8 @@ public:
   LinearPenaltyContactModel(Eigen::Vector3d &stiffness, Eigen::Vector3d &damping, double frictionCoeff);    
   
   void computeForce(ContactPoint& cp) override;
-  void projectForceInCone(Eigen::Vector3d &f, ContactPoint& cp);
+  void computeForceNoUpdate(const ContactPoint &cp, Eigen::Vector3d& f) override;
+  void projectForceInCone(Eigen::Vector3d &f, ContactPoint& cp) override;
 
   Eigen::Vector3d normalF_;
   Eigen::Vector3d tangentF_; 

@@ -110,7 +110,7 @@ namespace consim {
         * loops over contact points, checks active contacts and sets reference contact positions 
       */
       void detectContacts();
-      void forwardDynamics(Eigen::VectorXd &tau, Eigen::VectorXd &dv); 
+      void forwardDynamics(Eigen::VectorXd &tau, Eigen::VectorXd &dv, const Eigen::VectorXd *q=NULL, const Eigen::VectorXd *v=NULL); 
       virtual void computeContactForces()=0;
 
       const pinocchio::Model *model_;
@@ -150,7 +150,6 @@ namespace consim {
     /**
      * Explicit Euler first oder step 
     */
-
       void step(const Eigen::VectorXd &tau) override;
 
     protected:
@@ -159,11 +158,31 @@ namespace consim {
 
   }; // class EulerSimulator
 
+/*_______________________________________________________________________________*/
+
+  class ImplicitEulerSimulator : public EulerSimulator
+  {
+    public: 
+      ImplicitEulerSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD); 
+      ~ImplicitEulerSimulator(){};
+
+    /**
+     * Implicit Euler first oder step 
+    */
+      void step(const Eigen::VectorXd &tau) override;
+
+    protected:      
+      void computeDynamicsAndJacobian(Eigen::VectorXd &tau, Eigen::VectorXd &q , Eigen::VectorXd &v, Eigen::VectorXd &f, Eigen::MatrixXd &Fx);
+
+      Eigen::VectorXd vnext_;   // guess used for the iterative search
+      Eigen::MatrixXd Fx_;      // dynamics Jacobian matrix
+  }; // class ImplicitEulerSimulator
+
 
   /*_______________________________________________________________________________*/
 
 
-  class RK4Simulator : public AbstractSimulator
+  class RK4Simulator : public EulerSimulator
   {
     public: 
       RK4Simulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD);  
@@ -176,8 +195,7 @@ namespace consim {
       void step(const Eigen::VectorXd &tau) override;
 
     protected:
-      void forwardDynamics(Eigen::VectorXd &tau, Eigen::VectorXd &q , Eigen::VectorXd &v, Eigen::VectorXd &dv); 
-      void computeContactForces() override;
+      void computeContactForces(bool updateContactStates);
 
     private: 
       //\brief : vectors for the RK4 integration will be allocated in the constructor, depends on state dimension

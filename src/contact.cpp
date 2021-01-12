@@ -104,6 +104,30 @@ void LinearPenaltyContactModel::computeForce(ContactPoint& cp)
     cp.slipping = false;
 }
 
+void LinearPenaltyContactModel::computeForceNoUpdate(const ContactPoint& cp, Eigen::Vector3d& f)
+{
+  // cp.f = stiffness_.cwiseProduct(cp.delta_x) + damping_.cwiseProduct(cp.v_anchor - cp.v); 
+  f = stiffness_.cwiseProduct(cp.delta_x) - damping_.cwiseProduct(cp.v); 
+  /*!< force along normal to contact object */ 
+  normalNorm_ = cp.f.dot(cp.contactNormal_);
+  /*!< unilateral force, no pulling into contact object */ 
+  if (cp.unilateral && normalNorm_<0){
+    f.fill(0);
+    return;
+  } 
+
+  normalF_ = normalNorm_ * cp.contactNormal_; 
+  tangentF_ = cp.f - normalF_;
+  tangentNorm_ = tangentF_.norm();
+  
+  if (cp.unilateral && (tangentNorm_ > friction_coeff_*normalNorm_)){
+    //cp.slipping = true;
+    tangentDir_ = tangentF_/tangentNorm_; 
+    f = normalF_;
+    f += friction_coeff_*normalNorm_*tangentDir_; 
+  } 
+}
+
 void LinearPenaltyContactModel::projectForceInCone(Eigen::Vector3d &f, ContactPoint& cp)
 {
   /*!< force along normal to contact object */ 

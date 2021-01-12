@@ -57,9 +57,9 @@ SAVE_GROUND_TRUTH_TO_FILE = 1
 RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
 
 #TEST_NAME = 'solo-squat'
-#TEST_NAME = 'solo-trot'
+TEST_NAME = 'solo-trot'
 #TEST_NAME = 'solo-jump'
-TEST_NAME = 'romeo-walk'
+#TEST_NAME = 'romeo-walk'
 #TEST_NAME = 'talos-walk'
 
 LINE_WIDTH = 100
@@ -118,17 +118,17 @@ GROUND_TRUTH_EXP_SIMU_PARAMS = {
 SIMU_PARAMS = []
 
 # EXPONENTIAL INTEGRATOR WITH STANDARD SETTINGS
-#for i in range(i_min, i_max):
-#    for m in [0, 1, 2, 3, 4, -1]:
-##    for m in [-1]:
-#        SIMU_PARAMS += [{
-#            'name': 'Expo %4d mmm%2d'%(2**i,m),
-#            'method_name': 'Expo mmm%2d'%(m),
-#            'use_exp_int': 1,
-#            'ndt': 2**i,
-#            'forward_dyn_method': 3,
-#            'max_mat_mult': m
-#        }]
+for i in range(i_min, i_max):
+    for m in [0, 1, 2, 3, 4, -1]:
+#    for m in [-1]:
+        SIMU_PARAMS += [{
+            'name': 'Expo %4d mmm%2d'%(2**i,m),
+            'method_name': 'Expo mmm%2d'%(m),
+            'use_exp_int': 1,
+            'ndt': 2**i,
+            'forward_dyn_method': 3,
+            'max_mat_mult': m
+        }]
 
 i_min += 0
 i_max += 3
@@ -164,15 +164,15 @@ for i in range(i_min, i_max):
     }]
     
 # EULER INTEGRATOR WITH CLASSIC EXPLICIT INTEGRATION
-for i in range(i_min, i_max):
-    SIMU_PARAMS += [{
-        'name': 'Eul-clexp%4d'%(2**i),
-        'method_name': 'Eul-clexp',
-        'use_exp_int': 0,
-        'ndt': 2**i,
-        'forward_dyn_method': 3,
-        'integration_type': 2
-    }]
+#for i in range(i_min, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'Eul-clexp%4d'%(2**i),
+#        'method_name': 'Eul-clexp',
+#        'use_exp_int': 0,
+#        'ndt': 2**i,
+#        'forward_dyn_method': 3,
+#        'integration_type': 2
+#    }]
 
 #for i in range(i_min, i_max):
 #    SIMU_PARAMS += [{
@@ -297,18 +297,18 @@ descr_str = "k_%.1f_b_%.1f"%(np.log10(conf.K[0]), np.log10(conf.B[0]))
 
 # PLOT INTEGRATION ERRORS
 if(PLOT_INTEGRATION_ERRORS):
-#    plot_multi_x_vs_y_log_scale(res.err_infnorm_avg, res.dt, 'Mean error inf-norm', 'Time step [s]')
-#    plut.saveFigure("local_err_vs_dt_"+descr_str)
+    plot_multi_x_vs_y_log_scale(res.err_infnorm_avg, res.dt, 'Mean error inf-norm', 'Time step [s]')
+    plut.saveFigure("local_err_vs_dt_"+descr_str)
 
 #    plot_multi_x_vs_y_log_scale(res.err_infnorm_avg, res.comp_time, 'Mean error inf-norm', 'Computation time per step')
 #    plut.saveFigure("local_err_vs_comp_time_"+descr_str)
     
     (ff,ax) = plot_multi_x_vs_y_log_scale(res.err_infnorm_avg, res.realtime_factor, 'Mean error inf-norm', 'Real-time factor')
     plut.saveFigure("local_err_vs_realtime_factor_"+descr_str)
-#    ax.get_legend().remove()
-#    plut.saveFigure("local_err_vs_realtime_factor_"+descr_str+"_nolegend")
+    ax.get_legend().remove()
+    plut.saveFigure("local_err_vs_realtime_factor_"+descr_str+"_nolegend")
     
-    (ff,ax) = plot_multi_x_vs_y_rate_of_change(res.err_infnorm_avg, res.realtime_factor, 'Error rate of change', 'Real-time factor')
+#    (ff,ax) = plot_multi_x_vs_y_rate_of_change(res.err_infnorm_avg, res.realtime_factor, 'Error rate of change', 'Real-time factor')
     
 
 #    plot_multi_x_vs_y_log_scale(err_2norm_avg, ndt, 'Mean error 2-norm')
