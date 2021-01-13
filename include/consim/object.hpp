@@ -1,8 +1,9 @@
 #pragma once
-
+#include <Eigen/Geometry>
 // #include "consim/object.fwd.hpp"
 // #include "consim/contact.fwd.hpp"
 #include "consim/contact.hpp"
+
 
 namespace consim {
 
@@ -45,6 +46,33 @@ class FloorObject: public ContactObject
   bool checkCollision(ContactPoint &cp) override; 
   void computePenetration(ContactPoint &cp) override;
 };
+
+
+// -----------------------------------------------------------------------------
+
+class HalfPlaneObject: public ContactObject
+{
+  public:
+  HalfPlaneObject(const std::string & name, ContactModel& contact_model, double alpha);
+  ~HalfPlaneObject(){};
+
+  bool checkCollision(ContactPoint &cp) override; 
+  void computePenetration(ContactPoint &cp) override;
+
+  private:
+  const double angle_; 
+  Eigen::Vector3d planeNormal_; 
+  Eigen::Vector3d planeTangentA_; 
+  Eigen::Vector3d planeTangentB_; 
+  Eigen::Affine3d t_; 
+
+  double plane_offset_; 
+  double distance_; 
+
+  void computeDistance(ContactPoint &cp);
+
+};
+
 
 }
 
