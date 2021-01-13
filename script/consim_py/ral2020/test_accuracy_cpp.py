@@ -299,14 +299,14 @@ descr_str = "k_%.1f_b_%.1f"%(np.log10(conf.K[0]), np.log10(conf.B[0]))
 if(PLOT_INTEGRATION_ERRORS):
     plot_multi_x_vs_y_log_scale(res.err_infnorm_avg, res.dt, 'Mean error inf-norm', 'Time step [s]')
     plut.saveFigure("local_err_vs_dt_"+descr_str)
-
-#    plot_multi_x_vs_y_log_scale(res.err_infnorm_avg, res.comp_time, 'Mean error inf-norm', 'Computation time per step')
-#    plut.saveFigure("local_err_vs_comp_time_"+descr_str)
     
     (ff,ax) = plot_multi_x_vs_y_log_scale(res.err_infnorm_avg, res.realtime_factor, 'Mean error inf-norm', 'Real-time factor')
     plut.saveFigure("local_err_vs_realtime_factor_"+descr_str)
     ax.get_legend().remove()
     plut.saveFigure("local_err_vs_realtime_factor_"+descr_str+"_nolegend")
+
+#    plot_multi_x_vs_y_log_scale(res.err_infnorm_avg, res.comp_time, 'Mean error inf-norm', 'Computation time per step')
+#    plut.saveFigure("local_err_vs_comp_time_"+descr_str)
     
 #    (ff,ax) = plot_multi_x_vs_y_rate_of_change(res.err_infnorm_avg, res.realtime_factor, 'Error rate of change', 'Real-time factor')
     

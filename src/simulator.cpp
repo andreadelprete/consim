@@ -257,6 +257,8 @@ AbstractSimulator(model, data, dt, n_integration_steps, whichFD, type)
 
 void EulerSimulator::computeContactForces() 
 {
+  // with Euler the contact forces need only to be computed for the current state, so we
+  // can directly call the method with the current value of q, v and contacts
   nactive_ = computeContactForces_imp(*model_, *data_, q_, v_, tau_f_, contacts_, objects_);
   tau_ += tau_f_;
 }
@@ -302,10 +304,8 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
       q_ = qnext_;
       CONSIM_STOP_PROFILER("euler_simulator::integration");
       
-      
-      tau_.fill(0);
       // \brief adds contact forces to tau_
-      
+      tau_.setZero();
       computeContactForces(); 
       Eigen::internal::set_is_malloc_allowed(true);
       CONSIM_STOP_PROFILER("euler_simulator::substep");
@@ -438,6 +438,8 @@ EulerSimulator(model, data, dt, n_integration_steps, whichFD, EXPLICIT) {
 
 int RK4Simulator::computeContactForces(const Eigen::VectorXd &q, const Eigen::VectorXd &v, std::vector<ContactPoint*> &contacts) 
 {
+  // with RK4 the contact forces must be computed also for 3 intermediate states (2 in the middle of the time step and 1 at the end)
+  // so we need to specify different values of q, v and contacts
   int newActive = computeContactForces_imp(*model_, *data_, q, v, tau_f_, contacts, objects_);
   tau_ += tau_f_;
   return newActive;
@@ -446,7 +448,6 @@ int RK4Simulator::computeContactForces(const Eigen::VectorXd &q, const Eigen::Ve
 
 void RK4Simulator::step(const Eigen::VectorXd &tau) 
 {
-  
   if(!resetflag_){
     throw std::runtime_error("resetState() must be called first !");
   }
@@ -473,10 +474,9 @@ void RK4Simulator::step(const Eigen::VectorXd &tau)
         pinocchio::integrate(*model_,  q_, vi_[j] * sub_dt * rk_factors_[j+1], qi_[j+1]);
         vi_[j+1] = v_ +  dvi_[j] * sub_dt * rk_factors_[j+1]  ; 
 
-        vMean_.noalias() += vi_[j]/(rk_factors_[j]*6) ; 
-        dv_.noalias() += dvi_[j]/(rk_factors_[j]*6) ; 
+        vMean_.noalias() +=  vi_[j]/(rk_factors_[j]*6) ; 
+        dv_.noalias()    += dvi_[j]/(rk_factors_[j]*6) ; 
 
-        tau_ = tau;
         // create a copy of the current contacts
         for(auto &cp: contactsCopy_){
           delete cp;
@@ -485,22 +485,24 @@ void RK4Simulator::step(const Eigen::VectorXd &tau)
         for(auto &cp: contacts_){
           contactsCopy_.push_back(new ContactPoint(*cp));
         }
-        computeContactForces(qi_[j], vi_[j], contactsCopy_); 
+        // compute contact forces and add J^T*f to tau
+        tau_ = tau;
+        computeContactForces(qi_[j+1], vi_[j+1], contactsCopy_); 
       }
 
       forwardDynamics(tau_, dvi_[3], &qi_[3], &vi_[3]); 
 
-      vMean_.noalias() += vi_[3]/(rk_factors_[3]*6) ; 
-      dv_.noalias() += dvi_[3]/(rk_factors_[3]*6) ; 
+      vMean_.noalias() +=  vi_[3]/(rk_factors_[3]*6) ; 
+      dv_.noalias()    += dvi_[3]/(rk_factors_[3]*6) ; 
 
       v_ += dv_ * sub_dt;
       pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
       q_ = qnext_;
       
-      tau_.fill(0);
-      // \brief adds contact forces to tau_
-      
-      nactive_ = computeContactForces(q_, v_, contacts_); 
+      // compute contact forces and add J^T*f to tau
+      tau_.setZero();
+      nactive_ = computeContactForces(q_, v_, contacts_);
+
       // Eigen::internal::set_is_malloc_allowed(true);
       CONSIM_STOP_PROFILER("rk4_simulator::substep");
       elapsedTime_ += sub_dt; 
