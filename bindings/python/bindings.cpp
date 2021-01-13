@@ -77,7 +77,7 @@ RK4Simulator* build_rk4_simulator(
 
   if(!model.check(data))
   {
-    std::cout<<"[build_euler_simulator] Data is not consistent with specified model\n";
+    std::cout<<"[build_rk4_simulator] Data is not consistent with specified model\n";
     data = pinocchio::Data(model);
   }
   RK4Simulator* sim = new RK4Simulator(model, data, dt, n_integration_steps, whichFD);

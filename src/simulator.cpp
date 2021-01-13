@@ -308,6 +308,10 @@ ImplicitEulerSimulator::ImplicitEulerSimulator(const pinocchio::Model &model, pi
 EulerSimulator(model, data, dt, n_integration_steps, whichFD, EXPLICIT) 
 {
   Fx_.resize(2*model.nv, 2*model.nv);
+  f_.resize(2*model.nv);
+  x_.resize(model.nq+model.nv);
+  z_.resize(model.nq+model.nv);
+  g_.resize(model.nq+model.nv);
 }
 
 void ImplicitEulerSimulator::computeDynamicsAndJacobian(Eigen::VectorXd &tau, Eigen::VectorXd &q , Eigen::VectorXd &v, 
@@ -360,14 +364,22 @@ void ImplicitEulerSimulator::step(const Eigen::VectorXd &tau)
 //     # where F(z) is the Jacobian of f wrt z.
 //     I = np.identity(x_init.shape[0])
     bool converged = false;
+    x_.head(model_->nq) = q_;
+    x_.tail(model_->nv) = v_;
+    z_.head(model_->nq) = qnext_;
+    z_.tail(model_->nv) = vnext_;
     for(int j=0; j<100; ++j)
     {
 //     (f, Fx) = ode.f(z, U[ii,:], t[i], jacobian=True)
+      computeDynamicsAndJacobian(tau_, qnext_, vnext_, f_, Fx_);
 //     g = z - x[i,:] - h*f
-//     if(norm(g)<1e-8):
-//         converged = True
-//         break
+      g_ = z_ - x_ - sub_dt*f_;
+      if(g_.norm() < 1e-8){
+        converged = true;
+        break;
+      }
 //     G = I - h*Fx
+
 //     z += solve(G, -g)
     }
 
@@ -458,7 +470,9 @@ void RK4Simulator::step(const Eigen::VectorXd &tau)
       vMean_.setZero(); dv_.setZero();
 
       for(int j = 0; j<3; j++){
-        forwardDynamics(tau_, qi_[j], &vi_[j], &dvi_[j]); 
+        // cout<<"forwardDyn\n";
+        forwardDynamics(tau_, dvi_[j], &qi_[j], &vi_[j]); 
+        // cout<<"integrate\n";
         pinocchio::integrate(*model_,  q_, vi_[j] * sub_dt * rk_factors_[j+1], qi_[j+1]);
         vi_[j+1] = v_ +  dvi_[j] * sub_dt * rk_factors_[j+1]  ; 
 
@@ -466,10 +480,11 @@ void RK4Simulator::step(const Eigen::VectorXd &tau)
         dv_.noalias() += dvi_[j]/(rk_factors_[j]*6) ; 
 
         tau_ = tau;
+        // cout<<"computeContactForces\n";
         computeContactForces(false); 
       }
 
-      forwardDynamics(tau_, qi_[3], &vi_[3], &dvi_[3]); 
+      forwardDynamics(tau_, dvi_[3], &qi_[3], &vi_[3]); 
 
       vMean_.noalias() += vi_[3]/(rk_factors_[3]*6) ; 
       dv_.noalias() += dvi_[3]/(rk_factors_[3]*6) ; 

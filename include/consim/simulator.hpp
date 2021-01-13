@@ -175,6 +175,9 @@ namespace consim {
       void computeDynamicsAndJacobian(Eigen::VectorXd &tau, Eigen::VectorXd &q , Eigen::VectorXd &v, Eigen::VectorXd &f, Eigen::MatrixXd &Fx);
 
       Eigen::VectorXd vnext_;   // guess used for the iterative search
+      Eigen::VectorXd f_;       // evaluation of dynamics function
+      Eigen::VectorXd g_;       // residual of ackward Euler integration
+      Eigen::VectorXd x_, z_;   // current and next state (including q and v)
       Eigen::MatrixXd Fx_;      // dynamics Jacobian matrix
   }; // class ImplicitEulerSimulator
 
