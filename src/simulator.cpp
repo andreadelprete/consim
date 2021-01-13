@@ -474,8 +474,8 @@ void RK4Simulator::step(const Eigen::VectorXd &tau)
         pinocchio::integrate(*model_,  q_, vi_[j] * sub_dt * rk_factors_[j+1], qi_[j+1]);
         vi_[j+1] = v_ +  dvi_[j] * sub_dt * rk_factors_[j+1]  ; 
 
-        vMean_.noalias() += vi_[j]/(rk_factors_[j]*6) ; 
-        dv_.noalias() += dvi_[j]/(rk_factors_[j]*6) ; 
+        vMean_.noalias() +=  vi_[j]/(rk_factors_[j]*6) ; 
+        dv_.noalias()    += dvi_[j]/(rk_factors_[j]*6) ; 
 
         // create a copy of the current contacts
         for(auto &cp: contactsCopy_){
@@ -492,8 +492,8 @@ void RK4Simulator::step(const Eigen::VectorXd &tau)
 
       forwardDynamics(tau_, dvi_[3], &qi_[3], &vi_[3]); 
 
-      vMean_.noalias() += vi_[3]/(rk_factors_[3]*6) ; 
-      dv_.noalias() += dvi_[3]/(rk_factors_[3]*6) ; 
+      vMean_.noalias() +=  vi_[3]/(rk_factors_[3]*6) ; 
+      dv_.noalias()    += dvi_[3]/(rk_factors_[3]*6) ; 
 
       v_ += dv_ * sub_dt;
       pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
