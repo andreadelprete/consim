@@ -208,7 +208,7 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
                                     compute_predicted_forces, forward_dyn_method, integration_type,
                                     max_mat_mult, max_mat_mult, use_balancing)
         simu.assumeSlippageContinues(slippageContinues)
-    elif('euler' in name):
+    elif('eul' in name):
         simu = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
                                         conf.K, conf.B, conf.mu, forward_dyn_method, integration_type)
     elif('rk4' in name):

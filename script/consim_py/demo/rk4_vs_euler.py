@@ -103,38 +103,15 @@ elif(TEST_NAME=='talos-walk'):
     ctrl_type = 'tsid-biped'
     dt = 0.03
 
+SIMU_PARAMS = []
+
 # ground truth computed with time step 1/64 ms
 ground_truth_dt = 1e-3/64
 i_ground_truth = int(np.log2(dt / ground_truth_dt))
 
+i_ground_truth += 4
 i_min = 0
 i_max = i_ground_truth - 2
-
-# GROUND_TRUTH_EXP_SIMU_PARAMS = {
-#     'name': 'ground-truth-exp %d'%(2**i_ground_truth),
-#     'method_name': 'ground-truth-exp',
-#     'use_exp_int': 1,
-#     'ndt': 2**i_ground_truth,
-# }
-
-SIMU_PARAMS = []
-
-# EXPONENTIAL INTEGRATOR WITH STANDARD SETTINGS
-# for i in range(i_min, i_max):
-# #    for m in [0, 1, 2, 3, 4, -1]:
-#     for m in [-1]:
-#         SIMU_PARAMS += [{
-#             'name': 'exp %4d mmm%2d'%(2**i,m),
-#             'method_name': 'exp mmm%2d'%(m),
-#             'use_exp_int': 1,
-#             'ndt': 2**i,
-#             'forward_dyn_method': 3,
-#             'max_mat_mult': m
-#         }]
-
-i_min += 0
-i_max += 2
-i_ground_truth = i_max+2
 
 GROUND_TRUTH_EULER_SIMU_PARAMS = {
     'name': 'ground-truth-euler %d'%(2**i_ground_truth),
@@ -143,17 +120,6 @@ GROUND_TRUTH_EULER_SIMU_PARAMS = {
     'ndt': 2**i_ground_truth,
     'semi_implicit': 0
 }
-
-GROUND_TRUTH_RK4_SIMU_PARAMS = {
-    'name': 'ground-truth-rk4 %d'%(2**i_ground_truth),
-    'method_name': 'ground-truth-rk4',
-    'use_exp_int': 0,
-    'ndt': 2**i_ground_truth,
-    'semi_implicit': 0
-}
-
-#i_min = 0
-#i_max = 8
 
 # EULER INTEGRATOR WITH EXPLICIT INTEGRATION
 for i in range(i_min, i_max):
@@ -165,6 +131,20 @@ for i in range(i_min, i_max):
         'forward_dyn_method': 3,
         'semi_implicit': 0
     }]
+    
+
+i_ground_truth = int(np.log2(dt / ground_truth_dt))
+i_ground_truth += 2
+i_min = 0
+i_max = i_ground_truth - 2
+
+GROUND_TRUTH_RK4_SIMU_PARAMS = {
+    'name': 'ground-truth-rk4 %d'%(2**i_ground_truth),
+    'method_name': 'ground-truth-rk4',
+    'use_exp_int': 0,
+    'ndt': 2**i_ground_truth,
+    'semi_implicit': 0
+}
 
 # RK-4 INTEGRATION
 for i in range(i_min, i_max):
@@ -176,19 +156,6 @@ for i in range(i_min, i_max):
         'forward_dyn_method': 3,
         'semi_implicit': 0
     }]
-
-# EULER INTEGRATOR WITH SEMI-IMPLICIT INTEGRATION
-# for i in range(i_min, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'euler semi%4d'%(2**i),
-#        'method_name': 'euler semi',
-#        'use_exp_int': 0,
-#        'ndt': 2**i,
-#        'forward_dyn_method': 1,
-#        'semi_implicit': 1
-#    }]
-
-
     
 unilateral_contacts = 1
 

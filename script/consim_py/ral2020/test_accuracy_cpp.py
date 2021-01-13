@@ -122,8 +122,8 @@ for i in range(i_min, i_max):
     for m in [0, 1, 2, 3, 4, -1]:
 #    for m in [-1]:
         SIMU_PARAMS += [{
-            'name': 'Expo %4d mmm%2d'%(2**i,m),
-            'method_name': 'Expo mmm%2d'%(m),
+            'name': 'expo %4d mmm%2d'%(2**i,m),
+            'method_name': 'expo mmm%2d'%(m),
             'use_exp_int': 1,
             'ndt': 2**i,
             'forward_dyn_method': 3,
@@ -144,8 +144,8 @@ GROUND_TRUTH_EULER_SIMU_PARAMS = {
 # EULER INTEGRATOR WITH EXPLICIT INTEGRATION
 for i in range(i_min, i_max):
     SIMU_PARAMS += [{
-        'name': 'Eul-exp %4d'%(2**i),
-        'method_name': 'Eul-exp',
+        'name': 'eul-ex %4d'%(2**i),
+        'method_name': 'eul-ex',
         'use_exp_int': 0,
         'ndt': 2**i,
         'forward_dyn_method': 3,
@@ -155,8 +155,8 @@ for i in range(i_min, i_max):
 # EULER INTEGRATOR WITH SEMI-IMPLICIT INTEGRATION
 for i in range(i_min, i_max):
     SIMU_PARAMS += [{
-        'name': 'Eul-semi%4d'%(2**i),
-        'method_name': 'Eul-semi',
+        'name': 'eul-semi%4d'%(2**i),
+        'method_name': 'eul-semi',
         'use_exp_int': 0,
         'ndt': 2**i,
         'forward_dyn_method': 3,
