@@ -30,14 +30,19 @@ comp_times_exp    = ['exponential_simulator::step',
                      'exponential_simulator::resizeVectorsAndMatrices']
 comp_times_euler = ['euler_simulator::step',
                     'euler_simulator::substep']
+comp_times_rk4   = ['rk4_simulator::step',
+                    'rk4_simulator::substep']
                     
 comp_times_exp_dict = {}
 comp_times_euler_dict = {}
+comp_times_rk4_dict = {}
 for s in comp_times_exp:
     comp_times_exp_dict[s] = s.split('::')[-1]
 for s in comp_times_euler:
     comp_times_euler_dict[s] = s.split('::')[-1]
-
+for s in comp_times_rk4:
+    comp_times_rk4_dict[s] = s.split('::')[-1]
+    
 plut.SAVE_FIGURES = 0
 PLOT_FORCES = 0
 PLOT_CONTACT_POINTS = 0
@@ -45,7 +50,7 @@ PLOT_VELOCITY_NORM = 0
 PLOT_SLIPPING = 0
 PLOT_BASE_POS = 0
 PLOT_INTEGRATION_ERRORS = 1
-PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
+PLOT_INTEGRATION_ERROR_TRAJECTORIES = 0
 PLOT_MATRIX_MULTIPLICATIONS = 0
 PLOT_MATRIX_NORMS = 0
 
@@ -127,11 +132,10 @@ SIMU_PARAMS = []
 #             'max_mat_mult': m
 #         }]
 
-
-
 i_min += 0
-i_max += 3
+i_max += 2
 i_ground_truth = i_max+2
+
 GROUND_TRUTH_EULER_SIMU_PARAMS = {
     'name': 'ground-truth-euler %d'%(2**i_ground_truth),
     'method_name': 'ground-truth-euler',
@@ -148,8 +152,9 @@ GROUND_TRUTH_RK4_SIMU_PARAMS = {
     'semi_implicit': 0
 }
 
-i_min = 0
-i_max = 8
+#i_min = 0
+#i_max = 8
+
 # EULER INTEGRATOR WITH EXPLICIT INTEGRATION
 for i in range(i_min, i_max):
     SIMU_PARAMS += [{
@@ -161,17 +166,17 @@ for i in range(i_min, i_max):
         'semi_implicit': 0
     }]
 
+# RK-4 INTEGRATION
 for i in range(i_min, i_max):
-#    for m in [0, 1, 2, 3, 4, -1]:
-    for m in [-1]:
-        SIMU_PARAMS += [{
-            'name': 'rk4 %d'%(2**i),
-            'method_name': 'rk4',
-            'use_exp_int': 0,
-            'ndt': 2**i,
-            'forward_dyn_method': 3,
-            'semi_implicit': 0
-        }]
+    SIMU_PARAMS += [{
+        'name': 'rk4 %4d'%(2**i),
+        'method_name': 'rk4',
+        'use_exp_int': 0,
+        'ndt': 2**i,
+        'forward_dyn_method': 3,
+        'semi_implicit': 0
+    }]
+
 # EULER INTEGRATOR WITH SEMI-IMPLICIT INTEGRATION
 # for i in range(i_min, i_max):
 #    SIMU_PARAMS += [{
@@ -181,24 +186,6 @@ for i in range(i_min, i_max):
 #        'ndt': 2**i,
 #        'forward_dyn_method': 1,
 #        'semi_implicit': 1
-#    }]
-
-#for i in range(i_min, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'euler ABA%4d'%(2**i),
-#        'method_name': 'euler ABA',
-#        'use_exp_int': 0,
-#        'ndt': 2**i,
-#        'forward_dyn_method': 2
-#    }]
-#
-#for i in range(i_min, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'euler Chol%4d'%(2**i),
-#        'method_name': 'euler Chol',
-#        'use_exp_int': 0,
-#        'ndt': 2**i,
-#        'forward_dyn_method': 3
 #    }]
 
 
@@ -237,10 +224,6 @@ if __name__ == "__main__":
 
     nq, nv = robot.nq, robot.nv
 
-
-
-
-
     # robot.initViewer(loadModel=True)
     # robot.viewer.gui.createSceneWithFloor('world')
     # robot.viewer.gui.setLightingMode('world/floor', 'OFF')
@@ -265,10 +248,11 @@ if __name__ == "__main__":
         data = pickle.load( open( ground_truth_file_name, "rb" ) )
     else:
         data = {}
-        print("\nStart simulation ground truth")
-        
         # data['ground-truth-exp'] = run_simulation(conf, dt, N, robot, controller, q0, v0, GROUND_TRUTH_EXP_SIMU_PARAMS)
+        print("\nStart simulation ground truth Euler")
         data['ground-truth-euler'] = run_simulation(conf, dt, N, robot, controller, q0, v0, GROUND_TRUTH_EULER_SIMU_PARAMS)
+        
+        print("\nStart simulation ground truth RK4")
         data['ground-truth-rk4'] = run_simulation(conf, dt, N, robot, controller, q0, v0, GROUND_TRUTH_RK4_SIMU_PARAMS)
         if(SAVE_GROUND_TRUTH_TO_FILE):
             pickle.dump( data, open( ground_truth_file_name, "wb" ) )
@@ -284,7 +268,7 @@ if __name__ == "__main__":
         
         elif ('rk4' in simu_params['name']):
             data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, 
-                                data['ground-truth-rk4'], comp_times_euler_dict)
+                                data['ground-truth-rk4'], comp_times_rk4_dict)
 
         elif ('euler' in simu_params['name']):
             data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, 

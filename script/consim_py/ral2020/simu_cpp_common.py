@@ -214,6 +214,8 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
     elif('rk4' in name):
         simu = consim.build_rk4_simulator(dt, ndt, robot.model, robot.data,
                                         conf.K, conf.B, conf.mu, forward_dyn_method)
+    else:
+        raise Exception("Unknown simulation type"+name)
                                         
     cpts = []
     for cf in conf.contact_frames:
@@ -327,7 +329,7 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
             
     except Exception as e:
 #        raise e
-        print("Exception while running simulation", e)
+        print("Exception while running simulation", e)        
         if(comp_times):
             for s_key, s in comp_times.items():
                 results.computation_times[s] = Empty()
