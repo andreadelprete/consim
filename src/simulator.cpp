@@ -22,6 +22,84 @@
 
 namespace consim {
 
+int detectContacts_imp(pinocchio::Data &data, std::vector<ContactPoint *> &contacts, std::vector<ContactObject*> &objects)
+{
+  // counter of number of active contacts
+  int newActive = 0;
+  // Loop over all the contact points, over all the objects.
+  for (auto &cp : contacts) {
+    cp->updatePosition(data);
+    if(cp->active)
+    {
+      // for unilateral active contacts check if they are still in contact with same object
+      if (cp->unilateral) {
+        // optr: object pointer
+        if (!cp->optr->checkCollision(*cp))
+        {
+          // if not => set them to inactive and move forward to searching a colliding object
+          cp->active = false;
+          cp->f.fill(0);
+          // cp->friction_flag = false;
+        } else {
+          newActive += 1;
+          // If the contact point is still active, then no need to search for
+          // other contacting object (we assume there is only one object acting
+          // on a contact point at each timestep).
+          continue;
+        }
+      }
+      else {
+        // bilateral contacts never break
+        newActive += 1;
+        continue;
+      }
+    }
+    // if a contact is bilateral and active => no need to search
+    // for colliding object because bilateral contacts never break
+    if(cp->unilateral || !cp->active) {  
+      for (auto &optr : objects) {
+        if (optr->checkCollision(*cp))
+        {
+          cp->active = true;
+          newActive += 1; 
+          cp->optr = optr;
+          if(!cp->unilateral){
+            std::cout<<"Bilateral contact with object "<<optr->getName()<<" at point "<<cp->x.transpose()<<std::endl;
+          }
+          break;
+        }
+      }
+    }
+  }
+  return newActive;
+}
+
+int computeContactForces_imp(const pinocchio::Model &model, pinocchio::Data &data, const Eigen::VectorXd &q, 
+                         const Eigen::VectorXd &v, Eigen::VectorXd &tau_f, 
+                         std::vector<ContactPoint*> &contacts, std::vector<ContactObject*> &objects) 
+{
+  pinocchio::forwardKinematics(model, data, q, v);
+  pinocchio::computeJointJacobians(model, data);
+  pinocchio::updateFramePlacements(model, data);
+  /*!< loops over all contacts and objects to detect contacts and update contact positions*/
+  
+  int newActive = detectContacts_imp(data, contacts, objects);
+  CONSIM_START_PROFILER("compute_contact_forces");
+  tau_f.setZero();
+  for (auto &cp : contacts) {
+    if (!cp->active) continue;
+    cp->firstOrderContactKinematics(data); /*!<  must be called before computePenetration() it updates cp.v and jacobian*/   
+    cp->optr->computePenetration(*cp); 
+    cp->optr->contact_model_->computeForce(*cp);
+    tau_f.noalias() += cp->world_J_.transpose() * cp->f; 
+    // if (contactChange_){
+    //     std::cout<<cp->name_<<" p ["<< cp->x.transpose() << "] v ["<< cp->v.transpose() << "] f ["<<  cp->f.transpose() <<"]"<<std::endl; 
+    //   }
+  }
+  CONSIM_STOP_PROFILER("compute_contact_forces");
+  return newActive;
+}
+
 /** 
  * AbstractSimulator Class 
 */
@@ -102,56 +180,10 @@ void AbstractSimulator::resetState(const Eigen::VectorXd& q, const Eigen::Vector
   resetflag_ = true;
 }
 
-void AbstractSimulator::detectContacts()
+void AbstractSimulator::detectContacts(std::vector<ContactPoint *> &contacts)
 {
-  newActive_ = 0;
   contactChange_ = false;  
-  // Loop over all the contact points, over all the objects.
-  for (auto &cp : contacts_) {
-    cp->updatePosition(*data_);
-    if(cp->active)
-    {
-      // for unilateral active contacts check if they are still in contact with same object
-      if (cp->unilateral) {
-        // optr: object pointer
-        if (!cp->optr->checkCollision(*cp))
-        {
-          // if not => set them to inactive and move forward to searching a colliding object
-          cp->active = false;
-          cp->f.fill(0);
-          // cp->friction_flag = false;
-        } else {
-          newActive_ += 1;
-          // If the contact point is still active, then no need to search for
-          // other contacting object (we assume there is only one object acting
-          // on a contact point at each timestep).
-          continue;
-        }
-      }
-      else {
-        // bilateral contacts never break
-        newActive_ += 1;
-        continue;
-      }
-    }
-    // if a contact is bilateral and active => no need to search
-    // for colliding object because bilateral contacts never break
-    if(cp->unilateral || !cp->active) {  
-      for (auto &optr : objects_) {
-        if (optr->checkCollision(*cp))
-        {
-          cp->active = true;
-          newActive_ += 1; 
-          cp->optr = optr;
-          if(!cp->unilateral){
-            std::cout<<"Bilateral contact with object "<<optr->getName()<<" at point "<<cp->x.transpose()<<std::endl;
-          }
-          break;
-        }
-      }
-    }
-  }
-
+  newActive_ = detectContacts_imp(*data_, contacts, objects_);
   if(newActive_!= nactive_){
     contactChange_ = true; 
     // std::cout <<elapsedTime_  <<" Number of active contacts changed from "<<nactive_<<" to "<<newActive_<<std::endl; 
@@ -217,31 +249,16 @@ void AbstractSimulator::forwardDynamics(Eigen::VectorXd &tau, Eigen::VectorXd &d
 */
 
 EulerSimulator::EulerSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD, EulerIntegrationType type):
-AbstractSimulator(model, data, dt, n_integration_steps, whichFD, type) {}
+AbstractSimulator(model, data, dt, n_integration_steps, whichFD, type) 
+{
+  tau_f_.resize(model.nv); tau_f_.setZero();
+}
 
 
 void EulerSimulator::computeContactForces() 
 {
-  
-  // CONSIM_START_PROFILER("pinocchio::computeAllTerms");
-  pinocchio::forwardKinematics(*model_, *data_, q_, v_);
-  pinocchio::computeJointJacobians(*model_, *data_);
-  pinocchio::updateFramePlacements(*model_, *data_);
-  /*!< loops over all contacts and objects to detect contacts and update contact positions*/
-  
-  detectContacts();
-  CONSIM_START_PROFILER("compute_contact_forces");
-  for (auto &cp : contacts_) {
-    if (!cp->active) continue;
-    cp->firstOrderContactKinematics(*data_); /*!<  must be called before computePenetration() it updates cp.v and jacobian*/   
-    cp->optr->computePenetration(*cp); 
-    cp->optr->contact_model_->computeForce(*cp);
-    tau_.noalias() += cp->world_J_.transpose() * cp->f; 
-    // if (contactChange_){
-    //     std::cout<<cp->name_<<" p ["<< cp->x.transpose() << "] v ["<< cp->v.transpose() << "] f ["<<  cp->f.transpose() <<"]"<<std::endl; 
-    //   }
-  }
-  CONSIM_STOP_PROFILER("compute_contact_forces");
+  nactive_ = computeContactForces_imp(*model_, *data_, q_, v_, tau_f_, contacts_, objects_);
+  tau_ += tau_f_;
 }
 
 
@@ -419,29 +436,11 @@ EulerSimulator(model, data, dt, n_integration_steps, whichFD, EXPLICIT) {
   rk_factors_.push_back(1.); rk_factors_.push_back(.5); rk_factors_.push_back(.5); rk_factors_.push_back(1.); 
 }
 
-void RK4Simulator::computeContactForces(bool updateContactStates) 
+int RK4Simulator::computeContactForces(const Eigen::VectorXd &q, const Eigen::VectorXd &v, std::vector<ContactPoint*> &contacts) 
 {
-  pinocchio::forwardKinematics(*model_, *data_, q_, v_);
-  pinocchio::computeJointJacobians(*model_, *data_);
-  pinocchio::updateFramePlacements(*model_, *data_);
-  /*!< loops over all contacts and objects to detect contacts and update contact positions*/
-  
-  detectContacts();
-  CONSIM_START_PROFILER("compute_contact_forces");
-  for (auto &cp : contacts_) {
-    if (!cp->active) continue;
-    cp->firstOrderContactKinematics(*data_); /*!<  must be called before computePenetration() it updates cp.v and jacobian*/   
-    cp->optr->computePenetration(*cp); 
-    if(updateContactStates)
-      cp->optr->contact_model_->computeForce(*cp);
-    else
-      cp->optr->contact_model_->computeForceNoUpdate(*cp, cp->f);
-    tau_.noalias() += cp->world_J_.transpose() * cp->f; 
-    // if (contactChange_){
-    //     std::cout<<cp->name_<<" p ["<< cp->x.transpose() << "] v ["<< cp->v.transpose() << "] f ["<<  cp->f.transpose() <<"]"<<std::endl; 
-    //   }
-  }
-  CONSIM_STOP_PROFILER("compute_contact_forces");
+  int newActive = computeContactForces_imp(*model_, *data_, q, v, tau_f_, contacts, objects_);
+  tau_ += tau_f_;
+  return newActive;
 }
 
 
@@ -470,9 +469,7 @@ void RK4Simulator::step(const Eigen::VectorXd &tau)
       vMean_.setZero(); dv_.setZero();
 
       for(int j = 0; j<3; j++){
-        // cout<<"forwardDyn\n";
         forwardDynamics(tau_, dvi_[j], &qi_[j], &vi_[j]); 
-        // cout<<"integrate\n";
         pinocchio::integrate(*model_,  q_, vi_[j] * sub_dt * rk_factors_[j+1], qi_[j+1]);
         vi_[j+1] = v_ +  dvi_[j] * sub_dt * rk_factors_[j+1]  ; 
 
@@ -480,8 +477,15 @@ void RK4Simulator::step(const Eigen::VectorXd &tau)
         dv_.noalias() += dvi_[j]/(rk_factors_[j]*6) ; 
 
         tau_ = tau;
-        // cout<<"computeContactForces\n";
-        computeContactForces(false); 
+        // create a copy of the current contacts
+        for(auto &cp: contactsCopy_){
+          delete cp;
+        }
+        contactsCopy_.clear();
+        for(auto &cp: contacts_){
+          contactsCopy_.push_back(new ContactPoint(*cp));
+        }
+        computeContactForces(qi_[j], vi_[j], contactsCopy_); 
       }
 
       forwardDynamics(tau_, dvi_[3], &qi_[3], &vi_[3]); 
@@ -490,12 +494,13 @@ void RK4Simulator::step(const Eigen::VectorXd &tau)
       dv_.noalias() += dvi_[3]/(rk_factors_[3]*6) ; 
 
       v_ += dv_ * sub_dt;
-      pinocchio::integrate(*model_, q_, vMean_ * sub_dt, q_);
+      pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
+      q_ = qnext_;
       
       tau_.fill(0);
       // \brief adds contact forces to tau_
       
-      computeContactForces(true); 
+      nactive_ = computeContactForces(q_, v_, contacts_); 
       // Eigen::internal::set_is_malloc_allowed(true);
       CONSIM_STOP_PROFILER("rk4_simulator::substep");
       elapsedTime_ += sub_dt; 
@@ -680,7 +685,7 @@ void ExponentialSimulator::computeExpLDS(){
   CONSIM_STOP_PROFILER("exponential_simulator::kinematics");
 
   CONSIM_START_PROFILER("exponential_simulator::contactDetection");
-  detectContacts(); /*!<inactive contacts get automatically filled with zero here */
+  detectContacts(contacts_); /*!<inactive contacts get automatically filled with zero here */
   CONSIM_STOP_PROFILER("exponential_simulator::contactDetection");
 
   if (nactive_>0){
