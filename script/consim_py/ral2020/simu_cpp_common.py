@@ -87,7 +87,7 @@ def compute_integration_errors(data, robot, dt):
         if('ground-truth' in name): continue
         d = data[name]
         if('exp' in name): data_ground_truth = data['ground-truth-exp']
-        elif('euler' in name): data_ground_truth = data['ground-truth-euler']
+        elif('eul' in name): data_ground_truth = data['ground-truth-euler']
         elif('rk4' in name): data_ground_truth = data['ground-truth-rk4']
         else: raise BaseException('Ground truth method not recognized ')
         
@@ -174,7 +174,7 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
     compute_predicted_forces = False     
     nq, nv = robot.nq, robot.nv
     ndt = simu_params['ndt']
-    use_exp_int = simu_params['use_exp_int']
+#    use_exp_int = simu_params['use_exp_int']
     name = simu_params['name']
     try:
         forward_dyn_method = simu_params['forward_dyn_method']
@@ -202,12 +202,14 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
     except:
         slippageContinues = False
         
+    use_exp_int = False
     if('exp' in name):
         simu = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
                                     conf.K, conf.B, conf.mu, conf.anchor_slipping_method,
                                     compute_predicted_forces, forward_dyn_method, integration_type,
                                     max_mat_mult, max_mat_mult, use_balancing)
         simu.assumeSlippageContinues(slippageContinues)
+        use_exp_int = True
     elif('eul' in name):
         simu = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
                                         conf.K, conf.B, conf.mu, forward_dyn_method, integration_type)
