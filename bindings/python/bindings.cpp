@@ -131,7 +131,7 @@ ExponentialSimulator* build_exponential_simulator(
   return sim;
 }
 
-ContactObject& create_half_plane(Eigen::Vector3d stifness, Eigen::Vector3d damping, 
+ContactObject* create_half_plane(Eigen::Vector3d stifness, Eigen::Vector3d damping, 
 double frictionCoefficient, double alpha)
 {
   LinearPenaltyContactModel *contact_model = new LinearPenaltyContactModel(
@@ -139,7 +139,7 @@ double frictionCoefficient, double alpha)
 
   ContactObject* obj = new HalfPlaneObject("HalfPlane", *contact_model, alpha);
 
-  return *obj; 
+  return obj; 
 }
 
 

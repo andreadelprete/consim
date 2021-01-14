@@ -20,9 +20,9 @@ anchor_slipping_method = 1
 
 dt = 1.e-2
 ndt = 100 
-mu = 0.3  
+mu = 150.  
  
-plane_angle = - 45*np.pi/180 
+plane_angle = 10*np.pi/180 
 integration_type = 0 #0: explicit, 1: semi_implicit, 2: classic-explicit
 
 contact_frames = ['root_joint']
@@ -84,10 +84,11 @@ if __name__=="__main__":
         q[:,t] = simu.get_q()
         v[:,t] = simu.get_v()
         for ci, cp in enumerate(cpts):
-            f[:,ci,0] = cp.f
+            f[:,ci,t] = cp.f
 
 
 
     plt.figure()
     plt.plot(q[0,:], q[2,:])
+    plt. axis('equal')
     plt.show()

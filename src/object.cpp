@@ -69,6 +69,8 @@ HalfPlaneObject::HalfPlaneObject(const std::string & name, ContactModel& contact
     planeTangentA_ = t_.linear() * flatTangentA;
     planeTangentB_ = t_.linear() * flatTangentB;
 
+    std::cout<<"plane normal is "<<planeNormal_<<std::endl; 
+
     plane_offset_ = - planeNormal_.transpose()*plane_point;  // d in the plane equation above 
     
 
