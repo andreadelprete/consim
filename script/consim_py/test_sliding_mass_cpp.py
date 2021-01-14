@@ -45,14 +45,14 @@ i_max = i_min+10
 i_ground_truth = i_max+2
 
 GROUND_TRUTH_EXP_SIMU_PARAMS = {
-    'name': 'ground-truth %d'%(2**i_ground_truth),
+    'name': 'ground-truth-exp %d'%(2**i_ground_truth),
     'method_name': 'ground-truth-exp',
     'use_exp_int': 1,
     'ndt': 2**i_ground_truth,
 }
 
 GROUND_TRUTH_EULER_SIMU_PARAMS = {
-    'name': 'ground-truth %d'%(2**i_ground_truth),
+    'name': 'ground-truth-eul %d'%(2**i_ground_truth),
     'method_name': 'ground-truth-euler',
     'use_exp_int': 0,
     'ndt': 2**i_ground_truth,
