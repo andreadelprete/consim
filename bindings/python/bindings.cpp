@@ -45,6 +45,26 @@ class AbstractSimulatorWrapper : public AbstractSimulator, public boost::python:
 
 };
 
+class ContactObjectWrapper : public ContactObject, public boost::python::wrapper<ContactObject>
+{
+  public: 
+    ContactObjectWrapper(const std::string & name, ContactModel& contact_model) : 
+      ContactObject(name, contact_model), boost::python::wrapper<ContactObject>() {}
+
+    bool checkCollision(ContactPoint &cp){
+      bool st = this->get_override("checkCollision")(cp);
+      return st; 
+    }
+
+    void computePenetration(ContactPoint &cp){
+      this->get_override("computePenetration")(cp);
+    }
+
+};
+
+
+
+
 EulerSimulator* build_euler_simulator(
     float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data,
     Eigen::Vector3d stifness, Eigen::Vector3d damping, double frictionCoefficient, int whichFD, int type)
@@ -111,6 +131,19 @@ ExponentialSimulator* build_exponential_simulator(
   return sim;
 }
 
+ContactObject& create_half_plane(Eigen::Vector3d stifness, Eigen::Vector3d damping, 
+double frictionCoefficient, double alpha)
+{
+  LinearPenaltyContactModel *contact_model = new LinearPenaltyContactModel(
+      stifness, damping, frictionCoefficient);
+
+  ContactObject* obj = new HalfPlaneObject("HalfPlane", *contact_model, alpha);
+
+  return *obj; 
+}
+
+
+
 void stop_watch_report(int precision)
 {
   getProfiler().report_all(precision);
@@ -170,6 +203,11 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
             "A simple way to create a simulator using exponential integration with floor object and LinearPenaltyContactModel.",
             bp::return_value_policy<bp::manage_new_object>());
 
+    bp::def("create_half_plane", create_half_plane,
+            "A simple way to add a half plane with LinearPenaltyContactModel.",
+            bp::return_value_policy<bp::manage_new_object>());
+      
+
     bp::def("stop_watch_report", stop_watch_report,
             "Report all the times measured by the shared stop-watch.");
 
@@ -215,7 +253,7 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
         .ADD_PROPERTY_RETURN_BY_VALUE("predicted_x", &ContactPoint::predictedX_)
         .ADD_PROPERTY_RETURN_BY_VALUE("predicted_v", &ContactPoint::predictedV_)
         .ADD_PROPERTY_RETURN_BY_VALUE("predicted_x0", &ContactPoint::predictedX0_);
-
+    
 
     bp::class_<AbstractSimulatorWrapper, boost::noncopyable>("AbstractSimulator", "Abstract Simulator Class", 
                          bp::init<pinocchio::Model &, pinocchio::Data &, float, int, int, EulerIntegrationType>())
@@ -277,6 +315,9 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
         .def("getMatrixMultiplications", &ExponentialSimulator::getMatrixMultiplications)
         .def("getMatrixExpL1Norm", &ExponentialSimulator::getMatrixExpL1Norm)
         .def("assumeSlippageContinues", &ExponentialSimulator::assumeSlippageContinues);
+
+    bp::class_<ContactObjectWrapper, boost::noncopyable>("ContactObject", "Abstract Contact Object Class", 
+                         bp::init<const std::string & , ContactModel& >());
 }
 
 }
