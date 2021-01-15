@@ -85,6 +85,26 @@ EulerSimulator* build_euler_simulator(
   return sim;
 }
 
+ImplicitEulerSimulator* build_implicit_euler_simulator(
+    float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data,
+    Eigen::Vector3d stifness, Eigen::Vector3d damping, double frictionCoefficient)
+{
+  LinearPenaltyContactModel *contact_model = new LinearPenaltyContactModel(
+      stifness, damping, frictionCoefficient);
+
+  ContactObject* obj = new FloorObject("Floor", *contact_model);
+
+  if(!model.check(data))
+  {
+    std::cout<<"[build_implicit_euler_simulator] Data is not consistent with specified model\n";
+    data = pinocchio::Data(model);
+  }
+  ImplicitEulerSimulator* sim = new ImplicitEulerSimulator(model, data, dt, n_integration_steps);
+  sim->addObject(*obj);
+
+  return sim;
+}
+
 
 RK4Simulator* build_rk4_simulator(
     float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data,
@@ -283,6 +303,20 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
         .def("get_q", &EulerSimulator::get_q,bp::return_value_policy<bp::copy_const_reference>(), "configuration state vector")
         .def("get_v", &EulerSimulator::get_v,bp::return_value_policy<bp::copy_const_reference>(), "tangent vector to configuration")
         .def("get_dv", &EulerSimulator::get_dv,bp::return_value_policy<bp::copy_const_reference>(), "time derivative of tangent vector to configuration");
+
+    bp::class_<ImplicitEulerSimulator, bases<AbstractSimulatorWrapper>>("ImplicitEulerSimulator",
+                          "Implicit Euler Simulator class",
+                          bp::init<pinocchio::Model &, pinocchio::Data &, float, int>())
+        .def("add_contact_point", &ImplicitEulerSimulator::addContactPoint, return_internal_reference<>())
+        .def("get_contact", &ImplicitEulerSimulator::getContact, return_internal_reference<>())
+        .def("add_object", &ImplicitEulerSimulator::addObject)
+        .def("reset_state", &ImplicitEulerSimulator::resetState)
+        .def("reset_contact_anchor", &ImplicitEulerSimulator::resetContactAnchorPoint)
+        .def("set_joint_friction", &ImplicitEulerSimulator::setJointFriction)
+        .def("step", &ImplicitEulerSimulator::step)
+        .def("get_q", &ImplicitEulerSimulator::get_q,bp::return_value_policy<bp::copy_const_reference>(), "configuration state vector")
+        .def("get_v", &ImplicitEulerSimulator::get_v,bp::return_value_policy<bp::copy_const_reference>(), "tangent vector to configuration")
+        .def("get_dv", &ImplicitEulerSimulator::get_dv,bp::return_value_policy<bp::copy_const_reference>(), "time derivative of tangent vector to configuration");
 
     bp::class_<RK4Simulator, bases<AbstractSimulatorWrapper>>("RK4Simulator",
                       "Runge-Kutta 4 Simulator class",

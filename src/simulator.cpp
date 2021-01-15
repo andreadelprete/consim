@@ -100,6 +100,41 @@ int computeContactForces_imp(const pinocchio::Model &model, pinocchio::Data &dat
   return newActive;
 }
 
+void integrateState(const pinocchio::Model &model, const Eigen::VectorXd &x, const Eigen::VectorXd &dx, 
+                    double dt, Eigen::VectorXd &xNext)
+{
+  pinocchio::integrate(model, x.head(model.nq), dx.head(model.nv) * dt, xNext.head(model.nq));
+  xNext.tail(model.nv) = x.tail(model.nv) + dx.tail(model.nv) * dt;
+}
+
+void differenceState(const pinocchio::Model &model, const Eigen::VectorXd &x0, const Eigen::VectorXd &x1, 
+                      Eigen::VectorXd &dx)
+{
+  pinocchio::difference(model, x0.head(model.nq), x1.head(model.nq), dx.head(model.nv));
+  dx.tail(model.nv) = x1.tail(model.nv) - x0.tail(model.nv);
+}
+
+void DintegrateState(const pinocchio::Model &model, const Eigen::VectorXd &x, const Eigen::VectorXd &dx, 
+                      double dt, Eigen::MatrixXd &J)
+{
+  pinocchio::dIntegrate(model, x.head(model.nq), dx.head(model.nv) * dt, J.topRows(model.nq), pinocchio::ArgumentPosition::ARG1);
+  J.bottomRows(model.nv) = MatrixXd::Identity(model.nv, model.nv) * dt;
+}
+
+void DdifferenceState_x0(const pinocchio::Model &model, const Eigen::VectorXd &x0, const Eigen::VectorXd &x1, 
+                        Eigen::MatrixXd &J)
+{
+  pinocchio::dDifference(model, x0.head(model.nq), x1.head(model.nq), J.topRows(model.nv), pinocchio::ArgumentPosition::ARG0);
+  J.bottomRows(model.nv) = -MatrixXd::Identity(model.nv, model.nv);
+}
+
+void DdifferenceState_x1(const pinocchio::Model &model, const Eigen::VectorXd &x0, const Eigen::VectorXd &x1, 
+                        Eigen::MatrixXd &J)
+{
+  pinocchio::dDifference(model, x0.head(model.nq), x1.head(model.nq), J.topRows(model.nv), pinocchio::ArgumentPosition::ARG1);
+  J.bottomRows(model.nv).setIdentity(model.nv, model.nv);
+}
+
 /** 
  * AbstractSimulator Class 
 */
@@ -320,20 +355,40 @@ void EulerSimulator::step(const Eigen::VectorXd &tau)
  * ImplicitEulerSimulator Class 
 */
 
-ImplicitEulerSimulator::ImplicitEulerSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, 
-                                               int whichFD):
-EulerSimulator(model, data, dt, n_integration_steps, whichFD, EXPLICIT) 
+ImplicitEulerSimulator::ImplicitEulerSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps):
+EulerSimulator(model, data, dt, n_integration_steps, 3, EXPLICIT) 
 {
-  Fx_.resize(2*model.nv, 2*model.nv);
-  f_.resize(2*model.nv);
-  x_.resize(model.nq+model.nv);
-  z_.resize(model.nq+model.nv);
-  g_.resize(model.nq+model.nv);
+  int nx = model.nq+model.nv;
+  int ndx = 2*model.nv;
+
+  Fx_.resize(ndx, ndx);
+  G_.resize(ndx, ndx);
+  Dintegrate_Ddx_.resize(ndx, ndx);
+  Ddifference_Dx0_.resize(ndx, ndx);
+  Ddifference_Dx1_.resize(ndx, ndx);
+
+  x_.resize(nx);
+  z_.resize(nx);
+  xIntegrated_.resize(nx);
+  f_.resize(ndx);
+  g_.resize(ndx);
+  dz_.resize(ndx);
 }
 
 void ImplicitEulerSimulator::computeDynamicsAndJacobian(Eigen::VectorXd &tau, Eigen::VectorXd &q , Eigen::VectorXd &v, 
                                                         Eigen::VectorXd &f, Eigen::MatrixXd &Fx)
 {
+  // create a copy of the current contacts
+  for(auto &cp: contactsCopy_){
+    delete cp;
+  }
+  contactsCopy_.clear();
+  for(auto &cp: contacts_){
+    contactsCopy_.push_back(new ContactPoint(*cp));
+  }
+
+  computeContactForces_imp(*model_, *data_, q, v, tau_f_, contactsCopy_, objects_);
+  tau += tau_f_;
   pinocchio::aba(*model_, *data_, q, v, tau);
   int nv = model_->nv;
   f.head(nv) = v;
@@ -354,6 +409,7 @@ void ImplicitEulerSimulator::step(const Eigen::VectorXd &tau)
   }
   CONSIM_START_PROFILER("imp_euler_simulator::step");
   assert(tau.size() == model_->nv);
+
   for (int i = 0; i < n_integration_steps_; i++)
   {
     Eigen::internal::set_is_malloc_allowed(false);
@@ -366,48 +422,55 @@ void ImplicitEulerSimulator::step(const Eigen::VectorXd &tau)
     }
     
     /*!< integrate twice with explicit Euler to compute initial guess */ 
-    //     z = x[i,:] + h*ode.f(x[i,:], U[ii,:], t[i])
+    // z = x[i,:] + h*ode.f(x[i,:], U[ii,:], t[i])
     forwardDynamics(tau_, dv_);
-    vMean_ = v_ + 0.5*sub_dt*dv_;
-    pinocchio::integrate(*model_, q_, vMean_ * sub_dt, qnext_);
+    pinocchio::integrate(*model_, q_, v_ * sub_dt, qnext_);
     vnext_ = v_ + sub_dt*dv_;
 
-//     # Solve the following system of equations for z:
-//     #   g(z) = z - x - h*f(z) = 0
-//     # Start by computing the Newton step:
-//     #   g(z) = g(z_i) + G(z_i)*dz = 0 => dz = -G(z_i)^-1 * g(z_i)
-//     # where G is the Jacobian of g and z_i is our current guess of z
-//     #   G(z) = I - h*F(z)
-//     # where F(z) is the Jacobian of f wrt z.
-//     I = np.identity(x_init.shape[0])
+    //   Solve the following system of equations for z:
+    //       g(z) = z - x - h*f(z) = 0
+    //   Start by computing the Newton step:
+    //       g(z) = g(z_i) + G(z_i)*dz = 0 => dz = -G(z_i)^-1 * g(z_i)
+    //   where G is the Jacobian of g and z_i is our current guess of z
+    //       G(z) = I - h*F(z)
+    //   where F(z) is the Jacobian of f wrt z.
     bool converged = false;
     x_.head(model_->nq) = q_;
     x_.tail(model_->nv) = v_;
     z_.head(model_->nq) = qnext_;
     z_.tail(model_->nv) = vnext_;
+
     for(int j=0; j<100; ++j)
     {
-//     (f, Fx) = ode.f(z, U[ii,:], t[i], jacobian=True)
+      tau_ = tau;
       computeDynamicsAndJacobian(tau_, qnext_, vnext_, f_, Fx_);
-//     g = z - x[i,:] - h*f
-      g_ = z_ - x_ - sub_dt*f_;
+      // g = z - x[i,:] - h*f
+      integrateState(*model_, x_, f_, sub_dt, xIntegrated_);
+      differenceState(*model_, xIntegrated_, z_, g_);
+      // g_ = z_ - xIntegrated_;
       if(g_.norm() < 1e-8){
         converged = true;
         break;
       }
-//     G = I - h*Fx
+      // Compute gradient G = I - h*Fx
+      DintegrateState(    *model_, x_, f_, sub_dt,   Dintegrate_Ddx_);
+      DdifferenceState_x0(*model_, xIntegrated_, z_, Ddifference_Dx0_);
+      DdifferenceState_x1(*model_, xIntegrated_, z_, Ddifference_Dx1_);
+      G_ = Ddifference_Dx0_ + sub_dt * Ddifference_Dx1_ * Dintegrate_Ddx_ * Fx_;
 
-//     z += solve(G, -g)
+      // Update with Newton step: z += solve(G, -g)
+      dz_ = G_.ldlt().solve(g_);
+      integrateState(*model_, z_, dz_, 1.0, z_);
     }
 
 
-//     if(not converged):
-//         print("Implicit Euler did not converge!!!! |g|=", norm(g))
-        
-//     dx[i,:] = f
-//     x[i+1,:] = x[i,:] + h*dx[i,:]
+    if(!converged)
+      cout<<"Implicit Euler did not converge!!!! |g|="<<g_.norm()<<endl;
     
-    tau_.fill(0);
+    q_ = z_.head(model_->nq);
+    v_ = z_.tail(model_->nv);
+    
+    tau_.setZero();
     // \brief adds contact forces to tau_
     computeContactForces(); 
     Eigen::internal::set_is_malloc_allowed(true);
