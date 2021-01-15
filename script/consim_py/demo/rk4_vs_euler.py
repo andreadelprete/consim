@@ -116,7 +116,7 @@ i_max = i_ground_truth - 2
 GROUND_TRUTH_EULER_SIMU_PARAMS = {
     'name': 'ground-truth-euler %d'%(2**i_ground_truth),
     'method_name': 'ground-truth-euler',
-    'use_exp_int': 0,
+    'simulator': 'euler',
     'ndt': 2**i_ground_truth,
     'semi_implicit': 0
 }
@@ -126,7 +126,7 @@ for i in range(i_min, i_max):
     SIMU_PARAMS += [{
         'name': 'euler %4d'%(2**i),
         'method_name': 'euler',
-        'use_exp_int': 0,
+        'simulator': 'euler',
         'ndt': 2**i,
         'forward_dyn_method': 3,
         'semi_implicit': 0
@@ -141,7 +141,7 @@ i_max = i_ground_truth - 2
 GROUND_TRUTH_RK4_SIMU_PARAMS = {
     'name': 'ground-truth-rk4 %d'%(2**i_ground_truth),
     'method_name': 'ground-truth-rk4',
-    'use_exp_int': 0,
+    'simulator': 'rk4',
     'ndt': 2**i_ground_truth,
     'semi_implicit': 0
 }
@@ -151,10 +151,9 @@ for i in range(i_min, i_max):
     SIMU_PARAMS += [{
         'name': 'rk4 %4d'%(2**i),
         'method_name': 'rk4',
-        'use_exp_int': 0,
+        'simulator': 'rk4',
         'ndt': 2**i,
         'forward_dyn_method': 3,
-        'semi_implicit': 0
     }]
     
 unilateral_contacts = 1

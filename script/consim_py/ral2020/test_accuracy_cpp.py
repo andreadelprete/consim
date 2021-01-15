@@ -111,7 +111,7 @@ i_max = i_ground_truth - 2
 GROUND_TRUTH_EXP_SIMU_PARAMS = {
     'name': 'ground-truth %d'%(2**i_ground_truth),
     'method_name': 'ground-truth-exp',
-    'use_exp_int': 1,
+    'simulator': 'exponential',
     'ndt': 2**i_ground_truth,
 }
 
@@ -124,7 +124,7 @@ for i in range(i_min, i_max):
         SIMU_PARAMS += [{
             'name': 'expo %4d mmm%2d'%(2**i,m),
             'method_name': 'expo mmm%2d'%(m),
-            'use_exp_int': 1,
+            'simulator': 'exponential',
             'ndt': 2**i,
             'forward_dyn_method': 3,
             'max_mat_mult': m
@@ -136,7 +136,7 @@ i_ground_truth = i_max+2
 GROUND_TRUTH_EULER_SIMU_PARAMS = {
     'name': 'ground-truth %d'%(2**i_ground_truth),
     'method_name': 'ground-truth-euler',
-    'use_exp_int': 0,
+    'simulator': 'euler',
     'ndt': 2**i_ground_truth,
     'integration_type': 0
 }
@@ -146,7 +146,7 @@ for i in range(i_min, i_max):
     SIMU_PARAMS += [{
         'name': 'eul-ex %4d'%(2**i),
         'method_name': 'eul-ex',
-        'use_exp_int': 0,
+        'simulator': 'euler',
         'ndt': 2**i,
         'forward_dyn_method': 3,
         'integration_type': 0
@@ -157,7 +157,7 @@ for i in range(i_min, i_max):
     SIMU_PARAMS += [{
         'name': 'eul-semi%4d'%(2**i),
         'method_name': 'eul-semi',
-        'use_exp_int': 0,
+        'simulator': 'euler',
         'ndt': 2**i,
         'forward_dyn_method': 3,
         'integration_type': 1
@@ -168,7 +168,7 @@ for i in range(i_min, i_max):
 #    SIMU_PARAMS += [{
 #        'name': 'Eul-clexp%4d'%(2**i),
 #        'method_name': 'Eul-clexp',
-#        'use_exp_int': 0,
+#        'simulator': 'euler',
 #        'ndt': 2**i,
 #        'forward_dyn_method': 3,
 #        'integration_type': 2
@@ -178,7 +178,7 @@ for i in range(i_min, i_max):
 #    SIMU_PARAMS += [{
 #        'name': 'euler ABA%4d'%(2**i),
 #        'method_name': 'euler ABA',
-#        'use_exp_int': 0,
+#        'simulator': 'euler',
 #        'ndt': 2**i,
 #        'forward_dyn_method': 2
 #    }]
@@ -187,7 +187,7 @@ for i in range(i_min, i_max):
 #    SIMU_PARAMS += [{
 #        'name': 'euler Chol%4d'%(2**i),
 #        'method_name': 'euler Chol',
-#        'use_exp_int': 0,
+#        'simulator': 'euler',
 #        'ndt': 2**i,
 #        'forward_dyn_method': 3
 #    }]
@@ -280,7 +280,7 @@ for simu_params in SIMU_PARAMS:
     name = simu_params['name']
     print("\nStart simulation", name)
     print("q0", q0[2])
-    if(simu_params['use_exp_int']):
+    if(simu_params['simulator']=='exponential'):
         data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, 
                                     data['ground-truth-exp'], comp_times_exp_dict)
     else:

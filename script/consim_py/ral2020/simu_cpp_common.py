@@ -123,7 +123,7 @@ def compute_integration_errors(data, robot, dt):
             comp_time = np.nan
         res.comp_time[d.method_name] += [comp_time]
         res.realtime_factor[d.method_name] += [dt/comp_time]
-        if(d.use_exp_int==1):
+        if(d.simulator=='exponential'):
             try:
                 res.mat_mult[d.method_name] += [np.mean(d.mat_mult)]
                 res.mat_norm[d.method_name] += [np.mean(d.mat_norm)]
@@ -176,6 +176,7 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
     ndt = simu_params['ndt']
 #    use_exp_int = simu_params['use_exp_int']
     name = simu_params['name']
+    simu_type = simu_params['simulator']
     try:
         forward_dyn_method = simu_params['forward_dyn_method']
     except:
@@ -202,18 +203,16 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
     except:
         slippageContinues = False
         
-    use_exp_int = False
-    if('exp' in name):
+    if('exponential'==simu_type):
         simu = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
                                     conf.K, conf.B, conf.mu, conf.anchor_slipping_method,
                                     compute_predicted_forces, forward_dyn_method, integration_type,
                                     max_mat_mult, max_mat_mult, use_balancing)
         simu.assumeSlippageContinues(slippageContinues)
-        use_exp_int = True
-    elif('eul' in name):
+    elif('euler' == simu_type):
         simu = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
                                         conf.K, conf.B, conf.mu, forward_dyn_method, integration_type)
-    elif('rk4' in name):
+    elif('rk4' == simu_type):
         simu = consim.build_rk4_simulator(dt, ndt, robot.model, robot.data,
                                         conf.K, conf.B, conf.mu, forward_dyn_method)
     else:
@@ -245,7 +244,7 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
     results.p0 = np.zeros((3, nc, N+1))
     results.slipping = np.zeros((nc, N+1))
     results.active = np.zeros((nc, N+1))
-    if(use_exp_int):
+    if('exponential'==simu_type):
         results.mat_mult = np.zeros(N+1)
         results.mat_norm = np.zeros(N+1)
     results.computation_times = {}
@@ -288,7 +287,7 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
             results.com_pos[:,i+1] = robot.com(results.q[:,i+1])
 #            results.com_vel[:,i+1] = robot.com_vel()
             
-            if(use_exp_int):
+            if('exponential'==simu_type):
                 results.mat_mult[i] = simu.getMatrixMultiplications()
                 results.mat_norm[i] = simu.getMatrixExpL1Norm()
             
