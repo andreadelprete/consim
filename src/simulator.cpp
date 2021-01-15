@@ -117,22 +117,28 @@ void differenceState(const pinocchio::Model &model, const Eigen::VectorXd &x0, c
 void DintegrateState(const pinocchio::Model &model, const Eigen::VectorXd &x, const Eigen::VectorXd &dx, 
                       double dt, Eigen::MatrixXd &J)
 {
-  pinocchio::dIntegrate(model, x.head(model.nq), dx.head(model.nv) * dt, J.topRows(model.nq), pinocchio::ArgumentPosition::ARG1);
-  J.bottomRows(model.nv) = MatrixXd::Identity(model.nv, model.nv) * dt;
+  pinocchio::dIntegrate(model, x.head(model.nq), dx.head(model.nv) * dt, J.topLeftCorner(model.nv, model.nv), pinocchio::ArgumentPosition::ARG1);
+  J.bottomRightCorner(model.nv, model.nv) = MatrixXd::Identity(model.nv, model.nv) * dt;
+  J.topRightCorner(model.nv, model.nv).setZero();
+  J.bottomLeftCorner(model.nv, model.nv).setZero();
 }
 
 void DdifferenceState_x0(const pinocchio::Model &model, const Eigen::VectorXd &x0, const Eigen::VectorXd &x1, 
                         Eigen::MatrixXd &J)
 {
-  pinocchio::dDifference(model, x0.head(model.nq), x1.head(model.nq), J.topRows(model.nv), pinocchio::ArgumentPosition::ARG0);
-  J.bottomRows(model.nv) = -MatrixXd::Identity(model.nv, model.nv);
+  pinocchio::dDifference(model, x0.head(model.nq), x1.head(model.nq), J.topLeftCorner(model.nv, model.nv), pinocchio::ArgumentPosition::ARG0);
+  J.bottomRightCorner(model.nv, model.nv) = -MatrixXd::Identity(model.nv, model.nv);
+  J.topRightCorner(model.nv, model.nv).setZero();
+  J.bottomLeftCorner(model.nv, model.nv).setZero();
 }
 
 void DdifferenceState_x1(const pinocchio::Model &model, const Eigen::VectorXd &x0, const Eigen::VectorXd &x1, 
                         Eigen::MatrixXd &J)
 {
-  pinocchio::dDifference(model, x0.head(model.nq), x1.head(model.nq), J.topRows(model.nv), pinocchio::ArgumentPosition::ARG1);
-  J.bottomRows(model.nv).setIdentity(model.nv, model.nv);
+  pinocchio::dDifference(model, x0.head(model.nq), x1.head(model.nq), J.topLeftCorner(model.nv, model.nv), pinocchio::ArgumentPosition::ARG1);
+  J.bottomRightCorner(model.nv, model.nv).setIdentity(model.nv, model.nv);
+  J.topRightCorner(model.nv, model.nv).setZero();
+  J.bottomLeftCorner(model.nv, model.nv).setZero();
 }
 
 /** 
@@ -361,18 +367,18 @@ EulerSimulator(model, data, dt, n_integration_steps, 3, EXPLICIT)
   int nx = model.nq+model.nv;
   int ndx = 2*model.nv;
 
-  Fx_.resize(ndx, ndx);
-  G_.resize(ndx, ndx);
-  Dintegrate_Ddx_.resize(ndx, ndx);
-  Ddifference_Dx0_.resize(ndx, ndx);
-  Ddifference_Dx1_.resize(ndx, ndx);
+  Fx_.resize(ndx, ndx); Fx_.setZero();
+  G_.resize(ndx, ndx); G_.setZero();
+  Dintegrate_Ddx_.resize(ndx, ndx); Dintegrate_Ddx_.setZero();
+  Ddifference_Dx0_.resize(ndx, ndx); Ddifference_Dx0_.setZero();
+  Ddifference_Dx1_.resize(ndx, ndx); Ddifference_Dx1_.setZero();
 
-  x_.resize(nx);
-  z_.resize(nx);
-  xIntegrated_.resize(nx);
-  f_.resize(ndx);
-  g_.resize(ndx);
-  dz_.resize(ndx);
+  x_.resize(nx);x_.setZero();
+  z_.resize(nx);z_.setZero();
+  xIntegrated_.resize(nx);xIntegrated_.setZero();
+  f_.resize(ndx);f_.setZero();
+  g_.resize(ndx);g_.setZero();
+  dz_.resize(ndx);dz_.setZero();
 }
 
 void ImplicitEulerSimulator::computeDynamicsAndJacobian(Eigen::VectorXd &tau, Eigen::VectorXd &q , Eigen::VectorXd &v, 
@@ -440,27 +446,48 @@ void ImplicitEulerSimulator::step(const Eigen::VectorXd &tau)
     z_.head(model_->nq) = qnext_;
     z_.tail(model_->nv) = vnext_;
 
-    for(int j=0; j<100; ++j)
+    for(int j=0; j<5; ++j)
     {
       tau_ = tau;
+      cout<<"j = "<<j<<endl;
+      // cout<<"computeDynamicsAndJacobian"<<endl;
       computeDynamicsAndJacobian(tau_, qnext_, vnext_, f_, Fx_);
       // g = z - x[i,:] - h*f
+      // cout<<"integrateState"<<endl;
+      cout<<"f = "<<f_.transpose()<<endl;
+      // cout<<"Fx = \n"<<Fx_<<endl;
       integrateState(*model_, x_, f_, sub_dt, xIntegrated_);
+      cout<<"xIntegrated: "<<xIntegrated_.transpose()<<endl;
+      // cout<<"differenceState"<<endl;
       differenceState(*model_, xIntegrated_, z_, g_);
       // g_ = z_ - xIntegrated_;
+      cout<<"g="<<g_.transpose()<<endl;
       if(g_.norm() < 1e-8){
         converged = true;
         break;
       }
       // Compute gradient G = I - h*Fx
+      // cout<<"DintegrateState"<<endl;
       DintegrateState(    *model_, x_, f_, sub_dt,   Dintegrate_Ddx_);
+      // cout<<"Dintegrate_Ddx_ = \n"<<Dintegrate_Ddx_<<endl;
+      // cout<<"DdifferenceState_x0"<<endl;
       DdifferenceState_x0(*model_, xIntegrated_, z_, Ddifference_Dx0_);
+      // cout<<"Ddifference_Dx0_ = \n"<<Ddifference_Dx0_<<endl;
+      // cout<<"DdifferenceState_x1"<<endl;
       DdifferenceState_x1(*model_, xIntegrated_, z_, Ddifference_Dx1_);
-      G_ = Ddifference_Dx0_ + sub_dt * Ddifference_Dx1_ * Dintegrate_Ddx_ * Fx_;
+      // cout<<"Ddifference_Dx1_ = \n"<<Ddifference_Dx1_<<endl;
+      // cout<<"compute G"<<endl;
+      G_ = sub_dt * Ddifference_Dx1_ * Dintegrate_Ddx_ * Fx_;
+      G_ += Ddifference_Dx0_;
+      // cout<<"G\n"<<G_<<endl;
 
       // Update with Newton step: z += solve(G, -g)
+      // cout<<"compute dz"<<endl;
       dz_ = G_.ldlt().solve(g_);
+      cout<<"dz = "<<dz_.transpose()<<endl;
+      // cout<<"integrateState"<<endl;
       integrateState(*model_, z_, dz_, 1.0, z_);
+      cout<<"z="<<z_.transpose()<<endl;
     }
 
 

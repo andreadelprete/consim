@@ -215,6 +215,10 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
             "A simple way to create a simulator using explicit euler integration with floor object and LinearPenaltyContactModel.",
             bp::return_value_policy<bp::manage_new_object>());
 
+    bp::def("build_implicit_euler_simulator", build_implicit_euler_simulator,
+            "A simple way to create a simulator using implicit euler integration with floor object and LinearPenaltyContactModel.",
+            bp::return_value_policy<bp::manage_new_object>());
+
     bp::def("build_rk4_simulator", build_rk4_simulator,
             "A simple way to create a simulator using Runge-Kutta 4 integration with floor object and LinearPenaltyContactModel.",
             bp::return_value_policy<bp::manage_new_object>());

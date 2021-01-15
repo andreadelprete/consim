@@ -24,8 +24,8 @@ anchor_slipping_method = 1
 unilateral_contacts = 1
 
 DATA_FILE_TSID = '../demo/references/romeo_walking_traj_tsid.npz'
-# modelPath = '/home/student/devel/src/tsid/models/romeo'
-modelPath = '/home/bhammoud/devel/consim_dev/tsid/models/romeo'
+modelPath = '/home/student/devel/src/tsid/models/romeo'
+#modelPath = '/home/bhammoud/devel/consim_dev/tsid/models/romeo'
 urdf = modelPath+'/urdf/romeo.urdf'
 srdf = modelPath+'/srdf/romeo_collision.srdf'
 dt_ref = 0.002

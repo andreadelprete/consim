@@ -212,11 +212,14 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
     elif('euler' == simu_type):
         simu = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
                                         conf.K, conf.B, conf.mu, forward_dyn_method, integration_type)
+    elif('implicit-euler' == simu_type):
+        simu = consim.build_implicit_euler_simulator(dt, ndt, robot.model, robot.data,
+                                        conf.K, conf.B, conf.mu)
     elif('rk4' == simu_type):
         simu = consim.build_rk4_simulator(dt, ndt, robot.model, robot.data,
                                         conf.K, conf.B, conf.mu, forward_dyn_method)
     else:
-        raise Exception("Unknown simulation type"+name)
+        raise Exception("Unknown simulation type: "+simu_type)
                                         
     cpts = []
     for cf in conf.contact_frames:

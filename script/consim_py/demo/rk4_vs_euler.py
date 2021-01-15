@@ -58,8 +58,8 @@ LOAD_GROUND_TRUTH_FROM_FILE = 0
 SAVE_GROUND_TRUTH_TO_FILE = 1
 RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
 
-#TEST_NAME = 'solo-squat'
-TEST_NAME = 'solo-trot'
+TEST_NAME = 'solo-squat'
+#TEST_NAME = 'solo-trot'
 #TEST_NAME = 'solo-jump'
 #TEST_NAME = 'romeo-walk'
 #TEST_NAME = 'talos-walk'
@@ -190,9 +190,9 @@ if __name__ == "__main__":
 
     nq, nv = robot.nq, robot.nv
 
-    # robot.initViewer(loadModel=True)
-    # robot.viewer.gui.createSceneWithFloor('world')
-    # robot.viewer.gui.setLightingMode('world/floor', 'OFF')
+#    robot.initViewer(loadModel=True)
+#    robot.viewer.gui.createSceneWithFloor('world')
+#    robot.viewer.gui.setLightingMode('world/floor', 'OFF')
 
     # create feedback controller
     if(ctrl_type=='linear'):
