@@ -40,41 +40,41 @@ print(" Test Sliding Mass ".center(conf.LINE_WIDTH, '#'))
 print("".center(conf.LINE_WIDTH, '#'))
 
 # parameters of the simulation to be tested
-i_min = 0
-i_max = i_min+10
+i_min = 2
+i_max = i_min+10-9
 i_ground_truth = i_max+2
 
 GROUND_TRUTH_EXP_SIMU_PARAMS = {
     'name': 'ground-truth-exp %d'%(2**i_ground_truth),
     'method_name': 'ground-truth-exp',
-    'use_exp_int': 1,
+    'simulator': 'exponential',
     'ndt': 2**i_ground_truth,
 }
 
 GROUND_TRUTH_EULER_SIMU_PARAMS = {
     'name': 'ground-truth-eul %d'%(2**i_ground_truth),
     'method_name': 'ground-truth-euler',
-    'use_exp_int': 0,
+    'simulator': 'euler',
     'ndt': 2**i_ground_truth,
 }
 
 SIMU_PARAMS = []
 
 # EXPONENTIAL INTEGRATOR WITH STANDARD SETTINGS
-for i in range(i_min, i_max):
-    SIMU_PARAMS += [{
-        'name': 'exp%4d slip-cont'%(2**i),
-        'method_name': 'exp slip-cont',
-        'use_exp_int': 1,
-        'ndt': 2**i,
-        'assumeSlippageContinues': 1
-    }]
+#for i in range(i_min, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'exp%4d slip-cont'%(2**i),
+#        'method_name': 'exp slip-cont',
+#        'simulator': 'exponential',
+#        'ndt': 2**i,
+#        'assumeSlippageContinues': 1
+#    }]
 
 for i in range(i_min, i_max):
     SIMU_PARAMS += [{
-        'name': 'exp%4d slip-stop'%(2**i),
-        'method_name': 'exp slip-stop',
-        'use_exp_int': 1,
+        'name': 'exp%4d'%(2**i),
+        'method_name': 'exp',
+        'simulator': 'exponential',
         'ndt': 2**i,
         'assumeSlippageContinues': 0
     }]
@@ -83,21 +83,21 @@ for i in range(i_min, i_max):
 for i in range(i_min, i_max):
     SIMU_PARAMS += [{
         'name': 'euler%4d'%(2**i),
-        'method_name': 'euler',
-        'use_exp_int': 0,
+        'method_name': 'eul',
+        'simulator': 'euler',
         'ndt': 2**i,
     }]
     
-PLOT_FORCES = 0
-PLOT_BASE_POS = 0
+PLOT_FORCES = 1
+PLOT_BASE_POS = 1
 PLOT_FORCE_PREDICTIONS = 0
 PLOT_FORCE_INTEGRALS = 0
 PLOT_INTEGRATION_ERRORS = 1
-PLOT_INTEGRATION_ERROR_TRAJECTORIES = 0
+PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
 PLOT_CONTACT_POINT_PREDICTION = 0
 PLOT_CONTACT_POINTS = 0
 PLOT_SLIPPING = 0
-PLOT_ANCHOR_POINTS = 0
+PLOT_ANCHOR_POINTS = 1
 
 dt = 0.01                      # controller time step
 T = 0.5
@@ -121,7 +121,7 @@ data = {}
 for simu_params in SIMU_PARAMS:
     name = simu_params['name']
     print("\nStart simulation", name)
-    if(simu_params['use_exp_int']):
+    if(simu_params['simulator']=='exponential'):
         data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params)
     else:
         data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params)
@@ -158,34 +158,38 @@ if(PLOT_INTEGRATION_ERROR_TRAJECTORIES):
 # PLOT THE CONTACT FORCES OF ALL INTEGRATION METHODS ON THE SAME PLOT
 if(PLOT_FORCES):        
     nc = len(conf.contact_frames)
-    ax = get_empty_figure(nc)    
-    for (name, d) in data.items():
+    ax = plut.get_empty_figure(nc)
+    j = 0    
+#    for (name, d) in data.items():
+    for name in sorted(data.keys()):
+        d = data[name]
         for i in range(nc):
 #            ax[i].plot(tt, norm(d.f[0:2,i,:], axis=0) / (1e-3+d.f[2,i,:]), alpha=0.7, label=name)
-            ax[i].plot(tt, d.f[0,i,:], alpha=0.7, label=name)
+            ax[i].plot(tt, d.f[0,i,:], line_styles[j], alpha=0.5, label=name)
+            j += 1
             ax[i].set_xlabel('Time [s]')
             ax[i].set_ylabel('F_X [N]')
-            leg = ax[i].legend()
+            leg = ax[i].legend(loc='best')
             if(leg): leg.get_frame().set_alpha(0.5)
             
-    for (name, d) in data.items():
-        if d.use_exp_int:
-            ax = get_empty_figure(nc)    
-            for i in range(nc):
-    #            ax[i].plot(tt, norm(d.f[0:2,i,:], axis=0) / (1e-3+d.f[2,i,:]), alpha=0.7, label=name)
-                ax[i].plot(tt, d.f[0,i,:], alpha=0.7, label='f')
-                ax[i].plot(tt, d.f_avg[0,i,:], alpha=0.7, label='f avg')
-                ax[i].plot(tt, d.f_avg2[0,i,:], alpha=0.7, label='f avg2')
-                ax[i].plot(tt, d.f_prj[0,i,:], alpha=0.7, label='f prj')
-                ax[i].plot(tt, d.f_prj2[0,i,:], alpha=0.7, label='f prj2')
-                ax[i].set_xlabel('Time [s]')
-                ax[i].set_ylabel('F_X [N]')
-                ax[i].set_title(name)
-                leg = ax[i].legend()
-                if(leg): leg.get_frame().set_alpha(0.5)
+#    for (name, d) in data.items():
+#        if d.simulator=='exponential':
+#            ax = plut.get_empty_figure(nc)    
+#            for i in range(nc):
+#    #            ax[i].plot(tt, norm(d.f[0:2,i,:], axis=0) / (1e-3+d.f[2,i,:]), alpha=0.7, label=name)
+#                ax[i].plot(tt, d.f[0,i,:], alpha=0.7, label='f')
+##                ax[i].plot(tt, d.f_avg[0,i,:], alpha=0.7, label='f avg')
+##                ax[i].plot(tt, d.f_avg2[0,i,:], alpha=0.7, label='f avg2')
+##                ax[i].plot(tt, d.f_prj[0,i,:], alpha=0.7, label='f prj')
+##                ax[i].plot(tt, d.f_prj2[0,i,:], alpha=0.7, label='f prj2')
+#                ax[i].set_xlabel('Time [s]')
+#                ax[i].set_ylabel('F_X [N]')
+#                ax[i].set_title(name)
+#                leg = ax[i].legend()
+#                if(leg): leg.get_frame().set_alpha(0.5)
 
 if(PLOT_CONTACT_POINTS):
-    ax = get_empty_figure(nc)
+    ax = plut.get_empty_figure(nc)
     for (name, d) in data.items():
         for i in range(nc):
             ax[i].plot(tt, d.p[0,i,:], alpha=0.7, label=name+' p')
@@ -197,7 +201,7 @@ if(PLOT_CONTACT_POINTS):
             
 # PLOT THE SLIPPING FLAG OF ALL INTEGRATION METHODS ON THE SAME PLOT
 if(PLOT_SLIPPING):
-    ax = get_empty_figure(nc)
+    ax = plut.get_empty_figure(nc)
     for (name, d) in data.items():        
         for i in range(nc):
             ax[i].plot(tt, d.slipping[i,:tt.shape[0]], alpha=0.7, label=name)
@@ -206,7 +210,7 @@ if(PLOT_SLIPPING):
     leg = ax[0].legend()
     if(leg): leg.get_frame().set_alpha(0.5)
 
-    ax = get_empty_figure(nc)
+    ax = plut.get_empty_figure(nc)
     for (name, d) in data.items():
         for i in range(nc):
             ax[i].plot(tt, d.active[i,:tt.shape[0]], alpha=0.7, label=name)
@@ -219,16 +223,18 @@ if(PLOT_SLIPPING):
        
 # PLOT THE JOINT ANGLES OF ALL INTEGRATION METHODS ON THE SAME PLOT
 if(PLOT_BASE_POS):
-    ax = get_empty_figure(3)
+#    ax = plut.get_empty_figure(3)
     j = 0
-    for (name, d) in data.items():
-        for i in range(3):
-            ax[i].plot(tt, d.q[i, :], line_styles[j], alpha=0.7, label=name)
-            ax[i].set_xlabel('Time [s]')
-            ax[i].set_ylabel('Base pos [m]')
-        j += 1
-        leg = ax[0].legend()
-        if(leg): leg.get_frame().set_alpha(0.5)
+    for i in range(3):
+        ax = plut.get_empty_figure(1)[0]
+        for (name, d) in data.items():            
+            ax.plot(tt, d.q[i, :], line_styles[j], alpha=0.5, label=name)
+            ax.set_xlabel('Time [s]')
+            ax.set_ylabel('Base pos %d [m]'%i)
+            leg = ax.legend(loc='best')
+            if(leg): leg.get_frame().set_alpha(0.5)
+            j += 1
+        
         
 #    
 #if(PLOT_CONTACT_POINT_PREDICTION):
