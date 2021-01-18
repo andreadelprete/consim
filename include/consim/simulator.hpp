@@ -31,6 +31,8 @@
 namespace consim {
   enum EulerIntegrationType{ EXPLICIT=0, SEMI_IMPLICIT=1, CLASSIC_EXPLICIT=2};
 
+  typedef Eigen::DiagonalMatrix<double, Eigen::Dynamic> DiagonalMatrixXd;
+
   /**
    * Detect active/inactive contact points
    */
@@ -220,6 +222,7 @@ namespace consim {
       Eigen::VectorXd f_;       // evaluation of dynamics function
       Eigen::VectorXd g_;       // residual of ackward Euler integration
       Eigen::VectorXd x_, z_;   // current and next state (including q and v)
+      Eigen::VectorXd zNext_;   // temporary variable
       Eigen::VectorXd xIntegrated_; // used in Newton solver, integration of current state x_
       Eigen::VectorXd dz_;      // Newton step expressed in tangent space
       
@@ -228,6 +231,12 @@ namespace consim {
       Eigen::MatrixXd Dintegrate_Ddx_;
       Eigen::MatrixXd Ddifference_Dx0_;
       Eigen::MatrixXd Ddifference_Dx1_;
+
+      Eigen::MatrixXd MinvJcT_;
+      Eigen::MatrixXd Jc_;
+      DiagonalMatrixXd K_;
+      DiagonalMatrixXd B_;
+      Eigen::VectorXd lambda_;       // contact forces
 
       std::vector<ContactPoint *> contactsCopy_;
       
@@ -267,7 +276,6 @@ namespace consim {
 
   class ExponentialSimulator : public AbstractSimulator
   {
-    typedef Eigen::DiagonalMatrix<double, Eigen::Dynamic> DiagonalMatrixXd;
 
     public:
       /**

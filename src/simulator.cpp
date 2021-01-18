@@ -375,10 +375,20 @@ EulerSimulator(model, data, dt, n_integration_steps, 3, EXPLICIT)
 
   x_.resize(nx);x_.setZero();
   z_.resize(nx);z_.setZero();
+  zNext_.resize(nx); zNext_.setZero();
   xIntegrated_.resize(nx);xIntegrated_.setZero();
   f_.resize(ndx);f_.setZero();
   g_.resize(ndx);g_.setZero();
   dz_.resize(ndx);dz_.setZero();
+
+  tau_f_.resize(model.nv); tau_f_.setZero();
+
+  const int nactive=0;
+  lambda_.resize(3 * nactive); lambda_.setZero();
+  K_.resize(3 * nactive); K_.setZero();
+  B_.resize(3 * nactive); B_.setZero();
+  Jc_.resize(3 * nactive, model_->nv); Jc_.setZero();
+  MinvJcT_.resize(model_->nv, 3*nactive); MinvJcT_.setZero();
 }
 
 void ImplicitEulerSimulator::computeDynamicsAndJacobian(Eigen::VectorXd &tau, Eigen::VectorXd &q , Eigen::VectorXd &v, 
@@ -393,19 +403,46 @@ void ImplicitEulerSimulator::computeDynamicsAndJacobian(Eigen::VectorXd &tau, Ei
     contactsCopy_.push_back(new ContactPoint(*cp));
   }
 
-  computeContactForces_imp(*model_, *data_, q, v, tau_f_, contactsCopy_, objects_);
+  int nactive = computeContactForces_imp(*model_, *data_, q, v, tau_f_, contactsCopy_, objects_);
   tau += tau_f_;
   pinocchio::aba(*model_, *data_, q, v, tau);
   int nv = model_->nv;
   f.head(nv) = v;
   f.tail(nv) = data_-> ddq;
 
+  // compute contact Jacobian and contact forces
+  // cout<<"nactive "<<nactive<<endl;
+  if (nactive>0){
+    lambda_.resize(3 * nactive); lambda_.setZero();
+    K_.resize(3 * nactive); K_.setZero();
+    B_.resize(3 * nactive); B_.setZero();
+    Jc_.resize(3 * nactive, model_->nv); Jc_.setZero();
+    MinvJcT_.resize(model_->nv, 3*nactive); MinvJcT_.setZero();
+ 
+    int i_active_ = 0; 
+    for(unsigned int i=0; i<nc_; i++){
+      ContactPoint *cp = contactsCopy_[i];
+      if (!cp->active) continue;
+      Jc_.block(3*i_active_,0,3,model_->nv) = cp->world_J_;
+      K_.diagonal().segment<3>(3*i_active_) = cp->optr->contact_model_->stiffness_;
+      B_.diagonal().segment<3>(3*i_active_) = cp->optr->contact_model_->damping_;
+      lambda_.segment<3>(3*i_active_) = cp->f;
+      i_active_ += 1; 
+    }
+  } 
+
   pinocchio::computeABADerivatives(*model_, *data_, q, v, tau);
   Fx.topLeftCorner(nv, nv).setZero();
   Fx.topRightCorner(nv, nv).setIdentity(nv,nv);
   Fx.bottomLeftCorner(nv, nv) = data_->ddq_dq;
   Fx.bottomRightCorner(nv, nv) = data_->ddq_dv;
-  // Fu[nv:, :] = data_->Minv;
+
+  if (nactive>0){
+    data_->Minv.triangularView<Eigen::StrictlyLower>()
+    = data_->Minv.transpose().triangularView<Eigen::StrictlyLower>(); // need to fill the Lower part of the matrix
+    MinvJcT_.noalias() = data_->Minv * Jc_.transpose(); 
+    Fx.bottomLeftCorner(nv, nv) -= MinvJcT_ * K_ * Jc_;
+  }
 }
 
 void ImplicitEulerSimulator::step(const Eigen::VectorXd &tau) 
@@ -418,7 +455,7 @@ void ImplicitEulerSimulator::step(const Eigen::VectorXd &tau)
 
   for (int i = 0; i < n_integration_steps_; i++)
   {
-    Eigen::internal::set_is_malloc_allowed(false);
+    // Eigen::internal::set_is_malloc_allowed(false);
     CONSIM_START_PROFILER("imp_euler_simulator::substep");
     // \brief add input control 
     tau_ += tau;
@@ -446,48 +483,71 @@ void ImplicitEulerSimulator::step(const Eigen::VectorXd &tau)
     z_.head(model_->nq) = qnext_;
     z_.tail(model_->nv) = vnext_;
 
-    for(int j=0; j<5; ++j)
+    for(int j=0; j<50; ++j)
     {
       tau_ = tau;
-      cout<<"j = "<<j<<endl;
-      // cout<<"computeDynamicsAndJacobian"<<endl;
+      // cout<<"j = "<<j<<endl;
       computeDynamicsAndJacobian(tau_, qnext_, vnext_, f_, Fx_);
       // g = z - x[i,:] - h*f
-      // cout<<"integrateState"<<endl;
-      cout<<"f = "<<f_.transpose()<<endl;
+      // cout<<"f = "<<f_.transpose()<<endl;
       // cout<<"Fx = \n"<<Fx_<<endl;
       integrateState(*model_, x_, f_, sub_dt, xIntegrated_);
-      cout<<"xIntegrated: "<<xIntegrated_.transpose()<<endl;
-      // cout<<"differenceState"<<endl;
+      // cout<<"xIntegrated: "<<xIntegrated_.transpose()<<endl;
       differenceState(*model_, xIntegrated_, z_, g_);
       // g_ = z_ - xIntegrated_;
-      cout<<"g="<<g_.transpose()<<endl;
-      if(g_.norm() < 1e-8){
+      // cout<<"g="<<g_.transpose()<<endl;
+      // cout<<"|g|="<<g_.norm()<<endl;
+      double residual = g_.norm();
+      if(residual < 1e-10){
         converged = true;
         break;
       }
       // Compute gradient G = I - h*Fx
-      // cout<<"DintegrateState"<<endl;
       DintegrateState(    *model_, x_, f_, sub_dt,   Dintegrate_Ddx_);
       // cout<<"Dintegrate_Ddx_ = \n"<<Dintegrate_Ddx_<<endl;
-      // cout<<"DdifferenceState_x0"<<endl;
       DdifferenceState_x0(*model_, xIntegrated_, z_, Ddifference_Dx0_);
       // cout<<"Ddifference_Dx0_ = \n"<<Ddifference_Dx0_<<endl;
-      // cout<<"DdifferenceState_x1"<<endl;
       DdifferenceState_x1(*model_, xIntegrated_, z_, Ddifference_Dx1_);
       // cout<<"Ddifference_Dx1_ = \n"<<Ddifference_Dx1_<<endl;
-      // cout<<"compute G"<<endl;
       G_ = sub_dt * Ddifference_Dx1_ * Dintegrate_Ddx_ * Fx_;
       G_ += Ddifference_Dx0_;
       // cout<<"G\n"<<G_<<endl;
 
       // Update with Newton step: z += solve(G, -g)
-      // cout<<"compute dz"<<endl;
       dz_ = G_.ldlt().solve(g_);
-      cout<<"dz = "<<dz_.transpose()<<endl;
-      // cout<<"integrateState"<<endl;
-      integrateState(*model_, z_, dz_, 1.0, z_);
-      cout<<"z="<<z_.transpose()<<endl;
+      // cout<<"dz = "<<dz_.transpose()<<endl;
+      double alpha = 1.0;
+      bool line_search_converged = false;
+      for(int k=0; k<50 && !line_search_converged; ++k)
+      {
+        integrateState(*model_, z_, dz_, alpha, zNext_);
+        tau_ = tau;
+        qnext_ = zNext_.head(model_->nq);
+        vnext_ = zNext_.tail(model_->nv);
+        // cout<<"j = "<<j<<endl;
+        computeDynamicsAndJacobian(tau_, qnext_, vnext_, f_, Fx_);
+        // g = z - x[i,:] - h*f
+        // cout<<"f = "<<f_.transpose()<<endl;
+        // cout<<"Fx = \n"<<Fx_<<endl;
+        integrateState(*model_, x_, f_, sub_dt, xIntegrated_);
+        // cout<<"xIntegrated: "<<xIntegrated_.transpose()<<endl;
+        differenceState(*model_, xIntegrated_, zNext_, g_);
+        // g_ = z_ - xIntegrated_;
+        // cout<<"g="<<g_.transpose()<<endl;
+        // cout<<"|g|="<<g_.norm()<<endl;
+        double new_residual = g_.norm();
+        if(new_residual > residual){
+          alpha *= 0.5;
+        }
+        else{
+          line_search_converged = true;
+        }
+      }
+      
+      z_ = zNext_;
+      qnext_ = z_.head(model_->nq);
+      vnext_ = z_.tail(model_->nv);
+      // cout<<"z="<<z_.transpose()<<endl;
     }
 
 
@@ -500,7 +560,7 @@ void ImplicitEulerSimulator::step(const Eigen::VectorXd &tau)
     tau_.setZero();
     // \brief adds contact forces to tau_
     computeContactForces(); 
-    Eigen::internal::set_is_malloc_allowed(true);
+    // Eigen::internal::set_is_malloc_allowed(true);
     CONSIM_STOP_PROFILER("imp_euler_simulator::substep");
     elapsedTime_ += sub_dt; 
   }
