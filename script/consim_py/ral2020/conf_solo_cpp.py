@@ -17,10 +17,15 @@ mu = 1.0                            # friction coefficient
 parent_frames = ['HL_FOOT', 'HR_FOOT', 'FL_FOOT', 'FR_FOOT']
 parent_frame_index = [0,1,2,3]
 contact_frames = ['HL_FOOT', 'HR_FOOT', 'FL_FOOT', 'FR_FOOT']
+#contact_frames = []
+
 # direction of the normal to the contact surface
 contact_normal = np.array([0., 0., 1.])
 K = 1e5*np.ones(3)
 B = 3e2*np.ones(3)
+
+#K = 1e2*np.ones(3)
+#B = 1e1*np.ones(3)
 
 anchor_slipping_method = 1
 unilateral_contacts = 1

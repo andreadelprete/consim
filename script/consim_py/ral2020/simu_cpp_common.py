@@ -86,9 +86,10 @@ def compute_integration_errors(data, robot, dt):
     for name in sorted(data.keys()):
         if('ground-truth' in name): continue
         d = data[name]
-        if('exp' in name): data_ground_truth = data['ground-truth-exp']
-        elif('eul' in name): data_ground_truth = data['ground-truth-euler']
-        elif('rk4' in name): data_ground_truth = data['ground-truth-rk4']
+        if(d.simulator=='exponential'): data_ground_truth = data['ground-truth-exp']
+        elif(d.simulator=='euler'): data_ground_truth = data['ground-truth-euler']
+        elif(d.simulator=='implicit-euler'): data_ground_truth = data['ground-truth-implicit-euler']
+        elif(d.simulator=='rk4'): data_ground_truth = data['ground-truth-rk4']
         else: raise BaseException('Ground truth method not recognized ')
         
         err_vec = np.empty((2*robot.nv, d.q.shape[1]))

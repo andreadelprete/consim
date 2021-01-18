@@ -74,6 +74,9 @@ plut.FIGURE_PATH = './'+TEST_NAME+'/'
 N = 300
 dt = 0.010      # controller and simulator time step
 
+# DEBUG
+#N = 10
+
 if(TEST_NAME=='solo-squat'):
     robot_name = 'solo'
     motionName = 'squat'
@@ -157,6 +160,7 @@ for i in range(i_min, i_max):
     }]
     
 unilateral_contacts = 1
+#unilateral_contacts = 0
 
 if __name__ == "__main__":
     if(robot_name=='solo'):
@@ -273,8 +277,8 @@ if __name__ == "__main__":
         plot_multi_x_vs_y_log_scale(res.err_infnorm_avg, res.dt, 'Mean error inf-norm', 'Time step [s]')
         plut.saveFigure("local_err_vs_dt_"+descr_str)
 
-        plot_multi_x_vs_y_log_scale(res.err_infnorm_avg, res.comp_time, 'Mean error inf-norm', 'Computation time per step')
-        plut.saveFigure("local_err_vs_comp_time_"+descr_str)
+#        plot_multi_x_vs_y_log_scale(res.err_infnorm_avg, res.comp_time, 'Mean error inf-norm', 'Computation time per step')
+#        plut.saveFigure("local_err_vs_comp_time_"+descr_str)
         
         plot_multi_x_vs_y_log_scale(res.err_infnorm_avg, res.realtime_factor, 'Mean error inf-norm', 'Real-time factor')
         # plut.saveFigure("local_err_vs_realtime_factor_"+descr_str)
