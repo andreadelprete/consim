@@ -203,6 +203,18 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
         slippageContinues = simu_params['assumeSlippageContinues']
     except:
         slippageContinues = False
+    try:
+        use_fin_diff_dyn = simu_params['use_finite_differences_dynamics']
+    except:
+        use_fin_diff_dyn = False
+    try:
+        use_fin_diff_nle = simu_params['use_finite_differences_nle']
+    except:
+        use_fin_diff_nle = False
+    try:
+        use_current_state_as_initial_guess = simu_params['use_current_state_as_initial_guess']
+    except:
+        use_current_state_as_initial_guess = False
         
     if('exponential'==simu_type):
         simu = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
@@ -216,6 +228,9 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
     elif('implicit-euler' == simu_type):
         simu = consim.build_implicit_euler_simulator(dt, ndt, robot.model, robot.data,
                                         conf.K, conf.B, conf.mu)
+        simu.set_use_finite_differences_dynamics(use_fin_diff_dyn)
+        simu.set_use_finite_differences_nle(use_fin_diff_nle)
+        simu.set_use_current_state_as_initial_guess(use_current_state_as_initial_guess)
     elif('rk4' == simu_type):
         simu = consim.build_rk4_simulator(dt, ndt, robot.model, robot.data,
                                         conf.K, conf.B, conf.mu, forward_dyn_method)
@@ -285,6 +300,7 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
                     
             results.u[:,i] = controller.compute_control(simu.get_q(), simu.get_v())
             simu.step(results.u[:,i])
+#            time.sleep(5)
                 
             results.q[:,i+1] = simu.get_q()
             results.v[:,i+1] = simu.get_v()

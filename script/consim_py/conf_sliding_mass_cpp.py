@@ -16,16 +16,22 @@ mu = 0.3                            # friction coefficient
 fMin = 1.0                          # minimum normal force
 fMax = 1000.0                       # maximum normal force
 contact_frames = ['root_joint']
+#contact_frames = []
+
 # direction of the normal to the contact surface
 contact_normal = np.array([0., 0., 1.])
 K = 1e5*np.array([1., 1., 1.])
 B = 2e2*np.array([1., 1., 1.])
+#K = 1e3*np.array([1., 1., 1.])
+#B = 2e1*np.array([1., 1., 1.])
 
 q0 = np.array([0., 0., -1e-4, 0., 0., 0., 1.])
+#q0 = np.array([0., 0., -1e-4, 0.5, 0., 0., np.sqrt(1-0.5**2)])
 v0 = np.array([0., 0., 0., 0., 0., 0.])
 
 anchor_slipping_method = 1
 unilateral_contacts = 1
+#unilateral_contacts = 0
 
 T_pre = 0.0
 

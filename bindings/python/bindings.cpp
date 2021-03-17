@@ -22,6 +22,8 @@
 #include <pinocchio/bindings/python/multibody/model.hpp>
 
 #include "consim/simulator.hpp"
+#include "consim/implicit_euler.hpp"
+#include "consim/exponential_simulator.hpp"
 
 //eigenpy::switchToNumpyMatrix();
 
@@ -317,6 +319,9 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
         .def("reset_state", &ImplicitEulerSimulator::resetState)
         .def("reset_contact_anchor", &ImplicitEulerSimulator::resetContactAnchorPoint)
         .def("set_joint_friction", &ImplicitEulerSimulator::setJointFriction)
+        .def("set_use_finite_differences_dynamics", &ImplicitEulerSimulator::set_use_finite_differences_dynamics)
+        .def("set_use_finite_differences_nle", &ImplicitEulerSimulator::set_use_finite_differences_nle)
+        .def("set_use_current_state_as_initial_guess", &ImplicitEulerSimulator::set_use_current_state_as_initial_guess)
         .def("step", &ImplicitEulerSimulator::step)
         .def("get_q", &ImplicitEulerSimulator::get_q,bp::return_value_policy<bp::copy_const_reference>(), "configuration state vector")
         .def("get_v", &ImplicitEulerSimulator::get_v,bp::return_value_policy<bp::copy_const_reference>(), "tangent vector to configuration")

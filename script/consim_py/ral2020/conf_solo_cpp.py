@@ -23,7 +23,6 @@ contact_frames = ['HL_FOOT', 'HR_FOOT', 'FL_FOOT', 'FR_FOOT']
 contact_normal = np.array([0., 0., 1.])
 K = 1e5*np.ones(3)
 B = 3e2*np.ones(3)
-
 #K = 1e2*np.ones(3)
 #B = 1e1*np.ones(3)
 

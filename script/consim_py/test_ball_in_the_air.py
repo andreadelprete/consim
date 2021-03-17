@@ -3,7 +3,8 @@ import numpy as np
 from pinocchio.utils import isapprox, zero
 import pinocchio as se3
 # from test_utils import TestCaseDefault, degrees2radians, one
-from py_dynamics_simulator.robot_wrapper import RobotWrapper
+#from py_dynamics_simulator.robot_wrapper import RobotWrapper
+from pinocchio.robot_wrapper import RobotWrapper
 
 import consim
 
@@ -43,7 +44,8 @@ operational_frames = [
 ball = {'joints': joints, 'operational_frames': operational_frames}
 print("test set up")
 
-robot = RobotWrapper(ball, name='ball', display=None)
+robot = RobotWrapper(ball)
+#robot = RobotWrapper(ball, name='ball', display=None)
 
 print(robot.data.com[0])
 
