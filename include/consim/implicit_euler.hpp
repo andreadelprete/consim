@@ -40,7 +40,7 @@ namespace consim
 
     protected:      
       int computeDynamics(const Eigen::VectorXd &tau, const Eigen::VectorXd &x, Eigen::VectorXd &f);
-      void computeDynamicsAndJacobian(const Eigen::VectorXd &tau, const Eigen::VectorXd &x, Eigen::VectorXd &f, Eigen::MatrixXd &Fx);
+      void computeDynamicsJacobian(const Eigen::VectorXd &tau, const Eigen::VectorXd &x, const Eigen::VectorXd &f, Eigen::MatrixXd &Fx);
       void computeNonlinearEquations(const Eigen::VectorXd &tau, const Eigen::VectorXd &x, const Eigen::VectorXd &xNext, Eigen::VectorXd &out);
 
       // Eigen::VectorXd vnext_;   // guess used for the iterative search
@@ -56,6 +56,9 @@ namespace consim
       Eigen::MatrixXd Dintegrate_Ddx_;
       Eigen::MatrixXd Ddifference_Dx0_;
       Eigen::MatrixXd Ddifference_Dx1_;
+      // temporary variables
+      Eigen::MatrixXd Dintegrate_Ddx_Fx_;
+      Eigen::MatrixXd Ddifference_Dx0_Dintegrate_Ddx_Fx_;
 
       Eigen::MatrixXd MinvJcT_;
       Eigen::MatrixXd Jc_;

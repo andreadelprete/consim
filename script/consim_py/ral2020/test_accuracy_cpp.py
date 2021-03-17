@@ -34,7 +34,15 @@ comp_times_exp    = ['exponential_simulator::step',
 comp_times_euler = ['euler_simulator::step',
                     'euler_simulator::substep']
 comp_times_implicit_euler = ['imp_euler_simulator::step',
-                             'imp_euler_simulator::substep']
+                             'imp_euler_simulator::substep',
+                             'imp_euler_simulator::computeDynamicsJacobian',
+                             'imp_euler_simulator::Minv_JT_K_J',
+                             'imp_euler_simulator::computeNonlinearEquations',
+                             'imp_euler_simulator::computeNewtonSystem',
+                             'imp_euler_simulator::solveNewtonSystem',
+                             'imp_euler_simulator::lineSearch',
+                             'imp_euler_simulator::computeABADerivatives',
+                             'imp_euler_simulator::copyContacts']
 comp_times_rk4   = ['rk4_simulator::step',
                     'rk4_simulator::substep']
                     
@@ -194,8 +202,8 @@ GROUND_TRUTH_RK4_SIMU_PARAMS = {
 #        'ndt': 2**i,
 #    }]
     
-i_min = 1
-#i_max = 11
+#i_min = 1
+i_max -= 3
 i_ground_truth = i_max+2
 
 #i_ground_truth = 0
@@ -359,8 +367,8 @@ for simu_params in SIMU_PARAMS:
     elif(simu_params['simulator']=='implicit-euler'):
         data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, 
                             data['ground-truth-implicit-euler'], comp_times_implicit_euler_dict)
-#        print("Avg iter: %.1f"%(np.mean(data[name].avg_iter_num)))
-        print("Comp time:", data[name].computation_times['step'].avg)
+        print("Avg iter: %.1f"%(np.mean(data[name].avg_iter_num)))
+#        print("Comp time:", data[name].computation_times['step'].avg)
     elif(simu_params['simulator']=='rk4'):
         data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, 
                             data['ground-truth-rk4'], comp_times_rk4_dict)

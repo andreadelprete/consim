@@ -37,14 +37,20 @@ use_finite_differences_nle_(true),
 use_current_state_as_initial_guess_(true),
 convergence_threshold_(1e-8)
 {
-  int nx = model.nq+model.nv;
-  int ndx = 2*model.nv;
+  const int nv = model.nv, nq=model.nq;
+  int nx = nq+nv;
+  int ndx = 2*nv;
 
   Fx_.resize(ndx, ndx); Fx_.setZero();
   G_.resize(ndx, ndx); G_.setZero();
   Dintegrate_Ddx_.resize(ndx, ndx); Dintegrate_Ddx_.setZero();
   Ddifference_Dx0_.resize(ndx, ndx); Ddifference_Dx0_.setZero();
   Ddifference_Dx1_.resize(ndx, ndx); Ddifference_Dx1_.setZero();
+  Dintegrate_Ddx_Fx_.resize(ndx, ndx);
+  Ddifference_Dx0_Dintegrate_Ddx_Fx_.resize(ndx, ndx);
+
+  Fx_.topLeftCorner(nv, nv).setZero();
+  Fx_.topRightCorner(nv, nv).setIdentity(nv,nv);
 
   x_.resize(nx);x_.setZero();
   z_.resize(nx);z_.setZero();
@@ -54,15 +60,15 @@ convergence_threshold_(1e-8)
   g_.resize(ndx);g_.setZero();
   dz_.resize(ndx);dz_.setZero();
 
-  tau_f_.resize(model.nv); tau_f_.setZero();
-  tau_plus_JT_f_.resize(model.nv); tau_plus_JT_f_.setZero();
+  tau_f_.resize(nv); tau_f_.setZero();
+  tau_plus_JT_f_.resize(nv); tau_plus_JT_f_.setZero();
 
   const int nactive=0;
   lambda_.resize(3 * nactive); lambda_.setZero();
   K_.resize(3 * nactive); K_.setZero();
   B_.resize(3 * nactive); B_.setZero();
-  Jc_.resize(3 * nactive, model_->nv); Jc_.setZero();
-  MinvJcT_.resize(model_->nv, 3*nactive); MinvJcT_.setZero();
+  Jc_.resize(3 * nactive, nv); Jc_.setZero();
+  MinvJcT_.resize(nv, 3*nactive); MinvJcT_.setZero();
   G_LU_ = PartialPivLU<MatrixXd>(ndx);
 }
 
@@ -83,6 +89,7 @@ double ImplicitEulerSimulator::get_avg_iteration_number() const { return avg_ite
 int ImplicitEulerSimulator::computeDynamics(const Eigen::VectorXd &tau, const Eigen::VectorXd &x, Eigen::VectorXd &f)
 {
   // create a copy of the current contacts
+  CONSIM_START_PROFILER("imp_euler_simulator::copyContacts");
   for(auto &cp: contactsCopy_){
     delete cp;
   }
@@ -90,6 +97,7 @@ int ImplicitEulerSimulator::computeDynamics(const Eigen::VectorXd &tau, const Ei
   for(auto &cp: contacts_){
     contactsCopy_.push_back(new ContactPoint(*cp));
   }
+  CONSIM_STOP_PROFILER("imp_euler_simulator::copyContacts");
 
   const int nq = model_->nq, nv = model_->nv;
   int nactive = computeContactForces_imp(*model_, *data_, x.head(nq), x.tail(nv), tau_f_, contactsCopy_, objects_);
@@ -102,19 +110,15 @@ int ImplicitEulerSimulator::computeDynamics(const Eigen::VectorXd &tau, const Ei
   return nactive;
 }
 
-void ImplicitEulerSimulator::computeDynamicsAndJacobian(const Eigen::VectorXd &tau, const Eigen::VectorXd &x, 
-                                                        Eigen::VectorXd &f, Eigen::MatrixXd &Fx)
+void ImplicitEulerSimulator::computeDynamicsJacobian(const Eigen::VectorXd &tau, const Eigen::VectorXd &x, 
+                                                     const Eigen::VectorXd &f, Eigen::MatrixXd &Fx)
 {
+  CONSIM_START_PROFILER("imp_euler_simulator::computeDynamicsJacobian");
   const int nq = model_->nq, nv = model_->nv;
-  const double epsilon = 1e-8;
-
-  int nactive = computeDynamics(tau, x, f);
-
-  Fx.topLeftCorner(nv, nv).setZero();
-  Fx.topRightCorner(nv, nv).setIdentity(nv,nv);
 
   if(use_finite_differences_dynamics_)
   {  
+    const double epsilon = 1e-8;
     VectorXd x_eps(nq+nv), dx_eps(2*nv), f_eps(2*nv);
     for(int i=0; i<2*nv; ++i)
     {
@@ -132,13 +136,13 @@ void ImplicitEulerSimulator::computeDynamicsAndJacobian(const Eigen::VectorXd &t
   else
   {  
     // compute contact Jacobian and contact forces
-    // cout<<"nactive "<<nactive<<endl;
-    if (nactive>0){
-      lambda_.resize(3 * nactive); lambda_.setZero();
-      K_.resize(3 * nactive); K_.setZero();
-      B_.resize(3 * nactive); B_.setZero();
-      Jc_.resize(3 * nactive, model_->nv); Jc_.setZero();
-      MinvJcT_.resize(model_->nv, 3*nactive); MinvJcT_.setZero();
+    if (nactive_>0){
+      CONSIM_START_PROFILER("imp_euler_simulator::update_J_K_B_f");
+      lambda_.resize(3 * nactive_); lambda_.setZero();
+      K_.resize(3 * nactive_); K_.setZero();
+      B_.resize(3 * nactive_); B_.setZero();
+      Jc_.resize(3 * nactive_, model_->nv); Jc_.setZero();
+      MinvJcT_.resize(model_->nv, 3*nactive_); MinvJcT_.setZero();
   
       int i_active_ = 0; 
       for(unsigned int i=0; i<nc_; i++){
@@ -150,33 +154,41 @@ void ImplicitEulerSimulator::computeDynamicsAndJacobian(const Eigen::VectorXd &t
         lambda_.segment<3>(3*i_active_) = cp->f;
         i_active_ += 1; 
       }
+      CONSIM_STOP_PROFILER("imp_euler_simulator::update_J_K_B_f");
     } 
 
+    CONSIM_START_PROFILER("imp_euler_simulator::computeABADerivatives");
     pinocchio::computeABADerivatives(*model_, *data_, x.head(nq), x.tail(nv), tau);
     Fx.bottomLeftCorner(nv, nv) = data_->ddq_dq;
     Fx.bottomRightCorner(nv, nv) = data_->ddq_dv;
+    CONSIM_STOP_PROFILER("imp_euler_simulator::computeABADerivatives");
 
-    if (nactive>0){
+    if (nactive_>0){
+      CONSIM_START_PROFILER("imp_euler_simulator::Minv_JT_K_J");
       data_->Minv.triangularView<Eigen::StrictlyLower>()
       = data_->Minv.transpose().triangularView<Eigen::StrictlyLower>(); // need to fill the Lower part of the matrix
       MinvJcT_.noalias() = data_->Minv * Jc_.transpose(); 
       Fx.bottomLeftCorner(nv, nv)  -= MinvJcT_ * K_ * Jc_;
       Fx.bottomRightCorner(nv, nv) -= MinvJcT_ * B_ * Jc_;
+      CONSIM_STOP_PROFILER("imp_euler_simulator::Minv_JT_K_J");
     }
     // cout<<"Fx:\n"<<Fx<<endl;
   }
+  CONSIM_STOP_PROFILER("imp_euler_simulator::computeDynamicsJacobian");
 }
 
 void ImplicitEulerSimulator::computeNonlinearEquations(const Eigen::VectorXd &tau, const Eigen::VectorXd &x, 
                                                        const Eigen::VectorXd &xNext, Eigen::VectorXd &out)
 {
+  CONSIM_START_PROFILER("imp_euler_simulator::computeNonlinearEquations");
   // out = g = xNext - (x + h*f)
   // cout<<"**** compute NLE\n";
-  computeDynamics(tau, xNext, f_);
+  nactive_ = computeDynamics(tau, xNext, f_);
   // cout<<"xNext="<<xNext.transpose()<<"\nf(xNext)="<<f.transpose()<<endl;
   integrateState(*model_, x, f_, sub_dt, xIntegrated_);
   // cout<<"xIntegrated="<<xIntegrated.transpose()<<endl;
   differenceState(*model_, xIntegrated_, xNext, out);
+  CONSIM_STOP_PROFILER("imp_euler_simulator::computeNonlinearEquations");
 }
 
 void ImplicitEulerSimulator::step(const Eigen::VectorXd &tau) 
@@ -224,25 +236,26 @@ void ImplicitEulerSimulator::step(const Eigen::VectorXd &tau)
     //   where G is the Jacobian of g and z_i is our current guess of z
     //       G(z) = I - h*F(z)
     //   where F(z) is the Jacobian of f wrt z.
+
+    CONSIM_START_PROFILER("imp_euler_simulator::computeResidual");
+    tau_ = tau;
+    computeNonlinearEquations(tau_, x_, z_, g_);
+    // g_ = z_ - xIntegrated_;
+    double residual = g_.norm();
+    CONSIM_STOP_PROFILER("imp_euler_simulator::computeResidual");
+    
     bool converged = false;
-    double residual;
     int j=0;
+    
     for(; j<10; ++j)
     {
-      // cout<<"j = "<<j<<endl;
-      // cout<<"  z = "<<z_.transpose()<<endl;
-      tau_ = tau;
+      if(residual < convergence_threshold_){
+        converged = true;
+        break;
+      }
+      
       if(use_finite_differences_nle_)
       {
-        computeNonlinearEquations(tau_, x_, z_, g_);
-        residual = g_.norm();
-        // cout<<"g="<<g_.transpose()<<endl;
-        // cout<<"  |g|="<<g_.norm()<<endl;
-        if(residual < convergence_threshold_){
-          converged = true;
-          break;
-        }
-
         const int ndx = 2*model_->nv;
         VectorXd delta_z_eps(ndx), zEps(z_.size()), gEps(ndx);
         const double eps = 1e-8;
@@ -260,22 +273,9 @@ void ImplicitEulerSimulator::step(const Eigen::VectorXd &tau)
       }
       else
       {
-        computeDynamicsAndJacobian(tau_, z_, f_, Fx_);
-        // g = z - x[i,:] - h*f
-        // cout<<"f = "<<f_.transpose()<<endl;
-        // cout<<"Fx = \n"<<Fx_<<endl;
-        integrateState(*model_, x_, f_, sub_dt, xIntegrated_);
-        // cout<<"xIntegrated: "<<xIntegrated_.transpose()<<endl;
-        differenceState(*model_, xIntegrated_, z_, g_);
-        // g_ = z_ - xIntegrated_;
-        // cout<<"g="<<g_.transpose()<<endl;
-        // cout<<j<<" |g|="<<g_.norm()<<endl;
-        residual = g_.norm();
-        if(residual < convergence_threshold_){
-          converged = true;
-          break;
-        }
+        CONSIM_START_PROFILER("imp_euler_simulator::computeNewtonSystem");
         // Compute gradient G = I - h*Fx
+        computeDynamicsJacobian(tau_, z_, f_, Fx_);
         // g = diff(int(x, h*f(z)), z)
         // G = Dg/Dz = Ddiff_Dx1 + h * Ddiff_Dx0 * Dint * Fx
         DintegrateState(    *model_, x_, f_, sub_dt,   Dintegrate_Ddx_);
@@ -284,13 +284,17 @@ void ImplicitEulerSimulator::step(const Eigen::VectorXd &tau)
         // cout<<"Ddifference_Dx0_ = \n"<<Ddifference_Dx0_<<endl;
         DdifferenceState_x1(*model_, xIntegrated_, z_, Ddifference_Dx1_);
         // cout<<"Ddifference_Dx1_ = \n"<<Ddifference_Dx1_<<endl;
-        G_ = sub_dt * Ddifference_Dx0_ * Dintegrate_Ddx_ * Fx_;
+        Dintegrate_Ddx_Fx_.noalias() = Dintegrate_Ddx_ * Fx_;
+        Ddifference_Dx0_Dintegrate_Ddx_Fx_.noalias() = Ddifference_Dx0_ * Dintegrate_Ddx_Fx_;
+        G_.noalias() = sub_dt * Ddifference_Dx0_Dintegrate_Ddx_Fx_;
         G_ += Ddifference_Dx1_;
-        // G_ = sub_dt * Ddifference_Dx1_ * Dintegrate_Ddx_ * Fx_;
-        // G_ += Ddifference_Dx0_;
+        // G_.setIdentity();
+        // G_ -= sub_dt * Fx_;
+        CONSIM_STOP_PROFILER("imp_euler_simulator::computeNewtonSystem");
       }
       // cout<<"G\n"<<G_<<endl;
 
+      CONSIM_START_PROFILER("imp_euler_simulator::solveNewtonSystem");
       // Update with Newton step: z += solve(G, -g)
       g_ *= -1;
       G_LU_.compute(G_);
@@ -299,6 +303,9 @@ void ImplicitEulerSimulator::step(const Eigen::VectorXd &tau)
       // dz_ = G_.partialPivLu().solve(g_);
       // dz_ = G_.ldlt().solve(g_); // cannot use LDLT decomposition because G is not PD in general
       // cout<<"dz = "<<dz_.transpose()<<endl;
+      CONSIM_STOP_PROFILER("imp_euler_simulator::solveNewtonSystem");
+
+      CONSIM_START_PROFILER("imp_euler_simulator::lineSearch");
       double alpha = 1.0, new_residual;
       bool line_search_converged = false;
       for(int k=0; k<20 && !line_search_converged; ++k)
@@ -309,7 +316,7 @@ void ImplicitEulerSimulator::step(const Eigen::VectorXd &tau)
         // cout<<"   line search "<<k<<" g="<<g_.transpose()<<endl;
         // cout<<"   line search "<<k<<" |g|="<<g_.norm()<<endl;
         new_residual = g_.norm();
-        if(new_residual > residual){
+        if(new_residual >= residual){
           alpha *= 0.5;
         }
         else{
@@ -318,6 +325,7 @@ void ImplicitEulerSimulator::step(const Eigen::VectorXd &tau)
           z_ = zNext_;
         }
       } // end of line search
+      CONSIM_STOP_PROFILER("imp_euler_simulator::lineSearch");
 
       if(!line_search_converged)
       {
