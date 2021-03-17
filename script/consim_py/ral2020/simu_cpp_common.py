@@ -203,18 +203,6 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
         slippageContinues = simu_params['assumeSlippageContinues']
     except:
         slippageContinues = False
-    try:
-        use_fin_diff_dyn = simu_params['use_finite_differences_dynamics']
-    except:
-        use_fin_diff_dyn = False
-    try:
-        use_fin_diff_nle = simu_params['use_finite_differences_nle']
-    except:
-        use_fin_diff_nle = False
-    try:
-        use_current_state_as_initial_guess = simu_params['use_current_state_as_initial_guess']
-    except:
-        use_current_state_as_initial_guess = False
         
     if('exponential'==simu_type):
         simu = consim.build_exponential_simulator(dt, ndt, robot.model, robot.data,
@@ -226,11 +214,28 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
         simu = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
                                         conf.K, conf.B, conf.mu, forward_dyn_method, integration_type)
     elif('implicit-euler' == simu_type):
+        try:
+            use_fin_diff_dyn = simu_params['use_finite_differences_dynamics']
+        except:
+            use_fin_diff_dyn = False
+        try:
+            use_fin_diff_nle = simu_params['use_finite_differences_nle']
+        except:
+            use_fin_diff_nle = False
+        try:
+            use_current_state_as_initial_guess = simu_params['use_current_state_as_initial_guess']
+        except:
+            use_current_state_as_initial_guess = False
+        try:
+            convergence_threshold = simu_params['convergence_threshold']
+        except:
+            convergence_threshold = 1e-8
         simu = consim.build_implicit_euler_simulator(dt, ndt, robot.model, robot.data,
                                         conf.K, conf.B, conf.mu)
         simu.set_use_finite_differences_dynamics(use_fin_diff_dyn)
         simu.set_use_finite_differences_nle(use_fin_diff_nle)
         simu.set_use_current_state_as_initial_guess(use_current_state_as_initial_guess)
+        simu.set_convergence_threshold(convergence_threshold)
     elif('rk4' == simu_type):
         simu = consim.build_rk4_simulator(dt, ndt, robot.model, robot.data,
                                         conf.K, conf.B, conf.mu, forward_dyn_method)
@@ -266,6 +271,8 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
     if('exponential'==simu_type):
         results.mat_mult = np.zeros(N+1)
         results.mat_norm = np.zeros(N+1)
+    if('implicit-euler' == simu_type):
+        results.avg_iter_num = np.zeros(N+1)
     results.computation_times = {}
     
     results.q[:,0] = np.copy(q0)
@@ -310,6 +317,8 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
             if('exponential'==simu_type):
                 results.mat_mult[i] = simu.getMatrixMultiplications()
                 results.mat_norm[i] = simu.getMatrixExpL1Norm()
+            elif('implicit-euler' == simu_type):
+                results.avg_iter_num[i] = simu.get_avg_iteration_number()
             
             for ci, cp in enumerate(cpts):
                 results.f[:,ci,i+1] = cp.f

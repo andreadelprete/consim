@@ -33,6 +33,11 @@ namespace consim
       void set_use_current_state_as_initial_guess(bool value);
       bool get_use_current_state_as_initial_guess() const;
 
+      void set_convergence_threshold(double value);
+      double get_convergence_threshold() const;
+
+      double get_avg_iteration_number() const;
+
     protected:      
       int computeDynamics(const Eigen::VectorXd &tau, const Eigen::VectorXd &x, Eigen::VectorXd &f);
       void computeDynamicsAndJacobian(const Eigen::VectorXd &tau, const Eigen::VectorXd &x, Eigen::VectorXd &f, Eigen::MatrixXd &Fx);
@@ -57,11 +62,16 @@ namespace consim
       DiagonalMatrixXd K_;
       DiagonalMatrixXd B_;
       Eigen::VectorXd lambda_;       // contact forces
+      Eigen::VectorXd tau_plus_JT_f_;
+
+      Eigen::PartialPivLU<Eigen::MatrixXd> G_LU_;
 
       std::vector<ContactPoint *> contactsCopy_;
       bool use_finite_differences_dynamics_;
       bool use_finite_differences_nle_;
       bool use_current_state_as_initial_guess_;
+      double convergence_threshold_;
+      double avg_iteration_number_; // average number of iterations during last call to step
   }; // class ImplicitEulerSimulator
 
 } // namespace consim 
