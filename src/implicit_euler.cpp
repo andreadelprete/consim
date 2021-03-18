@@ -247,7 +247,7 @@ void ImplicitEulerSimulator::step(const Eigen::VectorXd &tau)
     bool converged = false;
     int j=0;
     
-    for(; j<10; ++j)
+    for(; j<30; ++j)
     {
       if(residual < convergence_threshold_){
         converged = true;
@@ -329,8 +329,9 @@ void ImplicitEulerSimulator::step(const Eigen::VectorXd &tau)
 
       if(!line_search_converged)
       {
-        cout<<"Iter "<<j<<". Line search did not converge. new residual: "<<new_residual<<" old residual: "<<residual<<endl;
-        computeNonlinearEquations(tau_, x_, z_, g_);
+        // cout<<"Iter "<<j<<". Line search did not converge. new residual: "<<new_residual<<" old residual: "<<residual<<endl;
+        // recompute residual, just for error print
+        // computeNonlinearEquations(tau_, x_, z_, g_);
         break;
       }
       // cout<<"z="<<z_.transpose()<<endl;
@@ -338,7 +339,7 @@ void ImplicitEulerSimulator::step(const Eigen::VectorXd &tau)
     avg_iteration_number_ += j;
 
     if(!converged && residual>=convergence_threshold_)
-      cout<<i<<" Implicit Euler did not converge!!!! |g|="<<g_.norm()<<endl;
+      cout<<i<<" Implicit Euler did not converge!!!! |g|="<<residual<<endl;
     
     q_ = z_.head(model_->nq);
     v_ = z_.tail(model_->nv);
