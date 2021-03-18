@@ -352,8 +352,8 @@ void ImplicitEulerSimulator::step(const Eigen::VectorXd &tau)
     }
     avg_iteration_number_ += j;
 
-    if(!converged && residual>=convergence_threshold_)
-      cout<<"Substep "<<i<<" iter "<<j<<" Implicit Euler did not converge!!!! |g|="<<residual<<endl;
+    // if(!converged && residual>=convergence_threshold_)
+      // cout<<"Substep "<<i<<" iter "<<j<<" Implicit Euler did not converge!!!! |g|="<<residual<<endl;
     
     q_ = z_.head(model_->nq);
     v_ = z_.tail(model_->nv);
