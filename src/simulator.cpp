@@ -219,7 +219,7 @@ void AbstractSimulator::resetState(const Eigen::VectorXd& q, const Eigen::Vector
   for (unsigned int i=0; i<nc_; ++i){
     contacts_[i]->predictedX_ = data_->oMf[contacts_[i]->frame_id].translation(); 
   }
-  elapsedTime_ = 0.;  
+  // elapsedTime_ = 0.;  
   resetflag_ = true;
 }
 
