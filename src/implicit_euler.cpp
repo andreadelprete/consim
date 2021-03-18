@@ -35,7 +35,8 @@ EulerSimulator(model, data, dt, n_integration_steps, 3, EXPLICIT),
 use_finite_differences_dynamics_(true),
 use_finite_differences_nle_(true),
 use_current_state_as_initial_guess_(true),
-convergence_threshold_(1e-8)
+convergence_threshold_(1e-8),
+regularization_(1e-10)
 {
   const int nv = model.nv, nq=model.nq;
   int nx = nq+nv;
@@ -297,6 +298,7 @@ void ImplicitEulerSimulator::step(const Eigen::VectorXd &tau)
       CONSIM_START_PROFILER("imp_euler_simulator::solveNewtonSystem");
       // Update with Newton step: z += solve(G, -g)
       g_ *= -1;
+      G_ += regularization_ * MatrixXd::Identity(2*model_->nv, 2*model_->nv);
       G_LU_.compute(G_);
       dz_ = G_LU_.solve(g_);
       // dz_ = G_.colPivHouseholderQr().solve(g_); // slower than LU
@@ -323,23 +325,35 @@ void ImplicitEulerSimulator::step(const Eigen::VectorXd &tau)
           line_search_converged = true;
           residual = new_residual;
           z_ = zNext_;
+          if(k==0){
+            regularization_ *= 0.1;
+            if(regularization_<1e-10)
+              regularization_ = 1e-10;
+          }
+            
         }
       } // end of line search
       CONSIM_STOP_PROFILER("imp_euler_simulator::lineSearch");
 
       if(!line_search_converged)
       {
+        regularization_ *= 10;
+        if(regularization_ > 1e-3){
+          regularization_ = 1e-3;
+          break;
+        }
+        // cout<<"t "<<elapsedTime_<<" substep "<<i<<" iter "<<j << " increase reg to "<<regularization_<<" |g|="<<residual<<endl;
         // cout<<"Iter "<<j<<". Line search did not converge. new residual: "<<new_residual<<" old residual: "<<residual<<endl;
         // recompute residual, just for error print
         // computeNonlinearEquations(tau_, x_, z_, g_);
-        break;
+        // break;
       }
       // cout<<"z="<<z_.transpose()<<endl;
     }
     avg_iteration_number_ += j;
 
     if(!converged && residual>=convergence_threshold_)
-      cout<<i<<" Implicit Euler did not converge!!!! |g|="<<residual<<endl;
+      cout<<"Substep "<<i<<" iter "<<j<<" Implicit Euler did not converge!!!! |g|="<<residual<<endl;
     
     q_ = z_.head(model_->nq);
     v_ = z_.tail(model_->nv);

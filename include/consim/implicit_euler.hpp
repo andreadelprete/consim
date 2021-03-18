@@ -75,6 +75,7 @@ namespace consim
       bool use_current_state_as_initial_guess_;
       double convergence_threshold_;
       double avg_iteration_number_; // average number of iterations during last call to step
+      double regularization_;       // regularization parameter
   }; // class ImplicitEulerSimulator
 
 } // namespace consim 
