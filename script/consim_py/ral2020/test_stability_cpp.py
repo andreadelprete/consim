@@ -91,9 +91,23 @@ for i in range(i_min, i_max):
     SIMU_PARAMS += [{
         'name': 'exp %4d'%(2**i),
         'method_name': 'exp',
+        'simulator': 'exponential',
         'use_exp_int': 1,
         'ndt': 2**i,
         'forward_dyn_method': 3
+    }]
+    
+# IMPLICIT EULER INTEGRATOR
+for i in range(i_min, i_max):
+    SIMU_PARAMS += [{
+        'name': 'imp-eul %4d'%(2**i),
+        'method_name': 'imp-eul',
+        'simulator': 'implicit-euler',
+        'ndt': 2**i,
+        'use_finite_differences_dynamics': False,
+        'use_finite_differences_nle': False,
+        'use_current_state_as_initial_guess': False,
+        'convergence_threshold': 1e-6
     }]
 
 i_max = 8
@@ -103,6 +117,7 @@ for i in range(i_min, i_max):
     SIMU_PARAMS += [{
         'name': 'euler %4d'%(2**i),
         'method_name': 'euler',
+        'simulator': 'euler',
         'use_exp_int': 0,
         'ndt': 2**i,
         'forward_dyn_method': 3,
@@ -114,6 +129,7 @@ for i in range(i_min, i_max):
     SIMU_PARAMS += [{
         'name': 'euler semi%4d'%(2**i),
         'method_name': 'euler semi',
+        'simulator': 'euler',
         'use_exp_int': 0,
         'ndt': 2**i,
         'forward_dyn_method': 1,
@@ -197,10 +213,7 @@ data = {}
 for simu_params in SIMU_PARAMS:
     name = simu_params['name']
     print("\nStart simulation", name)
-    if(simu_params['use_exp_int']):
-        data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params)
-    else:
-        data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params)
+    data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params)
 
 # COMPUTE INTEGRATION ERRORS:
 #res = compute_integration_errors(data, robot, dt)

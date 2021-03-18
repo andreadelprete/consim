@@ -343,7 +343,7 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
             t += dt
         
 #        print("Real-time factor:", t/(time.time() - time_start))
-        consim.stop_watch_report(3)
+#        consim.stop_watch_report(3)
         if(comp_times):
             for s_key, s_value in comp_times.items():
 #                print(s)

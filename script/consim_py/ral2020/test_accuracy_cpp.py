@@ -74,9 +74,9 @@ LOAD_GROUND_TRUTH_FROM_FILE = 1
 SAVE_GROUND_TRUTH_TO_FILE = 1
 RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
 
-TEST_NAME = 'solo-squat'
+#TEST_NAME = 'solo-squat'
 #TEST_NAME = 'solo-trot'
-#TEST_NAME = 'solo-jump'
+TEST_NAME = 'solo-jump'
 #TEST_NAME = 'romeo-walk'
 #TEST_NAME = 'talos-walk'
 
@@ -141,8 +141,8 @@ SIMU_PARAMS = []
 
 # EXPONENTIAL INTEGRATOR WITH STANDARD SETTINGS
 for i in range(i_min, i_max):
-#    for m in [0, 1, 2, 3, 4, -1]:
-    for m in [-1]:
+    for m in [0, 2, 4, -1]:
+#    for m in [-1]:
         SIMU_PARAMS += [{
             'name': 'expo %4d mmm%2d'%(2**i,m),
             'method_name': 'expo mmm%2d'%(m),
@@ -151,6 +151,70 @@ for i in range(i_min, i_max):
             'forward_dyn_method': 3,
             'max_mat_mult': m
         }]
+        
+#i_min = 1
+#i_max -= 3
+#i_ground_truth = i_max+2
+#i_ground_truth = 0
+#dt = 0.002
+#N = 10
+#i_ground_truth = int(np.log2(dt / ground_truth_dt))
+
+GROUND_TRUTH_IMPLICIT_EULER_SIMU_PARAMS = {
+    'name': 'ground-truth %d'%(2**i_ground_truth),
+    'method_name': 'ground-truth-implicit-euler',
+    'simulator': 'implicit-euler',
+    'ndt': 2**i_ground_truth,
+    'use_finite_differences_dynamics': False,
+    'use_finite_differences_nle': False,
+    'use_current_state_as_initial_guess': False,
+    'convergence_threshold': 1e-6
+}
+print("dt=", dt, "ndt", 2**i_ground_truth)
+#i_max = 1
+
+# IMPLICIT EULER INTEGRATOR
+for i in range(i_min, i_max):
+    SIMU_PARAMS += [{
+        'name': 'imp-eul %4d'%(2**i),
+        'method_name': 'imp-eul',
+        'simulator': 'implicit-euler',
+        'ndt': 2**i,
+        'use_finite_differences_dynamics': False,
+        'use_finite_differences_nle': False,
+        'use_current_state_as_initial_guess': False,
+        'convergence_threshold': 1e-6
+    }]
+# IMPLICIT EULER INTEGRATOR with finite differences
+#for i in range(i_min, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'imp-eul-fd %4d'%(2**i),
+#        'method_name': 'imp-eul-fd',
+#        'simulator': 'implicit-euler',
+#        'ndt': 2**i,
+#        'use_finite_differences_dynamics': False,
+#        'use_finite_differences_nle': True,
+#        'use_current_state_as_initial_guess': False,
+#        'convergence_threshold': 1e-5
+#    }]
+    
+GROUND_TRUTH_RK4_SIMU_PARAMS = {
+    'name': 'ground-truth %d'%(2**i_ground_truth),
+    'method_name': 'ground-truth-rk4',
+    'simulator': 'rk4',
+    'ndt': 2**i_ground_truth,
+}
+
+# RK4 INTEGRATOR
+for i in range(i_min, i_max):
+    SIMU_PARAMS += [{
+        'name': 'rk4 %4d'%(2**i),
+        'method_name': 'rk4',
+        'simulator': 'rk4',
+        'ndt': 2**i,
+    }]
+    
+    
 
 i_min += 0
 i_max += 3
@@ -184,56 +248,6 @@ for i in range(i_min, i_max):
 #        'forward_dyn_method': 3,
 #        'integration_type': 1
 #    }]
-    
-    
-GROUND_TRUTH_RK4_SIMU_PARAMS = {
-    'name': 'ground-truth %d'%(2**i_ground_truth),
-    'method_name': 'ground-truth-rk4',
-    'simulator': 'rk4',
-    'ndt': 2**i_ground_truth,
-}
-
-# RK4 INTEGRATOR
-#for i in range(i_min, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'rk4 %4d'%(2**i),
-#        'method_name': 'rk4',
-#        'simulator': 'rk4',
-#        'ndt': 2**i,
-#    }]
-    
-#i_min = 1
-i_max -= 3
-i_ground_truth = i_max+2
-
-#i_ground_truth = 0
-#dt = 0.002
-N = 10
-#i_ground_truth = int(np.log2(dt / ground_truth_dt))
-
-GROUND_TRUTH_IMPLICIT_EULER_SIMU_PARAMS = {
-    'name': 'ground-truth %d'%(2**i_ground_truth),
-    'method_name': 'ground-truth-implicit-euler',
-    'simulator': 'implicit-euler',
-    'ndt': 2**i_ground_truth,
-    'use_finite_differences_dynamics': False,
-    'use_finite_differences_nle': False,
-    'use_current_state_as_initial_guess': False
-}
-print("dt=", dt, "ndt", 2**i_ground_truth)
-
-# IMPLICIT EULER INTEGRATOR
-for i in range(i_min, i_max):
-    SIMU_PARAMS += [{
-        'name': 'imp-eul %4d'%(2**i),
-        'method_name': 'imp-eul',
-        'simulator': 'implicit-euler',
-        'ndt': 2**i,
-        'use_finite_differences_dynamics': False,
-        'use_finite_differences_nle': False,
-        'use_current_state_as_initial_guess': False,
-        'convergence_threshold': 1e-5
-    }]
     
 # EULER INTEGRATOR WITH CLASSIC EXPLICIT INTEGRATION
 #for i in range(i_min, i_max):

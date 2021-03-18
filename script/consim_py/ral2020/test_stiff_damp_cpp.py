@@ -28,12 +28,18 @@ comp_times_exp    = ['exponential_simulator::step',
                      'exponential_simulator::substep']
 comp_times_euler = ['euler_simulator::step',
                     'euler_simulator::substep']
+comp_times_implicit_euler = ['imp_euler_simulator::step',
+                             'imp_euler_simulator::substep']
 comp_times_exp_dict = {}
 comp_times_euler_dict = {}
+comp_times_implicit_euler_dict = {}
+comp_times_rk4_dict = {}
 for s in comp_times_exp:
     comp_times_exp_dict[s] = s.split('::')[-1]
 for s in comp_times_euler:
     comp_times_euler_dict[s] = s.split('::')[-1]
+for s in comp_times_implicit_euler:
+    comp_times_implicit_euler_dict[s] = s.split('::')[-1]
                     
 plut.SAVE_FIGURES = 1
 PLOT_INTEGRATION_ERRORS = 1
@@ -110,7 +116,7 @@ for ik in stiffnesses:
         SIMU_PARAMS += [{
             'name': 'exp %3.1f-%3.1f'%(np.log10(ik),dr),
             'method_name': 'Expo',
-            'use_exp_int': 1,
+            'simulator': 'exponential',
             'ndt': ndt_exp,
             'forward_dyn_method': 3,
             'max_mat_mult': maxMatMult,
@@ -124,7 +130,7 @@ for ik in stiffnesses:
         SIMU_PARAMS += [{
             'name': 'euler %3.1f-%3.1f'%(np.log10(ik),dr),
             'method_name': 'Eul-exp',
-            'use_exp_int': 0,
+            'simulator': 'euler',
             'ndt': ndt_euler,
             'forward_dyn_method': 3,
             'semi_implicit': 0,
@@ -132,16 +138,15 @@ for ik in stiffnesses:
             'damping_ratio': dr
         }]
         
-# EULER INTEGRATOR WITH SEMI-IMPLICIT INTEGRATION
+# EULER INTEGRATOR WITH IMPLICIT INTEGRATION
 for ik in stiffnesses:
     for dr in damping_ratios:
         SIMU_PARAMS += [{
-            'name': 'eul-semi %3.1f-%3.1f'%(np.log10(ik),dr),
-            'method_name': 'Eul-semi',
-            'use_exp_int': 0,
+            'name': 'eul-imp %3.1f-%3.1f'%(np.log10(ik),dr),
+            'method_name': 'Eul-imp',
+            'simulator': 'implicit-euler',
             'ndt': ndt_euler,
             'forward_dyn_method': 3,
-            'semi_implicit': 1,
             'K': ik,
             'damping_ratio': dr
         }]
@@ -213,10 +218,12 @@ else:
         simu_params['ndt'] = ndt_ground_truth
         data_gt[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params)
         simu_params['ndt'] = ndt
-        if(simu_params['use_exp_int']==1):
+        if(simu_params['simulator']=='exponential'):
             comp_times = comp_times_exp_dict
-        else:
+        elif(simu_params['simulator']=='euler'):
             comp_times = comp_times_euler_dict
+        elif(simu_params['simulator']=='implicit-euler'):
+            comp_times = comp_times_implicit_euler_dict
         data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, data_gt[name], comp_times)
 
 if(SAVE_DATA):
