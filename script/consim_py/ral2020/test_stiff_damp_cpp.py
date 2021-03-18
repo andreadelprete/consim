@@ -94,6 +94,7 @@ ground_truth_dt = 1e-3/64
 ndt_ground_truth = int(dt / ground_truth_dt)
 ndt_exp = 4
 ndt_euler = 16
+ndt_imp_euler = 4
 maxMatMult = 0
 test = 'stiffness'
 #test = 'damping'
@@ -145,7 +146,7 @@ for ik in stiffnesses:
             'name': 'eul-imp %3.1f-%3.1f'%(np.log10(ik),dr),
             'method_name': 'Eul-imp',
             'simulator': 'implicit-euler',
-            'ndt': ndt_euler,
+            'ndt': ndt_imp_euler,
             'forward_dyn_method': 3,
             'K': ik,
             'damping_ratio': dr
