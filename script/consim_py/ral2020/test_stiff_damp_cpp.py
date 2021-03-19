@@ -96,8 +96,14 @@ ndt_exp = 4
 ndt_euler = 16
 ndt_imp_euler = 4
 maxMatMult = 0
-test = 'stiffness'
-#test = 'damping'
+#test = 'stiffness'
+test = 'damping'
+
+ndt_exp = 1
+ndt_euler = 4
+ndt_imp_euler = 1
+
+print("Test", test)
 
 if(test=='stiffness'):
     stiffnesses    = np.logspace(3, 8, 11)

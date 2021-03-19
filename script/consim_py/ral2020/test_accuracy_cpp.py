@@ -76,8 +76,8 @@ RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground t
 
 #TEST_NAME = 'solo-squat'
 #TEST_NAME = 'solo-trot'
-TEST_NAME = 'solo-jump'
-#TEST_NAME = 'romeo-walk'
+#TEST_NAME = 'solo-jump'
+TEST_NAME = 'romeo-walk'
 #TEST_NAME = 'talos-walk'
 
 LINE_WIDTH = 100
@@ -145,7 +145,7 @@ for i in range(i_min, i_max):
 #    for m in [-1]:
         SIMU_PARAMS += [{
             'name': 'expo %4d mmm%2d'%(2**i,m),
-            'method_name': 'expo mmm%2d'%(m),
+            'method_name': 'Expo mmm%2d'%(m),
             'simulator': 'exponential',
             'ndt': 2**i,
             'forward_dyn_method': 3,
@@ -177,7 +177,7 @@ print("dt=", dt, "ndt", 2**i_ground_truth)
 for i in range(i_min, i_max):
     SIMU_PARAMS += [{
         'name': 'imp-eul %4d'%(2**i),
-        'method_name': 'imp-eul',
+        'method_name': 'Eul-imp',
         'simulator': 'implicit-euler',
         'ndt': 2**i,
         'use_finite_differences_dynamics': False,
@@ -209,7 +209,7 @@ GROUND_TRUTH_RK4_SIMU_PARAMS = {
 for i in range(i_min, i_max):
     SIMU_PARAMS += [{
         'name': 'rk4 %4d'%(2**i),
-        'method_name': 'rk4',
+        'method_name': 'RK4',
         'simulator': 'rk4',
         'ndt': 2**i,
     }]
@@ -231,7 +231,7 @@ GROUND_TRUTH_EULER_SIMU_PARAMS = {
 for i in range(i_min, i_max):
     SIMU_PARAMS += [{
         'name': 'eul-ex %4d'%(2**i),
-        'method_name': 'eul-exp',
+        'method_name': 'Eul-exp',
         'simulator': 'euler',
         'ndt': 2**i,
         'forward_dyn_method': 3,
