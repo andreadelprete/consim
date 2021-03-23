@@ -109,6 +109,15 @@ INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS})
 # --- INCLUDE ----------------------------------------
 # ----------------------------------------------------
 
+FILE(GLOB ${PYWRAP}_HEADERS
+    include/consim/bindings/python/common.hpp
+    # include/consim/bindings/python/base.hpp
+    include/consim/bindings/python/explicit_euler.hpp
+    include/consim/bindings/python/implicit_euler.hpp
+    # include/consim/bindings/python/exponential.hpp
+    # include/consim/bindings/python/rk4.hpp
+)
+
 SET(HEADERS
     include/consim/contact.hpp
     include/consim/object.hpp
@@ -121,9 +130,6 @@ SET(HEADERS
     include/consim/utils/stop-watch.hpp
     include/consim/utils/Stdafx.hh
     include/consim/real_time_tools.hpp
-    include/consim/bindings/python/common.hpp
-    include/consim/bindings/python/explicit_euler.hpp
-    include/consim/bindings/python/implicit_euler.hpp
  )
 
 LIST(REMOVE_DUPLICATES HEADERS)
