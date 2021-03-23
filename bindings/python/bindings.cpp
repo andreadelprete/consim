@@ -26,10 +26,10 @@
 #include <pinocchio/bindings/python/multibody/data.hpp>
 #include <pinocchio/bindings/python/multibody/model.hpp>
 
-#include "consim/simulators/base.hpp"
 #include "consim/simulators/exponential.hpp"
 
 #include "consim/bindings/python/common.hpp"
+#include "consim/bindings/python/base.hpp"
 #include "consim/bindings/python/explicit_euler.hpp"
 #include "consim/bindings/python/implicit_euler.hpp"
 #include "consim/bindings/python/rk4.hpp"
@@ -175,20 +175,20 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
         .ADD_PROPERTY_RETURN_BY_VALUE("predicted_x0", &ContactPoint::predictedX0_);
     
 
-    bp::class_<AbstractSimulatorWrapper, boost::noncopyable>("AbstractSimulator", "Abstract Simulator Class", 
-                         bp::init<pinocchio::Model &, pinocchio::Data &, float, int, int, EulerIntegrationType>())
-        .def("add_contact_point", &AbstractSimulatorWrapper::addContactPoint, return_internal_reference<>())
-        .def("get_contact", &AbstractSimulatorWrapper::getContact, return_internal_reference<>())
-        .def("add_object", &AbstractSimulatorWrapper::addObject)
-        .def("reset_state", &AbstractSimulatorWrapper::resetState)
-        .def("reset_contact_anchor", &AbstractSimulatorWrapper::resetContactAnchorPoint)
-        .def("set_joint_friction", &AbstractSimulatorWrapper::setJointFriction)
-        .def("step", bp::pure_virtual(&AbstractSimulatorWrapper::step))
-        .def("get_q", &AbstractSimulatorWrapper::get_q,bp::return_value_policy<bp::copy_const_reference>(), "configuration state vector")
-        .def("get_v", &AbstractSimulatorWrapper::get_v,bp::return_value_policy<bp::copy_const_reference>(), "tangent vector to configuration")
-        .def("get_dv", &AbstractSimulatorWrapper::get_dv,bp::return_value_policy<bp::copy_const_reference>(), "time derivative of tangent vector to configuration");
+    // bp::class_<AbstractSimulatorWrapper, boost::noncopyable>("AbstractSimulator", "Abstract Simulator Class", 
+    //                      bp::init<pinocchio::Model &, pinocchio::Data &, float, int, int, EulerIntegrationType>())
+    //     .def("add_contact_point", &AbstractSimulatorWrapper::addContactPoint, return_internal_reference<>())
+    //     .def("get_contact", &AbstractSimulatorWrapper::getContact, return_internal_reference<>())
+    //     .def("add_object", &AbstractSimulatorWrapper::addObject)
+    //     .def("reset_state", &AbstractSimulatorWrapper::resetState)
+    //     .def("reset_contact_anchor", &AbstractSimulatorWrapper::resetContactAnchorPoint)
+    //     .def("set_joint_friction", &AbstractSimulatorWrapper::setJointFriction)
+    //     .def("step", bp::pure_virtual(&AbstractSimulatorWrapper::step))
+    //     .def("get_q", &AbstractSimulatorWrapper::get_q,bp::return_value_policy<bp::copy_const_reference>(), "configuration state vector")
+    //     .def("get_v", &AbstractSimulatorWrapper::get_v,bp::return_value_policy<bp::copy_const_reference>(), "tangent vector to configuration")
+    //     .def("get_dv", &AbstractSimulatorWrapper::get_dv,bp::return_value_policy<bp::copy_const_reference>(), "time derivative of tangent vector to configuration");
 
-
+    export_base();
     export_explicit_euler();
     export_implicit_euler();
     export_rk4();

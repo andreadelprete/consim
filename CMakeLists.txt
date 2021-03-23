@@ -111,7 +111,7 @@ INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS})
 
 FILE(GLOB ${PYWRAP}_HEADERS
     include/consim/bindings/python/common.hpp
-    # include/consim/bindings/python/base.hpp
+    include/consim/bindings/python/base.hpp
     include/consim/bindings/python/explicit_euler.hpp
     include/consim/bindings/python/implicit_euler.hpp
     # include/consim/bindings/python/exponential.hpp
