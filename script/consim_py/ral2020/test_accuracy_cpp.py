@@ -75,8 +75,8 @@ SAVE_GROUND_TRUTH_TO_FILE = 1
 RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
 
 #TEST_NAME = 'solo-squat'
-#TEST_NAME = 'solo-trot'
-TEST_NAME = 'solo-jump'
+TEST_NAME = 'solo-trot'
+#TEST_NAME = 'solo-jump'
 #TEST_NAME = 'romeo-walk'
 #TEST_NAME = 'talos-walk'
 

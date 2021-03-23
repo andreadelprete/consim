@@ -74,7 +74,7 @@ const ContactPoint &AbstractSimulator::getContact(const std::string & name)
       return *cptr; 
     } 
   }
-  throw std::runtime_error("Contact name not recongnized ");
+  throw std::runtime_error("Contact name not recongnized "+name);
 }
 
 

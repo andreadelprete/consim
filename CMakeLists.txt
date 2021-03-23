@@ -121,6 +121,8 @@ SET(HEADERS
     include/consim/utils/stop-watch.hpp
     include/consim/utils/Stdafx.hh
     include/consim/real_time_tools.hpp
+    include/consim/bindings/python/common.hpp
+    include/consim/bindings/python/explicit_euler.hpp
  )
 
 LIST(REMOVE_DUPLICATES HEADERS)

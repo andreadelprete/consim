@@ -27,72 +27,24 @@
 #include <pinocchio/bindings/python/multibody/model.hpp>
 
 #include "consim/simulators/base.hpp"
-#include "consim/simulators/explicit_euler.hpp"
 #include "consim/simulators/rk4.hpp"
 #include "consim/simulators/implicit_euler.hpp"
 #include "consim/simulators/exponential.hpp"
 
+#include "consim/bindings/python/common.hpp"
+#include "consim/bindings/python/explicit_euler.hpp"
+
+namespace bp = boost::python;
+
+#define ADD_PROPERTY_RETURN_BY_VALUE(name, ref) add_property(name, \
+    make_getter(ref, bp::return_value_policy<bp::return_by_value>()), \
+    make_setter(ref, bp::return_value_policy<bp::return_by_value>()))
+
+#define ADD_PROPERTY_READONLY_RETURN_BY_VALUE(name, ref) add_property(name, \
+    make_getter(ref, bp::return_value_policy<bp::return_by_value>()))
 
 namespace consim 
 {
-  
-// abstract simulator wrapper for bindings 
-class AbstractSimulatorWrapper : public AbstractSimulator, public boost::python::wrapper<AbstractSimulator>
-{
-  public: 
-    AbstractSimulatorWrapper(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD,
-    EulerIntegrationType type) : 
-              AbstractSimulator(model, data, dt, n_integration_steps, whichFD, type), boost::python::wrapper<AbstractSimulator>() {}
-
-    void step(const Eigen::VectorXd &tau){
-      this->get_override("step")(tau);
-    }
-
-  void computeContactForces(){
-    this->get_override("computeContactForces")();
-  }
-
-};
-
-class ContactObjectWrapper : public ContactObject, public boost::python::wrapper<ContactObject>
-{
-  public: 
-    ContactObjectWrapper(const std::string & name, ContactModel& contact_model) : 
-      ContactObject(name, contact_model), boost::python::wrapper<ContactObject>() {}
-
-    bool checkCollision(ContactPoint &cp){
-      bool st = this->get_override("checkCollision")(cp);
-      return st; 
-    }
-
-    void computePenetration(ContactPoint &cp){
-      this->get_override("computePenetration")(cp);
-    }
-
-};
-
-
-
-
-EulerSimulator* build_euler_simulator(
-    float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data,
-    Eigen::Vector3d stifness, Eigen::Vector3d damping, double frictionCoefficient, int whichFD, int type)
-{
-  LinearPenaltyContactModel *contact_model = new LinearPenaltyContactModel(
-      stifness, damping, frictionCoefficient);
-
-  ContactObject* obj = new FloorObject("Floor", *contact_model);
-
-  if(!model.check(data))
-  {
-    std::cout<<"[build_euler_simulator] Data is not consistent with specified model\n";
-    data = pinocchio::Data(model);
-  }
-  EulerSimulator* sim = new EulerSimulator(model, data, dt, n_integration_steps, whichFD, (EulerIntegrationType)type);
-  sim->addObject(*obj);
-
-  return sim;
-}
 
 ImplicitEulerSimulator* build_implicit_euler_simulator(
     float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data,
@@ -171,8 +123,6 @@ double frictionCoefficient, double alpha)
   return obj; 
 }
 
-
-
 void stop_watch_report(int precision)
 {
   getProfiler().report_all(precision);
@@ -205,24 +155,10 @@ void stop_watch_reset_all()
   getProfiler().reset_all();
 }
 
-namespace bp = boost::python;
-
-
-#define ADD_PROPERTY_RETURN_BY_VALUE(name, ref) add_property(name, \
-    make_getter(ref, bp::return_value_policy<bp::return_by_value>()), \
-    make_setter(ref, bp::return_value_policy<bp::return_by_value>()))
-
-#define ADD_PROPERTY_READONLY_RETURN_BY_VALUE(name, ref) add_property(name, \
-    make_getter(ref, bp::return_value_policy<bp::return_by_value>()))
-
 BOOST_PYTHON_MODULE(libconsim_pywrap)
 {
     using namespace boost::python;
     eigenpy::enableEigenPy();
-
-    bp::def("build_euler_simulator", build_euler_simulator,
-            "A simple way to create a simulator using explicit euler integration with floor object and LinearPenaltyContactModel.",
-            bp::return_value_policy<bp::manage_new_object>());
 
     bp::def("build_implicit_euler_simulator", build_implicit_euler_simulator,
             "A simple way to create a simulator using implicit euler integration with floor object and LinearPenaltyContactModel.",
@@ -302,20 +238,7 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
         .def("get_dv", &AbstractSimulatorWrapper::get_dv,bp::return_value_policy<bp::copy_const_reference>(), "time derivative of tangent vector to configuration");
 
 
-
-    bp::class_<EulerSimulator, bases<AbstractSimulatorWrapper>>("EulerSimulator",
-                          "Euler Simulator class",
-                          bp::init<pinocchio::Model &, pinocchio::Data &, float, int, int, EulerIntegrationType>())
-        .def("add_contact_point", &EulerSimulator::addContactPoint, return_internal_reference<>())
-        .def("get_contact", &EulerSimulator::getContact, return_internal_reference<>())
-        .def("add_object", &EulerSimulator::addObject)
-        .def("reset_state", &EulerSimulator::resetState)
-        .def("reset_contact_anchor", &EulerSimulator::resetContactAnchorPoint)
-        .def("set_joint_friction", &EulerSimulator::setJointFriction)
-        .def("step", &EulerSimulator::step)
-        .def("get_q", &EulerSimulator::get_q,bp::return_value_policy<bp::copy_const_reference>(), "configuration state vector")
-        .def("get_v", &EulerSimulator::get_v,bp::return_value_policy<bp::copy_const_reference>(), "tangent vector to configuration")
-        .def("get_dv", &EulerSimulator::get_dv,bp::return_value_policy<bp::copy_const_reference>(), "time derivative of tangent vector to configuration");
+    export_explicit_euler();
 
     bp::class_<ImplicitEulerSimulator, bases<AbstractSimulatorWrapper>>("ImplicitEulerSimulator",
                           "Implicit Euler Simulator class",

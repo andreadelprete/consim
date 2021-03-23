@@ -43,10 +43,9 @@ class ContactObject {
     virtual bool checkCollision(ContactPoint &cp) = 0;
     virtual void computePenetration(ContactPoint &cp) = 0;
     const std::string & getName() const { return name_; }
-    ContactModel* contact_model_;
      
     std::string name_;
-    
+    ContactModel* contact_model_;
 };
 
 // -----------------------------------------------------------------------------

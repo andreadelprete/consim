@@ -46,8 +46,8 @@ class ContactPoint {
     void resetAnchorPoint(const Eigen::Vector3d &p0, bool slipping);  /*!< resets the anchor point position and velocity */
     void projectForceInCone(Eigen::Vector3d &f);
     
-    std::string name_;
     const pinocchio::Model *model_;
+    std::string name_;
     unsigned int frame_id;
 
     bool active;            /*!< true if the point is in collision with the environment, false otherwise */

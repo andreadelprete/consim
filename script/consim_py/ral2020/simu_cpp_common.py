@@ -246,7 +246,8 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
     for cf in conf.contact_frames:
         if not robot.model.existFrame(cf):
             print(("ERROR: Frame", cf, "does not exist"))
-        cpts += [simu.add_contact_point(cf, robot.model.getFrameId(cf), conf.unilateral_contacts)]
+        frame_id = robot.model.getFrameId(cf)
+        cpts += [simu.add_contact_point(cf, frame_id, conf.unilateral_contacts)]
         
     simu.reset_state(q0, v0, True)
             
