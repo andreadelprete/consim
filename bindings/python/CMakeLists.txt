@@ -41,6 +41,7 @@ ENDFUNCTION(REMOVE_PATH_FROM_LIST)
 FILE(GLOB ${PYWRAP}_SOURCES
     explicit_euler.cpp
     implicit_euler.cpp
+    rk4.cpp
     bindings.cpp
 )
 
