@@ -26,12 +26,16 @@
 #include <pinocchio/bindings/python/multibody/data.hpp>
 #include <pinocchio/bindings/python/multibody/model.hpp>
 
-#include "consim/simulator.hpp"
-#include "consim/implicit_euler.hpp"
-#include "consim/exponential_simulator.hpp"
+#include "consim/simulators/base.hpp"
+#include "consim/simulators/explicit_euler.hpp"
+#include "consim/simulators/rk4.hpp"
+#include "consim/simulators/implicit_euler.hpp"
+#include "consim/simulators/exponential.hpp"
 
 
-namespace consim {
+namespace consim 
+{
+  
 // abstract simulator wrapper for bindings 
 class AbstractSimulatorWrapper : public AbstractSimulator, public boost::python::wrapper<AbstractSimulator>
 {

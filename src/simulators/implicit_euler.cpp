@@ -28,7 +28,7 @@
 
 #include "consim/object.hpp"
 #include "consim/contact.hpp"
-#include "consim/implicit_euler.hpp"
+#include "consim/simulators/implicit_euler.hpp"
 
 #include <iostream>
 

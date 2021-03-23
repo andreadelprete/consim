@@ -112,9 +112,12 @@ INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS})
 SET(HEADERS
     include/consim/contact.hpp
     include/consim/object.hpp
-    include/consim/simulator.hpp
-    include/consim/implicit_euler.hpp
-    include/consim/exponential_simulator.hpp
+    include/consim/simulators/common.hpp
+    include/consim/simulators/base.hpp
+    include/consim/simulators/explicit_euler.hpp
+    include/consim/simulators/rk4.hpp
+    include/consim/simulators/implicit_euler.hpp
+    include/consim/simulators/exponential.hpp
     include/consim/utils/stop-watch.hpp
     include/consim/utils/Stdafx.hh
     include/consim/real_time_tools.hpp

@@ -31,7 +31,7 @@
 #include "consim/object.hpp"
 #include "consim/contact.hpp"
 #include "eiquadprog/eiquadprog-fast.hpp"
-#include "consim/simulator.hpp"
+#include "consim/simulators/base.hpp"
 
 namespace consim {
 

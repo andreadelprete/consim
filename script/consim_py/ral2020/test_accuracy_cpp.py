@@ -70,14 +70,14 @@ PLOT_INTEGRATION_ERROR_TRAJECTORIES = 0
 PLOT_MATRIX_MULTIPLICATIONS = 0
 PLOT_MATRIX_NORMS = 0
 
-LOAD_GROUND_TRUTH_FROM_FILE = 1
+LOAD_GROUND_TRUTH_FROM_FILE = 0
 SAVE_GROUND_TRUTH_TO_FILE = 1
 RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
 
 #TEST_NAME = 'solo-squat'
 #TEST_NAME = 'solo-trot'
-#TEST_NAME = 'solo-jump'
-TEST_NAME = 'romeo-walk'
+TEST_NAME = 'solo-jump'
+#TEST_NAME = 'romeo-walk'
 #TEST_NAME = 'talos-walk'
 
 LINE_WIDTH = 100

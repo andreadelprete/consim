@@ -20,9 +20,12 @@ SET(LIBRARY_NAME ${PROJECT_NAME})
 SET(${LIBRARY_NAME}_SOURCES
     contact.cpp
     object.cpp
-    simulator.cpp
-    implicit_euler.cpp
-    exponential_simulator.cpp
+    simulators/common.cpp
+    simulators/base.cpp
+    simulators/explicit_euler.cpp
+    simulators/rk4.cpp
+    simulators/implicit_euler.cpp
+    simulators/exponential.cpp
     utils/stop-watch.cpp
   )
 

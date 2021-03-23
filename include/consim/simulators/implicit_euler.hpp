@@ -23,7 +23,7 @@
 #include <pinocchio/multibody/data.hpp>
 #include <pinocchio/spatial/motion.hpp>
 
-#include "consim/simulator.hpp"
+#include "consim/simulators/explicit_euler.hpp"
 
 namespace consim 
 {

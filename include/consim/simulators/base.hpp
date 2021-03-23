@@ -29,6 +29,7 @@
 #include "eiquadprog/eiquadprog-fast.hpp"
 
 #include "utils/stop-watch.h"
+#include "consim/simulators/common.hpp"
 
 #define CONSIM_PROFILER
 #ifndef CONSIM_PROFILER
@@ -40,55 +41,14 @@
 #endif
 
 
-namespace consim {
-  enum EulerIntegrationType{ EXPLICIT=0, SEMI_IMPLICIT=1, CLASSIC_EXPLICIT=2};
+namespace consim 
+{
 
-  typedef Eigen::DiagonalMatrix<double, Eigen::Dynamic> DiagonalMatrixXd;
-
-  /**
-   * Detect active/inactive contact points
-   */
-  int detectContacts_imp(pinocchio::Data &data, std::vector<ContactPoint *> &contacts, std::vector<ContactObject*> &objects);
-
-  /**
-   * Compute the contact forces associated to the specified list of contacts and objects. 
-   * Moreover, it computes their net effect on the generalized joint torques tau_f.
-   */
-  int computeContactForces_imp(const pinocchio::Model &model, pinocchio::Data &data, 
-                            const Eigen::VectorXd &q, const Eigen::VectorXd &v, Eigen::VectorXd &tau_f, 
-                            std::vector<ContactPoint*> &contacts, std::vector<ContactObject*> &objects);
-
-  /** 
-   * Integrate in state space.
-   */
-  void integrateState(const pinocchio::Model &model, const Eigen::VectorXd &x, const Eigen::VectorXd &dx, 
-                      double dt, Eigen::VectorXd &xNext);
-
-  /**
-   * Compute the difference between x1 and x0, i.e. x1-x0, where x0 and x1 might live on a Lie group.
-   */
-  void differenceState(const pinocchio::Model &model, const Eigen::VectorXd &x0, const Eigen::VectorXd &x1, 
-                      Eigen::VectorXd &dx);
-
-  /** 
-   * Derivatives of the function that integrates in state space.
-   */
-  void DintegrateState(const pinocchio::Model &model, const Eigen::VectorXd &x, const Eigen::VectorXd &dx, 
-                      double dt, Eigen::MatrixXd &J);
-
-  /**
-   * Derivatives of the function that computes the difference between x1 and x0, i.e. x1-x0, where x0 and x1 might live on a Lie group.
-   */
-  void DdifferenceState_x0(const pinocchio::Model &model, const Eigen::VectorXd &x0, const Eigen::VectorXd &x1, 
-                           Eigen::MatrixXd &J);
-
-  void DdifferenceState_x1(const pinocchio::Model &model, const Eigen::VectorXd &x0, const Eigen::VectorXd &x1, 
-                           Eigen::MatrixXd &J);
-
-
-  class AbstractSimulator {
+  class AbstractSimulator 
+  {
     public:
-      AbstractSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD, EulerIntegrationType type); 
+      AbstractSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, 
+                        int whichFD, EulerIntegrationType type); 
       ~AbstractSimulator(){};
 
       /**
@@ -193,53 +153,5 @@ namespace consim {
       void forwardDynamics(Eigen::VectorXd &tau, Eigen::VectorXd &dv, const Eigen::VectorXd *q=NULL, const Eigen::VectorXd *v=NULL); 
       virtual void computeContactForces()=0;
   }; // class AbstractSimulator
-
-/*_______________________________________________________________________________*/
-
-  class EulerSimulator : public AbstractSimulator
-  {
-    public: 
-      EulerSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD, EulerIntegrationType type); 
-      ~EulerSimulator(){};
-
-    /**
-     * Explicit Euler first oder step 
-    */
-      void step(const Eigen::VectorXd &tau) override;
-
-    protected:
-      void computeContactForces() override;
-      
-      Eigen::VectorXd tau_f_; // joint torques due to external forces
-  }; // class EulerSimulator
-
-  /*_______________________________________________________________________________*/
-
-
-  class RK4Simulator : public EulerSimulator
-  {
-    public: 
-      RK4Simulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps, int whichFD);  
-      ~RK4Simulator(){};
-
-    /**
-     * Runge Kutta 4th order, only applied for integrating acceleration to velocity 
-    */
-
-      void step(const Eigen::VectorXd &tau) override;
-
-    protected:
-      int computeContactForces(const Eigen::VectorXd &q, const Eigen::VectorXd &v, std::vector<ContactPoint*> &contacts);
-
-    private: 
-      //\brief : vectors for the RK4 integration will be allocated in the constructor, depends on state dimension
-      std::vector<Eigen::VectorXd> qi_;
-      std::vector<Eigen::VectorXd> vi_;
-      std::vector<Eigen::VectorXd> dvi_;
-      std::vector<double> rk_factors_;
-
-      // std::vector<Eigen::VectorXd> dyi_;
-      std::vector<ContactPoint *> contactsCopy_;
-  }; // class RK4Simulator
 
 } // namespace consim 

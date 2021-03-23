@@ -26,7 +26,7 @@
 #include <pinocchio/algorithm/jacobian.hpp>
 #include <pinocchio/algorithm/aba-derivatives.hpp>
 
-#include "consim/exponential_simulator.hpp"
+#include "consim/simulators/exponential.hpp"
 
 #include <iostream>
 

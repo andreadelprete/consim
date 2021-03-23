@@ -90,7 +90,7 @@ HalfPlaneObject::HalfPlaneObject(const std::string & name, ContactModel& contact
     plane_offset_ = - planeNormal_.transpose()*plane_point;  // d in the plane equation above 
     
 
-  };
+  }
 
 void HalfPlaneObject::computeDistance(ContactPoint &cp){
   distance_ = planeNormal_.transpose()*cp.x;  
