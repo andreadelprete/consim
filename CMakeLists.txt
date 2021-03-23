@@ -123,6 +123,7 @@ SET(HEADERS
     include/consim/real_time_tools.hpp
     include/consim/bindings/python/common.hpp
     include/consim/bindings/python/explicit_euler.hpp
+    include/consim/bindings/python/implicit_euler.hpp
  )
 
 LIST(REMOVE_DUPLICATES HEADERS)

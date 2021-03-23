@@ -28,11 +28,11 @@
 
 #include "consim/simulators/base.hpp"
 #include "consim/simulators/rk4.hpp"
-#include "consim/simulators/implicit_euler.hpp"
 #include "consim/simulators/exponential.hpp"
 
 #include "consim/bindings/python/common.hpp"
 #include "consim/bindings/python/explicit_euler.hpp"
+#include "consim/bindings/python/implicit_euler.hpp"
 
 namespace bp = boost::python;
 
@@ -45,27 +45,6 @@ namespace bp = boost::python;
 
 namespace consim 
 {
-
-ImplicitEulerSimulator* build_implicit_euler_simulator(
-    float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data,
-    Eigen::Vector3d stifness, Eigen::Vector3d damping, double frictionCoefficient)
-{
-  LinearPenaltyContactModel *contact_model = new LinearPenaltyContactModel(
-      stifness, damping, frictionCoefficient);
-
-  ContactObject* obj = new FloorObject("Floor", *contact_model);
-
-  if(!model.check(data))
-  {
-    std::cout<<"[build_implicit_euler_simulator] Data is not consistent with specified model\n";
-    data = pinocchio::Data(model);
-  }
-  ImplicitEulerSimulator* sim = new ImplicitEulerSimulator(model, data, dt, n_integration_steps);
-  sim->addObject(*obj);
-
-  return sim;
-}
-
 
 RK4Simulator* build_rk4_simulator(
     float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data,
@@ -160,10 +139,6 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
     using namespace boost::python;
     eigenpy::enableEigenPy();
 
-    bp::def("build_implicit_euler_simulator", build_implicit_euler_simulator,
-            "A simple way to create a simulator using implicit euler integration with floor object and LinearPenaltyContactModel.",
-            bp::return_value_policy<bp::manage_new_object>());
-
     bp::def("build_rk4_simulator", build_rk4_simulator,
             "A simple way to create a simulator using Runge-Kutta 4 integration with floor object and LinearPenaltyContactModel.",
             bp::return_value_policy<bp::manage_new_object>());
@@ -239,25 +214,7 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
 
 
     export_explicit_euler();
-
-    bp::class_<ImplicitEulerSimulator, bases<AbstractSimulatorWrapper>>("ImplicitEulerSimulator",
-                          "Implicit Euler Simulator class",
-                          bp::init<pinocchio::Model &, pinocchio::Data &, float, int>())
-        .def("add_contact_point", &ImplicitEulerSimulator::addContactPoint, return_internal_reference<>())
-        .def("get_contact", &ImplicitEulerSimulator::getContact, return_internal_reference<>())
-        .def("add_object", &ImplicitEulerSimulator::addObject)
-        .def("reset_state", &ImplicitEulerSimulator::resetState)
-        .def("reset_contact_anchor", &ImplicitEulerSimulator::resetContactAnchorPoint)
-        .def("set_joint_friction", &ImplicitEulerSimulator::setJointFriction)
-        .def("set_use_finite_differences_dynamics", &ImplicitEulerSimulator::set_use_finite_differences_dynamics)
-        .def("set_use_finite_differences_nle", &ImplicitEulerSimulator::set_use_finite_differences_nle)
-        .def("set_use_current_state_as_initial_guess", &ImplicitEulerSimulator::set_use_current_state_as_initial_guess)
-        .def("set_convergence_threshold", &ImplicitEulerSimulator::set_convergence_threshold)
-        .def("get_avg_iteration_number", &ImplicitEulerSimulator::get_avg_iteration_number)
-        .def("step", &ImplicitEulerSimulator::step)
-        .def("get_q", &ImplicitEulerSimulator::get_q,bp::return_value_policy<bp::copy_const_reference>(), "configuration state vector")
-        .def("get_v", &ImplicitEulerSimulator::get_v,bp::return_value_policy<bp::copy_const_reference>(), "tangent vector to configuration")
-        .def("get_dv", &ImplicitEulerSimulator::get_dv,bp::return_value_policy<bp::copy_const_reference>(), "time derivative of tangent vector to configuration");
+    export_implicit_euler();
 
     bp::class_<RK4Simulator, bases<AbstractSimulatorWrapper>>("RK4Simulator",
                       "Runge-Kutta 4 Simulator class",
