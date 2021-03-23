@@ -26,13 +26,12 @@
 #include <pinocchio/bindings/python/multibody/data.hpp>
 #include <pinocchio/bindings/python/multibody/model.hpp>
 
-#include "consim/simulators/exponential.hpp"
-
 #include "consim/bindings/python/common.hpp"
 #include "consim/bindings/python/base.hpp"
 #include "consim/bindings/python/explicit_euler.hpp"
 #include "consim/bindings/python/implicit_euler.hpp"
 #include "consim/bindings/python/rk4.hpp"
+#include "consim/bindings/python/exponential.hpp"
 
 namespace bp = boost::python;
 
@@ -45,31 +44,6 @@ namespace bp = boost::python;
 
 namespace consim 
 {
-
-ExponentialSimulator* build_exponential_simulator(
-    float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data,
-    Eigen::Vector3d stifness, Eigen::Vector3d damping, double frictionCoefficient, int which_slipping,
-    bool compute_predicted_forces, int whichFD, bool semi_implicit,
-    int exp_max_mat_mul, int lds_max_mat_mul, bool useMatrixBalancing)
-{
-  LinearPenaltyContactModel *contact_model = new LinearPenaltyContactModel(
-      stifness, damping, frictionCoefficient);
-
-  ContactObject* obj = new FloorObject("Floor", *contact_model);
-
-  if(!model.check(data))
-  {
-    std::cout<<"[build_exponential_simulator] Data is not consistent with specified model\n";
-    data = pinocchio::Data(model);
-  }
-  EulerIntegrationType type = semi_implicit ? EulerIntegrationType::SEMI_IMPLICIT : EulerIntegrationType::EXPLICIT;
-  ExponentialSimulator* sim = new ExponentialSimulator(model, data, dt, n_integration_steps, whichFD, type, which_slipping, 
-                                  compute_predicted_forces, exp_max_mat_mul, lds_max_mat_mul);
-  sim->useMatrixBalancing(useMatrixBalancing);
-  sim->addObject(*obj);
-
-  return sim;
-}
 
 ContactObject* create_half_plane(Eigen::Vector3d stifness, Eigen::Vector3d damping, 
 double frictionCoefficient, double alpha)
@@ -118,10 +92,6 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
 {
     using namespace boost::python;
     eigenpy::enableEigenPy();
-
-    bp::def("build_exponential_simulator", build_exponential_simulator,
-            "A simple way to create a simulator using exponential integration with floor object and LinearPenaltyContactModel.",
-            bp::return_value_policy<bp::manage_new_object>());
 
     bp::def("create_half_plane", create_half_plane,
             "A simple way to add a half plane with LinearPenaltyContactModel.",
@@ -174,41 +144,11 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
         .ADD_PROPERTY_RETURN_BY_VALUE("predicted_v", &ContactPoint::predictedV_)
         .ADD_PROPERTY_RETURN_BY_VALUE("predicted_x0", &ContactPoint::predictedX0_);
     
-
-    // bp::class_<AbstractSimulatorWrapper, boost::noncopyable>("AbstractSimulator", "Abstract Simulator Class", 
-    //                      bp::init<pinocchio::Model &, pinocchio::Data &, float, int, int, EulerIntegrationType>())
-    //     .def("add_contact_point", &AbstractSimulatorWrapper::addContactPoint, return_internal_reference<>())
-    //     .def("get_contact", &AbstractSimulatorWrapper::getContact, return_internal_reference<>())
-    //     .def("add_object", &AbstractSimulatorWrapper::addObject)
-    //     .def("reset_state", &AbstractSimulatorWrapper::resetState)
-    //     .def("reset_contact_anchor", &AbstractSimulatorWrapper::resetContactAnchorPoint)
-    //     .def("set_joint_friction", &AbstractSimulatorWrapper::setJointFriction)
-    //     .def("step", bp::pure_virtual(&AbstractSimulatorWrapper::step))
-    //     .def("get_q", &AbstractSimulatorWrapper::get_q,bp::return_value_policy<bp::copy_const_reference>(), "configuration state vector")
-    //     .def("get_v", &AbstractSimulatorWrapper::get_v,bp::return_value_policy<bp::copy_const_reference>(), "tangent vector to configuration")
-    //     .def("get_dv", &AbstractSimulatorWrapper::get_dv,bp::return_value_policy<bp::copy_const_reference>(), "time derivative of tangent vector to configuration");
-
     export_base();
     export_explicit_euler();
     export_implicit_euler();
     export_rk4();
-
-    bp::class_<ExponentialSimulator, bases<AbstractSimulatorWrapper>>("ExponentialSimulator",
-                          "Exponential Simulator class",
-                          bp::init<pinocchio::Model &, pinocchio::Data &, float, int, int, EulerIntegrationType, int, bool, int, int>())
-        .def("add_contact_point", &ExponentialSimulator::addContactPoint, return_internal_reference<>())
-        .def("get_contact", &ExponentialSimulator::getContact, return_internal_reference<>())
-        .def("add_object", &ExponentialSimulator::addObject)
-        .def("reset_state", &ExponentialSimulator::resetState)
-        .def("reset_contact_anchor", &ExponentialSimulator::resetContactAnchorPoint)
-        .def("set_joint_friction", &ExponentialSimulator::setJointFriction)
-        .def("step", &ExponentialSimulator::step)
-        .def("get_q", &ExponentialSimulator::get_q,bp::return_value_policy<bp::copy_const_reference>(), "configuration state vector")
-        .def("get_v", &ExponentialSimulator::get_v,bp::return_value_policy<bp::copy_const_reference>(), "tangent vector to configuration")
-        .def("get_dv", &ExponentialSimulator::get_dv,bp::return_value_policy<bp::copy_const_reference>(), "time derivative of tangent vector to configuration")
-        .def("getMatrixMultiplications", &ExponentialSimulator::getMatrixMultiplications)
-        .def("getMatrixExpL1Norm", &ExponentialSimulator::getMatrixExpL1Norm)
-        .def("assumeSlippageContinues", &ExponentialSimulator::assumeSlippageContinues);
+    export_exponential();
 
     bp::class_<ContactObjectWrapper, boost::noncopyable>("ContactObject", "Abstract Contact Object Class", 
                          bp::init<const std::string & , ContactModel& >());

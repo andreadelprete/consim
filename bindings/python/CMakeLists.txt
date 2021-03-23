@@ -43,6 +43,7 @@ FILE(GLOB ${PYWRAP}_SOURCES
     implicit_euler.cpp
     rk4.cpp
     base.cpp
+    exponential.cpp
     bindings.cpp
 )
 
