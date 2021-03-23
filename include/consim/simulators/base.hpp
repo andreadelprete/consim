@@ -31,15 +31,6 @@
 #include "utils/stop-watch.h"
 #include "consim/simulators/common.hpp"
 
-#define CONSIM_PROFILER
-#ifndef CONSIM_PROFILER
-#define CONSIM_START_PROFILER(name)
-#define CONSIM_STOP_PROFILER(name)
-#else
-#define CONSIM_START_PROFILER(name) getProfiler().start(name)
-#define CONSIM_STOP_PROFILER(name) getProfiler().stop(name)
-#endif
-
 
 namespace consim 
 {

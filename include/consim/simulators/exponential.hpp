@@ -33,7 +33,8 @@
 #include "eiquadprog/eiquadprog-fast.hpp"
 #include "consim/simulators/base.hpp"
 
-namespace consim {
+namespace consim 
+{
 
   class ExponentialSimulator : public AbstractSimulator
   {

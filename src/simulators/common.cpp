@@ -34,10 +34,8 @@
 
 using namespace Eigen;
 
-// TODO: sqr already defined in contact.cpp 
-#define sqr(x) (x * x)
-
-namespace consim {
+namespace consim 
+{
 
 int detectContacts_imp(pinocchio::Data &data, std::vector<ContactPoint *> &contacts, std::vector<ContactObject*> &objects)
 {

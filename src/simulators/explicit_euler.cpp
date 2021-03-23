@@ -34,9 +34,6 @@
 
 using namespace Eigen;
 
-// TODO: sqr already defined in contact.cpp 
-#define sqr(x) (x * x)
-
 namespace consim 
 {
 
