@@ -1,4 +1,20 @@
 
+//
+//  Copyright (c) 2020-2021 UNITN, NYU
+//
+//  This file is part of consim
+//  consim is free software: you can redistribute it
+//  and/or modify it under the terms of the GNU Lesser General Public
+//  License as published by the Free Software Foundation, either version
+//  3 of the License, or (at your option) any later version.
+//  consim is distributed in the hope that it will be
+//  useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+//  of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+//  General Lesser Public License for more details. You should have
+//  received a copy of the GNU Lesser General Public License along with
+//  consim If not, see
+//  <http://www.gnu.org/licenses/>.
+
 #include <pinocchio/algorithm/aba.hpp>
 #include <pinocchio/algorithm/joint-configuration.hpp> // se3.integrate
 #include <pinocchio/algorithm/frames.hpp>
@@ -13,7 +29,6 @@
 #include "consim/object.hpp"
 #include "consim/contact.hpp"
 #include "consim/implicit_euler.hpp"
-// #include "consim/utils/stop-watch.hpp"
 
 #include <iostream>
 
