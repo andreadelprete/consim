@@ -45,6 +45,7 @@ FILE(GLOB ${PYWRAP}_SOURCES
     base.cpp
     exponential.cpp
     bindings.cpp
+    contacts.cpp
 )
 
 # --- PYTHON TARGET --- #

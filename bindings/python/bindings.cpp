@@ -32,15 +32,7 @@
 #include "consim/bindings/python/implicit_euler.hpp"
 #include "consim/bindings/python/rk4.hpp"
 #include "consim/bindings/python/exponential.hpp"
-
-namespace bp = boost::python;
-
-#define ADD_PROPERTY_RETURN_BY_VALUE(name, ref) add_property(name, \
-    make_getter(ref, bp::return_value_policy<bp::return_by_value>()), \
-    make_setter(ref, bp::return_value_policy<bp::return_by_value>()))
-
-#define ADD_PROPERTY_READONLY_RETURN_BY_VALUE(name, ref) add_property(name, \
-    make_getter(ref, bp::return_value_policy<bp::return_by_value>()))
+#include "consim/bindings/python/contacts.hpp"
 
 namespace consim 
 {
@@ -116,34 +108,7 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
     bp::def("stop_watch_reset_all", stop_watch_reset_all,
             "Reset the shared stop-watch.");
 
-    bp::class_<ContactPoint>("Contact",
-                             "Contact Point",
-                          bp::init<pinocchio::Model &, const std::string &, unsigned int, unsigned int, bool >())
-        .def("updatePosition", &ContactPoint::updatePosition, return_internal_reference<>())
-        .def("firstOrderContactKinematics", &ContactPoint::firstOrderContactKinematics, return_internal_reference<>())
-        .def("secondOrderContactKinematics", &ContactPoint::secondOrderContactKinematics, return_internal_reference<>())
-        .def("resetAnchorPoint", &ContactPoint::resetAnchorPoint, return_internal_reference<>())
-        .ADD_PROPERTY_RETURN_BY_VALUE("frame_id", &ContactPoint::frame_id)
-        .ADD_PROPERTY_RETURN_BY_VALUE("name", &ContactPoint::name_)
-        .ADD_PROPERTY_RETURN_BY_VALUE("active", &ContactPoint::active)
-        .ADD_PROPERTY_RETURN_BY_VALUE("slipping", &ContactPoint::slipping)
-        .ADD_PROPERTY_RETURN_BY_VALUE("x", &ContactPoint::x)
-        .ADD_PROPERTY_RETURN_BY_VALUE("v", &ContactPoint::v)
-        .ADD_PROPERTY_RETURN_BY_VALUE("x_anchor", &ContactPoint::x_anchor)
-        .ADD_PROPERTY_RETURN_BY_VALUE("normal", &ContactPoint::normal)
-        .ADD_PROPERTY_RETURN_BY_VALUE("normvel", &ContactPoint::normvel)
-        .ADD_PROPERTY_RETURN_BY_VALUE("tangent", &ContactPoint::tangent)
-        .ADD_PROPERTY_RETURN_BY_VALUE("tanvel", &ContactPoint::tanvel)
-        .ADD_PROPERTY_RETURN_BY_VALUE("f", &ContactPoint::f)
-        .ADD_PROPERTY_RETURN_BY_VALUE("f_avg", &ContactPoint::f_avg)
-        .ADD_PROPERTY_RETURN_BY_VALUE("f_avg2", &ContactPoint::f_avg2)
-        .ADD_PROPERTY_RETURN_BY_VALUE("f_prj", &ContactPoint::f_prj)
-        .ADD_PROPERTY_RETURN_BY_VALUE("f_prj2", &ContactPoint::f_prj2)
-        .ADD_PROPERTY_RETURN_BY_VALUE("predicted_f", &ContactPoint::predictedF_)
-        .ADD_PROPERTY_RETURN_BY_VALUE("predicted_x", &ContactPoint::predictedX_)
-        .ADD_PROPERTY_RETURN_BY_VALUE("predicted_v", &ContactPoint::predictedV_)
-        .ADD_PROPERTY_RETURN_BY_VALUE("predicted_x0", &ContactPoint::predictedX0_);
-    
+    export_contacts();
     export_base();
     export_explicit_euler();
     export_implicit_euler();

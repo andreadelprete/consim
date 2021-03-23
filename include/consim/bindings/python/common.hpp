@@ -30,6 +30,14 @@
 
 #include "consim/simulators/base.hpp"
 
+namespace bp = boost::python;
+
+#define ADD_PROPERTY_RETURN_BY_VALUE(name, ref) add_property(name, \
+    make_getter(ref, bp::return_value_policy<bp::return_by_value>()), \
+    make_setter(ref, bp::return_value_policy<bp::return_by_value>()))
+
+#define ADD_PROPERTY_READONLY_RETURN_BY_VALUE(name, ref) add_property(name, \
+    make_getter(ref, bp::return_value_policy<bp::return_by_value>()))
 
 namespace consim 
 {

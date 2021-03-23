@@ -116,6 +116,7 @@ FILE(GLOB ${PYWRAP}_HEADERS
     include/consim/bindings/python/implicit_euler.hpp
     include/consim/bindings/python/exponential.hpp
     include/consim/bindings/python/rk4.hpp
+    include/consim/bindings/python/contacts.hpp
 )
 
 SET(HEADERS
