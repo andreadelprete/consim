@@ -104,7 +104,9 @@ int ImplicitEulerSimulator::computeDynamics(const Eigen::VectorXd &tau, const Ei
   int nactive = computeContactForces_imp(*model_, *data_, x.head(nq), x.tail(nv), tau_f_, contactsCopy_, objects_);
   // cout<<"tau_f: "<<tau_f_.transpose()<<endl;
   tau_plus_JT_f_ = tau + tau_f_;
+  CONSIM_START_PROFILER("imp_euler_simulator::ABA");
   pinocchio::aba(*model_, *data_, x.head(nq), x.tail(nv), tau_plus_JT_f_);
+  CONSIM_STOP_PROFILER("imp_euler_simulator::ABA");
   f.head(nv) = x.tail(nv);
   f.tail(nv) = data_-> ddq;
   
@@ -285,8 +287,10 @@ void ImplicitEulerSimulator::step(const Eigen::VectorXd &tau)
         // cout<<"Ddifference_Dx0_ = \n"<<Ddifference_Dx0_<<endl;
         DdifferenceState_x1(*model_, xIntegrated_, z_, Ddifference_Dx1_);
         // cout<<"Ddifference_Dx1_ = \n"<<Ddifference_Dx1_<<endl;
+        CONSIM_START_PROFILER("imp_euler_simulator::computeNewtonSystem-matmatmult");
         Dintegrate_Ddx_Fx_.noalias() = Dintegrate_Ddx_ * Fx_;
         Ddifference_Dx0_Dintegrate_Ddx_Fx_.noalias() = Ddifference_Dx0_ * Dintegrate_Ddx_Fx_;
+        CONSIM_STOP_PROFILER("imp_euler_simulator::computeNewtonSystem-matmatmult");
         G_.noalias() = sub_dt * Ddifference_Dx0_Dintegrate_Ddx_Fx_;
         G_ += Ddifference_Dx1_;
         // G_.setIdentity();
