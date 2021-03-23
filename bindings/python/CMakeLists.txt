@@ -1,17 +1,17 @@
 #
-# Copyright (c) 2017-2018 CNRS
+# Copyright (c) 2020-2021 UNITN, NYU
 #
-# This file is part of tsid
-# tsid is free software: you can redistribute it
+# This file is part of consim
+# consim is free software: you can redistribute it
 # and/or modify it under the terms of the GNU Lesser General Public
 # License as published by the Free Software Foundation, either version
 # 3 of the License, or (at your option) any later version.
-# tsid is distributed in the hope that it will be
+# consim is distributed in the hope that it will be
 # useful, but WITHOUT ANY WARRANTY; without even the implied warranty
 # of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
 # General Lesser Public License for more details. You should have
 # received a copy of the GNU Lesser General Public License along with
-# tsid If not, see
+# consim If not, see
 # <http://www.gnu.org/licenses/>.
 
 # --- MACROS --- #
@@ -59,16 +59,10 @@ SET(${PYWRAP}_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/${PYTHON_SITELIB}/${PROJECT_NA
 
 FILE(GLOB_RECURSE ${PROJECT_NAME}_PYTHON_HEADERS
      ${CMAKE_CURRENT_SOURCE_DIR}/*.hpp
-     #${CMAKE_CURRENT_SOURCE_DIR}/robots/*.hpp
-     #${CMAKE_CURRENT_SOURCE_DIR}/solvers/*.hpp
-     #${CMAKE_CURRENT_SOURCE_DIR}/utils/*.hpp
      ) 
 
 FILE(GLOB_RECURSE ${PROJECT_NAME}_PYTHON_SOURCES
      ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp 
-     #${CMAKE_CURRENT_SOURCE_DIR}/robots/*.cpp
-     #${CMAKE_CURRENT_SOURCE_DIR}/solvers/*.cpp
-     #${CMAKE_CURRENT_SOURCE_DIR}/utils/*.cpp
      ) 
 
 REMOVE_PATH_FROM_LIST("${${PROJECT_NAME}_PYTHON_HEADERS}" "${CMAKE_CURRENT_SOURCE_DIR}/" ${PROJECT_NAME}_PYTHON_HEADERS)
@@ -78,9 +72,6 @@ LIST(APPEND HEADERS ${${PROJECT_NAME}_PYTHON_HEADERS})
 
 # Headers of the python binding
 MAKE_DIRECTORY("${${PROJECT_NAME}_BINARY_DIR}/include/consim/bindings/python")
-#MAKE_DIRECTORY("${${PROJECT_NAME}_BINARY_DIR}/include/tsid/bindings/python/robots")
-#MAKE_DIRECTORY("${${PROJECT_NAME}_BINARY_DIR}/include/tsid/bindings/python/solvers")
-#MAKE_DIRECTORY("${${PROJECT_NAME}_BINARY_DIR}/include/tsid/bindings/python/utils")
 
 SYMLINK_AND_INSTALL_HEADERS("${${PROJECT_NAME}_PYTHON_HEADERS}" "bindings/python")
 

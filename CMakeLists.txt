@@ -1,17 +1,17 @@
 #
-# Copyright (c) 2017-2018 CNRS
+# Copyright (c) 2020-2021 UNITN, NYU
 #
-# This file is part of tsid
-# tsid is free software: you can redistribute it
+# This file is part of consim
+# consim is free software: you can redistribute it
 # and/or modify it under the terms of the GNU Lesser General Public
 # License as published by the Free Software Foundation, either version
 # 3 of the License, or (at your option) any later version.
-# tsid is distributed in the hope that it will be
+# consim is distributed in the hope that it will be
 # useful, but WITHOUT ANY WARRANTY; without even the implied warranty
 # of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
 # General Lesser Public License for more details. You should have
 # received a copy of the GNU Lesser General Public License along with
-# tsid If not, see
+# consim If not, see
 # <http://www.gnu.org/licenses/>.
 
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
@@ -109,49 +109,15 @@ INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS})
 # --- INCLUDE ----------------------------------------
 # ----------------------------------------------------
 
-SET(${PROJECT_NAME}_MATH_HEADERS
-    include/tsid/math/fwd.hpp
-    include/tsid/math/utils.hpp
-  )
-
-SET(${PROJECT_NAME}_SOLVERS_HEADERS
-    include/tsid/solvers/eiquadprog_2011.hpp
-    include/tsid/solvers/eiquadprog-rt.hpp
-    include/tsid/solvers/eiquadprog-rt.hxx
-    include/tsid/solvers/eiquadprog-fast.hpp
-    include/tsid/solvers/fwd.hpp
-    include/tsid/solvers/utils.hpp
-    include/tsid/solvers/solver-HQP-output.hpp
-    include/tsid/solvers/solver-HQP-base.hpp
-    include/tsid/solvers/solver-HQP-factory.hpp
-    include/tsid/solvers/solver-HQP-factory.hxx
-    include/tsid/solvers/solver-HQP-qpoases.hpp
-    include/tsid/solvers/solver-HQP-eiquadprog.hpp
-    include/tsid/solvers/solver-HQP-eiquadprog-rt.hpp
-    include/tsid/solvers/solver-HQP-eiquadprog-rt.hxx
-    include/tsid/solvers/solver-HQP-eiquadprog-fast.hpp
-  )
-
-SET(${PROJECT_NAME}_ROBOTS_HEADERS
-    include/tsid/robots/fwd.hpp
-    include/tsid/robots/robot-wrapper.hpp
-  )
-
 SET(HEADERS
     include/consim/contact.hpp
     include/consim/object.hpp
     include/consim/simulator.hpp
     include/consim/implicit_euler.hpp
     include/consim/exponential_simulator.hpp
-#    include/tsid/config.hpp
-#    include/tsid/deprecation.hpp
-#    include/consim/utils/statistics.hpp
     include/consim/utils/stop-watch.hpp
     include/consim/utils/Stdafx.hh
     include/consim/real_time_tools.hpp
-#    ${${PROJECT_NAME}_MATH_HEADERS}
-#    ${${PROJECT_NAME}_SOLVERS_HEADERS}
-#    ${${PROJECT_NAME}_ROBOTS_HEADERS}
  )
 
 LIST(REMOVE_DUPLICATES HEADERS)
