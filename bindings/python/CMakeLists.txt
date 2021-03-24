@@ -46,6 +46,7 @@ FILE(GLOB ${PYWRAP}_SOURCES
     exponential.cpp
     bindings.cpp
     contacts.cpp
+    stop_watch.cpp
 )
 
 # --- PYTHON TARGET --- #

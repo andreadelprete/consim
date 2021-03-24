@@ -15,8 +15,9 @@
 //  <http://www.gnu.org/licenses/>.
 
 
-#ifndef __invdyn_statistics_H__
-#define __invdyn_statistics_H__
+#pragma once
+// #ifndef __invdyn_statistics_H__
+// #define __invdyn_statistics_H__
 
 #include <iostream>
 #include <map>
@@ -155,4 +156,4 @@ protected:
 
 Statistics& getStatistics();
 
-#endif
+// #endif

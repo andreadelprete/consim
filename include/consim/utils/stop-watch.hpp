@@ -24,9 +24,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 */
 
-
-#ifndef __invdyn_stopwatch_H__
-#define __invdyn_stopwatch_H__
+#pragma once
+// #ifndef __invdyn_stopwatch_H__
+// #define __invdyn_stopwatch_H__
 
 #include "consim/utils/Stdafx.hh"
 
@@ -273,4 +273,4 @@ Stopwatch& getProfiler();
 #pragma GCC visibility pop
 #endif
 
-#endif
+// #endif

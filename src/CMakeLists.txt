@@ -26,7 +26,7 @@ SET(${LIBRARY_NAME}_SOURCES
     simulators/rk4.cpp
     simulators/implicit_euler.cpp
     simulators/exponential.cpp
-    utils/stop-watch.cpp
+    # utils/stop-watch.cpp
   )
 
 ADD_LIBRARY(${LIBRARY_NAME} SHARED ${HEADERS_FULL_PATH} ${${LIBRARY_NAME}_SOURCES})

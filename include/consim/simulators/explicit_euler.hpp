@@ -28,7 +28,6 @@
 #include "consim/contact.hpp"
 #include "eiquadprog/eiquadprog-fast.hpp"
 
-#include "utils/stop-watch.h"
 #include "consim/simulators/common.hpp"
 #include "consim/simulators/base.hpp"
 

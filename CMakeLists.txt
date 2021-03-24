@@ -117,6 +117,7 @@ FILE(GLOB ${PYWRAP}_HEADERS
     include/consim/bindings/python/exponential.hpp
     include/consim/bindings/python/rk4.hpp
     include/consim/bindings/python/contacts.hpp
+    include/consim/bindings/python/stop_watch.hpp
 )
 
 SET(HEADERS
@@ -128,8 +129,8 @@ SET(HEADERS
     include/consim/simulators/rk4.hpp
     include/consim/simulators/implicit_euler.hpp
     include/consim/simulators/exponential.hpp
-    include/consim/utils/stop-watch.hpp
-    include/consim/utils/Stdafx.hh
+    # include/consim/utils/stop-watch.hpp
+    # include/consim/utils/Stdafx.hh
     include/consim/real_time_tools.hpp
  )
 
