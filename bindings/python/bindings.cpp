@@ -37,17 +37,6 @@
 namespace consim 
 {
 
-ContactObject* create_half_plane(Eigen::Vector3d stifness, Eigen::Vector3d damping, 
-double frictionCoefficient, double alpha)
-{
-  LinearPenaltyContactModel *contact_model = new LinearPenaltyContactModel(
-      stifness, damping, frictionCoefficient);
-
-  ContactObject* obj = new HalfPlaneObject("HalfPlane", *contact_model, alpha);
-
-  return obj; 
-}
-
 void stop_watch_report(int precision)
 {
   getProfiler().report_all(precision);
@@ -83,12 +72,7 @@ void stop_watch_reset_all()
 BOOST_PYTHON_MODULE(libconsim_pywrap)
 {
     using namespace boost::python;
-    eigenpy::enableEigenPy();
-
-    bp::def("create_half_plane", create_half_plane,
-            "A simple way to add a half plane with LinearPenaltyContactModel.",
-            bp::return_value_policy<bp::manage_new_object>());
-      
+    eigenpy::enableEigenPy();      
 
     bp::def("stop_watch_report", stop_watch_report,
             "Report all the times measured by the shared stop-watch.");
@@ -114,9 +98,6 @@ BOOST_PYTHON_MODULE(libconsim_pywrap)
     export_implicit_euler();
     export_rk4();
     export_exponential();
-
-    bp::class_<ContactObjectWrapper, boost::noncopyable>("ContactObject", "Abstract Contact Object Class", 
-                         bp::init<const std::string & , ContactModel& >());
 }
 
 }

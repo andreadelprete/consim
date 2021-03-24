@@ -28,8 +28,13 @@
 #include <pinocchio/bindings/python/multibody/data.hpp>
 #include <pinocchio/bindings/python/multibody/model.hpp>
 
+#include "consim/contact.hpp"
+
 namespace consim 
 {
+
+ContactObject* create_half_plane(Eigen::Vector3d stifness, Eigen::Vector3d damping, 
+double frictionCoefficient, double alpha);
 
 void export_contacts();
 

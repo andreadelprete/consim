@@ -36,8 +36,23 @@ using namespace boost::python;
 namespace consim 
 {
 
+ContactObject* create_half_plane(Eigen::Vector3d stifness, Eigen::Vector3d damping, 
+double frictionCoefficient, double alpha)
+{
+  LinearPenaltyContactModel *contact_model = new LinearPenaltyContactModel(
+      stifness, damping, frictionCoefficient);
+
+  ContactObject* obj = new HalfPlaneObject("HalfPlane", *contact_model, alpha);
+
+  return obj; 
+}
+
 void export_contacts()
 {
+  bp::def("create_half_plane", create_half_plane,
+            "A simple way to add a half plane with LinearPenaltyContactModel.",
+            bp::return_value_policy<bp::manage_new_object>());
+
   bp::class_<ContactPoint>("Contact",
                              "Contact Point",
                           bp::init<pinocchio::Model &, const std::string &, unsigned int, unsigned int, bool >())
@@ -65,6 +80,9 @@ void export_contacts()
         .ADD_PROPERTY_RETURN_BY_VALUE("predicted_x", &ContactPoint::predictedX_)
         .ADD_PROPERTY_RETURN_BY_VALUE("predicted_v", &ContactPoint::predictedV_)
         .ADD_PROPERTY_RETURN_BY_VALUE("predicted_x0", &ContactPoint::predictedX0_);
+
+  bp::class_<ContactObjectWrapper, boost::noncopyable>("ContactObject", "Abstract Contact Object Class", 
+                         bp::init<const std::string & , ContactModel& >());
 }
 
 }
