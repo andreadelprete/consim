@@ -171,7 +171,7 @@ class ConsimVisual(object):
                 if forceMagnitude > 25.:
                     forceMagnitude = 25.
                 forceName = self.forceGroup + "/" + name
-                self.gui.setVector3Property(forceName, "Scale", [1. * forceMagnitude, 1., 1.])
+                self.gui.setVector3Property(forceName, "Scale", [1. * forceMagnitude, 1.5, 1.5])
                 self.gui.applyConfiguration(forceName, pin.SE3ToXYZQUATtuple(forcePose))
                 self.gui.setVisibility(forceName, "ALWAYS_ON_TOP")
                 # friction cone 
