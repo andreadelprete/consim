@@ -44,6 +44,7 @@ FILE(GLOB ${PYWRAP}_SOURCES
     rk4.cpp
     base.cpp
     exponential.cpp
+    rigid_euler.cpp
     bindings.cpp
     contacts.cpp
     stop_watch.cpp

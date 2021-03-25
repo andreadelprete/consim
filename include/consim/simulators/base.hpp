@@ -118,7 +118,7 @@ namespace consim
       Eigen::VectorXd vMean_;
       Eigen::VectorXd tau_;
       unsigned int nc_=0;
-      int nactive_; 
+      int nactive_;         // number of active contact points
       int newActive_;
       double elapsedTime_;  
       bool resetflag_ = false;

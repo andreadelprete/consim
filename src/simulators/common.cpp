@@ -78,9 +78,9 @@ int detectContacts_imp(pinocchio::Data &data, std::vector<ContactPoint *> &conta
           cp->active = true;
           newActive += 1; 
           cp->optr = optr;
-          if(!cp->unilateral){
-            std::cout<<"Bilateral contact with object "<<optr->getName()<<" at point "<<cp->x.transpose()<<std::endl;
-          }
+          // if(!cp->unilateral){
+          //   std::cout<<"Bilateral contact with object "<<optr->getName()<<" at point "<<cp->x.transpose()<<std::endl;
+          // }
           break;
         }
       }

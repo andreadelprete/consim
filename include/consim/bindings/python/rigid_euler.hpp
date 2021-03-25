@@ -14,6 +14,8 @@
 //  consim If not, see
 //  <http://www.gnu.org/licenses/>.
 
+#pragma once
+
 // IMPORTANT!!!!! DO NOT CHANGE THE ORDER OF THE INCLUDES HERE (COPIED FROM TSID) 
 #include <pinocchio/fwd.hpp>
 #include <boost/python.hpp>
@@ -26,32 +28,15 @@
 #include <pinocchio/bindings/python/multibody/data.hpp>
 #include <pinocchio/bindings/python/multibody/model.hpp>
 
-#include "consim/bindings/python/common.hpp"
-#include "consim/bindings/python/base.hpp"
-#include "consim/bindings/python/explicit_euler.hpp"
-#include "consim/bindings/python/implicit_euler.hpp"
-#include "consim/bindings/python/rk4.hpp"
-#include "consim/bindings/python/exponential.hpp"
-#include "consim/bindings/python/rigid_euler.hpp"
-#include "consim/bindings/python/contacts.hpp"
-#include "consim/bindings/python/stop_watch.hpp"
+#include "consim/simulators/rigid_euler.hpp"
 
 namespace consim 
 {
 
-BOOST_PYTHON_MODULE(libconsim_pywrap)
-{
-    using namespace boost::python;
-    eigenpy::enableEigenPy();      
+RigidEulerSimulator* build_rigid_euler_simulator(
+    float dt, int n_integration_steps, const pinocchio::Model& model, pinocchio::Data& data,
+    Eigen::Vector3d stifness, Eigen::Vector3d damping, double frictionCoefficient);
 
-    export_stop_watch();
-    export_contacts();
-    export_base();
-    export_explicit_euler();
-    export_implicit_euler();
-    export_rk4();
-    export_exponential();
-    export_rigid_euler();
-}
+void export_rigid_euler();
 
 }

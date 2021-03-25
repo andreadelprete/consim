@@ -189,7 +189,7 @@ void ExponentialSimulator::computeExpLDS(){
 
 
 
-  void ExponentialSimulator::computeContactForces()
+void ExponentialSimulator::computeContactForces()
 {
   /**
    * computes the kinematics at the end of the integration step, 
