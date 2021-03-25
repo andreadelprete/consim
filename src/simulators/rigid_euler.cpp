@@ -53,8 +53,8 @@ kd_(0.0)
   int nf=0;
   int nkkt = nv+3*nf;
 
-  x_.resize(nx);x_.setZero();
-  f_.resize(ndx);f_.setZero();
+  // x_.resize(nx);x_.setZero();
+  // f_.resize(ndx);f_.setZero();
   tau_f_.resize(nv); tau_f_.setZero();
   tau_plus_JT_f_.resize(nv); tau_plus_JT_f_.setZero();
 
@@ -98,7 +98,7 @@ void RigidEulerSimulator::computeContactForces()
   CONSIM_STOP_PROFILER("rigid_euler_simulator::contactDetection");
 
   if (nactive_>0){
-    if (f_.size()!=3*nactive_){
+    if (lambda_.size()!=3*nactive_){
       CONSIM_START_PROFILER("rigid_euler_simulator::resizeVectorsAndMatrices");
       // resizeVectorsAndMatrices();
       // nactive_ = newActive_;
@@ -135,48 +135,6 @@ void RigidEulerSimulator::computeContactForces()
   }
 } // RigidEulerSimulator::computeContactForces
 
-int RigidEulerSimulator::computeDynamics(const Eigen::VectorXd &tau, const Eigen::VectorXd &x, Eigen::VectorXd &f)
-{
-  const int nq = model_->nq, nv = model_->nv;
-  // newActive_ = computeContactForces_imp(*model_, *data_, x.head(nq), x.tail(nv), tau_f_, contacts_, objects_);
-  
-  // compute contact Jacobian and contact forces
-  if (nactive_>0){
-    CONSIM_START_PROFILER("rigid_euler_simulator::update_J_K_B_f");
-    // if(newActive_ != nactive_){
-    //   nactive_ = newActive_;
-    //   int nkkt = nv + 3*nactive_;
-
-    //   KKT_mat_.resize(nkkt, nkkt); KKT_mat_.setZero();
-    //   KKT_vec_.resize(nkkt); KKT_vec_.setZero();
-    //   KKT_LU_ = PartialPivLU<MatrixXd>(nkkt);
-
-    //   lambda_.resize(3 * nactive_); lambda_.setZero();
-    //   K_.resize(3 * nactive_); K_.setZero();
-    //   B_.resize(3 * nactive_); B_.setZero();
-    //   dJv_.resize(3 * nactive_); dJv_.setZero();
-    //   Jc_.resize(3 * nactive_, model_->nv); Jc_.setZero();
-    //   MinvJcT_.resize(model_->nv, 3*nactive_); MinvJcT_.setZero();
-    // }
-    
-    int i_active_ = 0; 
-    for(unsigned int i=0; i<nc_; i++){
-      ContactPoint *cp = contacts_[i];
-      if (!cp->active) continue;
-      Jc_.block(3*i_active_,0,3,model_->nv) = cp->world_J_;
-      dJv_.segment<3>(3*i_active_) = cp->dJv_; 
-      i_active_ += 1; 
-    }
-
-    // data_->Minv.triangularView<Eigen::StrictlyLower>()
-    // = data_->Minv.transpose().triangularView<Eigen::StrictlyLower>(); // need to fill the Lower part of the matrix
-    // MinvJcT_.noalias() = data_->Minv * Jc_.transpose(); 
-    
-    CONSIM_STOP_PROFILER("rigid_euler_simulator::update_J_K_B_f");
-  }
-  
-  return nactive_;
-}
 
 void RigidEulerSimulator::step(const Eigen::VectorXd &tau) 
 {
@@ -196,8 +154,9 @@ void RigidEulerSimulator::step(const Eigen::VectorXd &tau)
     }
     
     /*!< integrate twice with explicit Euler */ 
-    // forwardDynamics(tau_, dv_);
-    pinocchio::forwardDynamics(*model_, *data_, q_, v_, tau, Jc_, dJv_, regularization_);
+    pinocchio::crba(*model_, *data_, q_);
+    pinocchio::nonLinearEffects(*model_, *data_, q_, v_);
+    pinocchio::forwardDynamics(*model_, *data_, tau, Jc_, dJv_, regularization_);
     // cout<<"\ni="<<i<<endl;
     // cout<<"tau="<<tau.transpose()<<endl;
     // cout<<"dJv="<<dJv_.transpose()<<endl;
@@ -208,15 +167,6 @@ void RigidEulerSimulator::step(const Eigen::VectorXd &tau)
     pinocchio::integrate(*model_, q_, v_ * sub_dt, qnext_);
     q_ = qnext_;
     v_ += sub_dt*dv_;
-
-    // tau_ = tau;    
-    // bool converged = false;
-    // int j=0;
-    // for(; j<30; ++j)
-    // {
-    //   converged = true;
-    // }
-    // avg_iteration_number_ += j;
     
     computeContactForces();
     // Eigen::internal::set_is_malloc_allowed(true);

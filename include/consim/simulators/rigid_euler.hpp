@@ -44,12 +44,8 @@ namespace consim
       void set_contact_stabilization_gains(double kp, double kd);
 
     protected:      
-      int computeDynamics(const Eigen::VectorXd &tau, const Eigen::VectorXd &x, Eigen::VectorXd &f);
       void computeContactForces();
-      
-      Eigen::VectorXd f_;       // evaluation of dynamics function
-      Eigen::VectorXd x_;   // current and next state (including q and v)
-      
+            
       Eigen::MatrixXd KKT_mat_;
       Eigen::VectorXd KKT_vec_;      // Newton step expressed in tangent space
 
