@@ -24,45 +24,37 @@ from consim_py.ral2020.tsid_biped import TsidBiped
 def ndprint(a, format_string ='{0:.2f}'):
     print([format_string.format(v,i) for i,v in enumerate(a)])
     
-comp_times_exp    = ['exponential_simulator::step',
-                     'exponential_simulator::substep',
-                     'exponential_simulator::computeExpLDS',
-                     'exponential_simulator::computeIntegralsXt',
-                     'exponential_simulator::kinematics',
-                     'exponential_simulator::forwardDynamics',
-                     'exponential_simulator::resizeVectorsAndMatrices']
-comp_times_euler = ['euler_simulator::step',
-                    'euler_simulator::substep']
-comp_times_rigid_euler = ['rigid_euler_simulator::step',
-                          'rigid_euler_simulator::substep']
-comp_times_implicit_euler = ['imp_euler_simulator::step',
-                             'imp_euler_simulator::substep',
-                             'imp_euler_simulator::computeDynamicsJacobian',
-                             'imp_euler_simulator::Minv_JT_K_J',
-                             'imp_euler_simulator::computeNonlinearEquations',
-                             'imp_euler_simulator::computeNewtonSystem',
-                             'imp_euler_simulator::solveNewtonSystem',
-                             'imp_euler_simulator::lineSearch',
-                             'imp_euler_simulator::computeABADerivatives',
-                             'imp_euler_simulator::copyContacts']
-comp_times_rk4   = ['rk4_simulator::step',
-                    'rk4_simulator::substep']
-                    
-comp_times_exp_dict = {}
-comp_times_euler_dict = {}
-comp_times_implicit_euler_dict = {}
-comp_times_rk4_dict = {}
-comp_times_rigid_euler_dict = {}
-for s in comp_times_exp:
-    comp_times_exp_dict[s] = s.split('::')[-1]
-for s in comp_times_euler:
-    comp_times_euler_dict[s] = s.split('::')[-1]
-for s in comp_times_implicit_euler:
-    comp_times_implicit_euler_dict[s] = s.split('::')[-1]
-for s in comp_times_rk4:
-    comp_times_rk4_dict[s] = s.split('::')[-1]
-for s in comp_times_rigid_euler:
-    comp_times_rigid_euler_dict[s] = s.split('::')[-1]
+simulator_names = ['exponential', 'euler', 'implicit-euler', 'rk4', 'rigid-euler']
+comp_times = {}
+comp_times['exponential']    = ['exponential_simulator::step',
+                             'exponential_simulator::substep',
+                             'exponential_simulator::computeExpLDS',
+                             'exponential_simulator::computeIntegralsXt',
+                             'exponential_simulator::kinematics',
+                             'exponential_simulator::forwardDynamics',
+                             'exponential_simulator::resizeVectorsAndMatrices']
+comp_times['euler'] = ['euler_simulator::step',
+                       'euler_simulator::substep']
+comp_times['rigid-euler'] = ['rigid_euler_simulator::step',
+                             'rigid_euler_simulator::substep']
+comp_times['implicit-euler'] = ['imp_euler_simulator::step',
+                                'imp_euler_simulator::substep',
+                                'imp_euler_simulator::computeDynamicsJacobian',
+                                'imp_euler_simulator::Minv_JT_K_J',
+                                'imp_euler_simulator::computeNonlinearEquations',
+                                'imp_euler_simulator::computeNewtonSystem',
+                                'imp_euler_simulator::solveNewtonSystem',
+                                'imp_euler_simulator::lineSearch',
+                                'imp_euler_simulator::computeABADerivatives',
+                                'imp_euler_simulator::copyContacts']
+comp_times['rk4']   = ['rk4_simulator::step',
+                       'rk4_simulator::substep']
+
+comp_times_dict = {}
+for s in simulator_names:
+    comp_times_dict[s] = {}
+    for n in comp_times[s]:
+        comp_times_dict[s][n] = n.split('::')[-1]
     
 plut.SAVE_FIGURES = 0
 PLOT_FORCES = 0
@@ -77,7 +69,7 @@ PLOT_MATRIX_NORMS = 0
 
 LOAD_GROUND_TRUTH_FROM_FILE = 1
 SAVE_GROUND_TRUTH_TO_FILE = 1
-RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
+RESET_STATE_ON_GROUND_TRUTH = 0  # reset the state of the system on the ground truth
 
 TEST_NAME = 'solo-squat'
 #TEST_NAME = 'solo-trot'
@@ -132,7 +124,8 @@ i_ground_truth = int(np.log2(dt / ground_truth_dt))
 i_min = 0
 i_max = i_ground_truth - 2 -1
 
-GROUND_TRUTH_EXP_SIMU_PARAMS = {
+GROUND_TRUTH_SIMU_PARAMS = {}
+GROUND_TRUTH_SIMU_PARAMS['exponential'] = {
     'name': 'ground-truth %d'%(2**i_ground_truth),
     'method_name': 'ground-truth-exponential',
     'simulator': 'exponential',
@@ -154,16 +147,16 @@ for i in range(i_min, i_max):
             'max_mat_mult': m
         }]
 
-GROUND_TRUTH_IMPLICIT_EULER_SIMU_PARAMS = {
-    'name': 'ground-truth %d'%(2**i_ground_truth),
-    'method_name': 'ground-truth-implicit-euler',
-    'simulator': 'implicit-euler',
-    'ndt': 2**i_ground_truth,
-    'use_finite_differences_dynamics': False,
-    'use_finite_differences_nle': False,
-    'use_current_state_as_initial_guess': False,
-    'convergence_threshold': 1e-6
-}
+#GROUND_TRUTH_SIMU_PARAMS['implicit-euler'] = {
+#    'name': 'ground-truth %d'%(2**i_ground_truth),
+#    'method_name': 'ground-truth-implicit-euler',
+#    'simulator': 'implicit-euler',
+#    'ndt': 2**i_ground_truth,
+#    'use_finite_differences_dynamics': False,
+#    'use_finite_differences_nle': False,
+#    'use_current_state_as_initial_guess': False,
+#    'convergence_threshold': 1e-6
+#}
 
 # IMPLICIT EULER INTEGRATOR
 #for i in range(i_min, i_max):
@@ -178,12 +171,12 @@ GROUND_TRUTH_IMPLICIT_EULER_SIMU_PARAMS = {
 #        'convergence_threshold': 1e-6
 #    }]
     
-GROUND_TRUTH_RK4_SIMU_PARAMS = {
-    'name': 'ground-truth %d'%(2**i_ground_truth),
-    'method_name': 'ground-truth-rk4',
-    'simulator': 'rk4',
-    'ndt': 2**i_ground_truth,
-}
+#GROUND_TRUTH_SIMU_PARAMS['rk4'] = {
+#    'name': 'ground-truth %d'%(2**i_ground_truth),
+#    'method_name': 'ground-truth-rk4',
+#    'simulator': 'rk4',
+#    'ndt': 2**i_ground_truth,
+#}
 
 # RK4 INTEGRATOR
 #for i in range(i_min, i_max):
@@ -197,7 +190,7 @@ GROUND_TRUTH_RK4_SIMU_PARAMS = {
 kd = (2**i_ground_truth)/dt
 contact_stabilization_gains = [0.5*(kd**2), kd]
 
-GROUND_TRUTH_RIGID_EULER_SIMU_PARAMS = {
+GROUND_TRUTH_SIMU_PARAMS['rigid-euler'] = {
     'name': 'ground-truth %d'%(2**i_ground_truth),
     'method_name': 'ground-truth-rigid-euler',
     'simulator': 'rigid-euler',
@@ -241,7 +234,7 @@ for i in range(i_min, i_max):
     contact_stabilization_gains = [0.5*(kd**2), kd]
     SIMU_PARAMS += [{
         'name': 'rig-eul %4d'%(2**i),
-        'method_name': 'Rig-eul',
+        'method_name': 'rig-eul',
         'simulator': 'rigid-euler',
         'contact_stabilization_gains': contact_stabilization_gains,
         'ndt': 2**i
@@ -271,13 +264,13 @@ for i in range(i_min, i_max):
 i_min += 0
 i_max += 3
 i_ground_truth = i_max+2
-GROUND_TRUTH_EULER_SIMU_PARAMS = {
-    'name': 'ground-truth %d'%(2**i_ground_truth),
-    'method_name': 'ground-truth-euler',
-    'simulator': 'euler',
-    'ndt': 2**i_ground_truth,
-    'integration_type': 0
-}
+#GROUND_TRUTH_SIMU_PARAMS['euler'] = {
+#    'name': 'ground-truth %d'%(2**i_ground_truth),
+#    'method_name': 'ground-truth-euler',
+#    'simulator': 'euler',
+#    'ndt': 2**i_ground_truth,
+#    'integration_type': 0
+#}
 
 # EULER INTEGRATOR WITH EXPLICIT INTEGRATION
 #for i in range(i_min, i_max):
@@ -363,36 +356,13 @@ elif(ctrl_type=='tsid-biped'):
 if(LOAD_GROUND_TRUTH_FROM_FILE):    
     print("\nLoad ground truth from file")
     data = pickle.load( open( ground_truth_file_name, "rb" ) )
-    
-#    i0, i1 = 1314, 1315
-#    refX = refX[i0:i1+1,:]
-#    refU = refU[i0:i1,:]
-#    feedBack = feedBack[i0:i1,:,:]
-##    q0, v0 = refX[0,:nq], refX[0,nq:]
-#    N = refU.shape[0]
-#    for key in ['ground-truth-exp', 'ground-truth-euler']:
-#        data[key].q  = data[key].q[:,i0:i1+1]
-#        data[key].v  = data[key].v[:,i0:i1+1]
-#        data[key].p0 = data[key].p0[:,:,i0:i1+1]
-#        data[key].slipping = data[key].slipping[:,i0:i1+1]
-#    q0, v0 = data['ground-truth-exp'].q[:,0], data['ground-truth-exp'].v[:,0]
 else:
     data = {}
-    print("\nStart simulation ground truth Rigid Euler")
-    data['ground-truth-rigid-euler'] = run_simulation(conf, dt, N, robot, controller, q0, v0, GROUND_TRUTH_RIGID_EULER_SIMU_PARAMS)
-    
-#    print("\nStart simulation ground truth Implicit Euler")
-#    data['ground-truth-implicit-euler'] = run_simulation(conf, dt, N, robot, controller, q0, v0, GROUND_TRUTH_IMPLICIT_EULER_SIMU_PARAMS)
-#    
-#    print("\nStart simulation ground truth RK4")
-#    data['ground-truth-rk4'] = run_simulation(conf, dt, N, robot, controller, q0, v0, GROUND_TRUTH_RK4_SIMU_PARAMS)
-    
-    print("\nStart simulation ground truth Exponential")
-    data['ground-truth-exponential'] = run_simulation(conf, dt, N, robot, controller, q0, v0, GROUND_TRUTH_EXP_SIMU_PARAMS)
-    
-#    print("\nStart simulation ground truth Euler")
-#    data['ground-truth-euler'] = run_simulation(conf, dt, N, robot, controller, q0, v0, GROUND_TRUTH_EULER_SIMU_PARAMS)
-    
+    for item in GROUND_TRUTH_SIMU_PARAMS.items():
+        simu_params = item[1]
+        print("\nStart simulation ground truth", simu_params['simulator'])
+        data[simu_params['method_name']] = run_simulation(conf, dt, N, robot, controller, q0, v0, 
+                                                          simu_params)
     if(SAVE_GROUND_TRUTH_TO_FILE):
         pickle.dump( data, open( ground_truth_file_name, "wb" ) )
 
@@ -400,25 +370,12 @@ else:
 for simu_params in SIMU_PARAMS:
     name = simu_params['name']
     print("\nStart simulation", name)
-    if(simu_params['simulator']=='exponential'):
-        data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, 
-                                    None, comp_times_exp_dict)
-#                                    data['ground-truth-exponential'], comp_times_exp_dict)
-    elif(simu_params['simulator']=='euler'):
-        data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, 
-                            data['ground-truth-euler'], comp_times_euler_dict)
-    elif(simu_params['simulator']=='implicit-euler'):
-        data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, 
-                            data['ground-truth-implicit-euler'], comp_times_implicit_euler_dict)
-        print("Avg iter: %.1f"%(np.mean(data[name].avg_iter_num)))
-#        print("Comp time:", data[name].computation_times['step'].avg)
-    elif(simu_params['simulator']=='rk4'):
-        data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, 
-                            data['ground-truth-rk4'], comp_times_rk4_dict)
-    elif(simu_params['simulator']=='rigid-euler'):
-        data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, 
-                                    None, comp_times_rigid_euler_dict)
-#                                    data['ground-truth-rigid-euler'], comp_times_rigid_euler_dict)
+    if(RESET_STATE_ON_GROUND_TRUTH):
+        gt = data['ground-truth-'+simu_params['simulator']]
+    else:
+        gt = None
+    data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, 
+                                gt, comp_times_dict[simu_params['simulator']])
 
 # COMPUTE INTEGRATION ERRORS:
 res = compute_integration_errors(data, robot, dt)
