@@ -95,10 +95,6 @@ plut.FIGURE_PATH = './'+TEST_NAME+'/'
 N = 300
 dt = 0.010      # controller and simulator time step
 
-# DEBUG
-#N = 1
-# END DEBUG
-
 if(TEST_NAME=='solo-squat'):
     robot_name = 'solo'
     motionName = 'squat'
@@ -157,14 +153,6 @@ for i in range(i_min, i_max):
             'forward_dyn_method': 3,
             'max_mat_mult': m
         }]
-        
-#i_min = 1
-#i_max -= 3
-#i_ground_truth = i_max+2
-#i_ground_truth = 0
-#dt = 0.002
-#N = 10
-#i_ground_truth = int(np.log2(dt / ground_truth_dt))
 
 GROUND_TRUTH_IMPLICIT_EULER_SIMU_PARAMS = {
     'name': 'ground-truth %d'%(2**i_ground_truth),
@@ -176,7 +164,6 @@ GROUND_TRUTH_IMPLICIT_EULER_SIMU_PARAMS = {
     'use_current_state_as_initial_guess': False,
     'convergence_threshold': 1e-6
 }
-#i_max = 1
 
 # IMPLICIT EULER INTEGRATOR
 #for i in range(i_min, i_max):
@@ -189,18 +176,6 @@ GROUND_TRUTH_IMPLICIT_EULER_SIMU_PARAMS = {
 #        'use_finite_differences_nle': False,
 #        'use_current_state_as_initial_guess': False,
 #        'convergence_threshold': 1e-6
-#    }]
-# IMPLICIT EULER INTEGRATOR with finite differences
-#for i in range(i_min, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'imp-eul-fd %4d'%(2**i),
-#        'method_name': 'imp-eul-fd',
-#        'simulator': 'implicit-euler',
-#        'ndt': 2**i,
-#        'use_finite_differences_dynamics': False,
-#        'use_finite_differences_nle': True,
-#        'use_current_state_as_initial_guess': False,
-#        'convergence_threshold': 1e-5
 #    }]
     
 GROUND_TRUTH_RK4_SIMU_PARAMS = {
@@ -219,8 +194,6 @@ GROUND_TRUTH_RK4_SIMU_PARAMS = {
 #        'ndt': 2**i,
 #    }]
 
-#contact_stabilization_gains = [5000, 100]
-#contact_stabilization_gains = [0, 0]
 kd = (2**i_ground_truth)/dt
 contact_stabilization_gains = [0.5*(kd**2), kd]
 
@@ -326,35 +299,6 @@ GROUND_TRUTH_EULER_SIMU_PARAMS = {
 #        'ndt': 2**i,
 #        'forward_dyn_method': 3,
 #        'integration_type': 1
-#    }]
-    
-# EULER INTEGRATOR WITH CLASSIC EXPLICIT INTEGRATION
-#for i in range(i_min, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'Eul-clexp%4d'%(2**i),
-#        'method_name': 'Eul-clexp',
-#        'simulator': 'euler',
-#        'ndt': 2**i,
-#        'forward_dyn_method': 3,
-#        'integration_type': 2
-#    }]
-
-#for i in range(i_min, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'euler ABA%4d'%(2**i),
-#        'method_name': 'euler ABA',
-#        'simulator': 'euler',
-#        'ndt': 2**i,
-#        'forward_dyn_method': 2
-#    }]
-#
-#for i in range(i_min, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'euler Chol%4d'%(2**i),
-#        'method_name': 'euler Chol',
-#        'simulator': 'euler',
-#        'ndt': 2**i,
-#        'forward_dyn_method': 3
 #    }]
 
 

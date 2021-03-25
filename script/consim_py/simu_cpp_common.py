@@ -186,7 +186,7 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
         #  1: pinocchio.Minverse()
         #  2: pinocchio.aba()
         #  3: Cholesky factorization 
-        forward_dyn_method = 1
+        forward_dyn_method = 3
     try:
         #0: explicit, 1: semi_implicit, 2: classic-explicit
         integration_type = simu_params['integration_type']
