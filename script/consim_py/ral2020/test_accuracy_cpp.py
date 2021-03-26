@@ -74,8 +74,8 @@ LOAD_GROUND_TRUTH_FROM_FILE = 1
 SAVE_GROUND_TRUTH_TO_FILE = 1
 RESET_STATE_ON_GROUND_TRUTH = 1  # reset the state of the system on the ground truth
 
-#TEST_NAME = 'solo-squat'
-TEST_NAME = 'solo-trot'
+TEST_NAME = 'solo-squat'
+#TEST_NAME = 'solo-trot'
 #TEST_NAME = 'solo-jump'
 #TEST_NAME = 'romeo-walk'
 #TEST_NAME = 'talos-walk'
@@ -99,8 +99,10 @@ if(TEST_NAME=='solo-squat'):
     motionName = 'squat'
     ctrl_type = 'tsid-quadruped'
     com_offset = np.array([0.0, -0.0, 0.0])
-    com_amp    = np.array([0.0, 0.0, 0.05])
+    com_amp    = np.array([0.0, 0.0, 0.05-0.02])
     com_freq   = np.array([0.0, .0, 2.0])
+    dt = 0.04
+    N = 100
 if(TEST_NAME=='solo-trot'):
     robot_name = 'solo'
     motionName = 'trot'

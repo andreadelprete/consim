@@ -34,10 +34,10 @@ LOAD_GROUND_TRUTH_FROM_FILE = 0
 SAVE_GROUND_TRUTH_TO_FILE = 1
 RESET_STATE_ON_GROUND_TRUTH = 0  # reset the state of the system on the ground truth
 
-#TEST_NAME = 'solo-squat'
+TEST_NAME = 'solo-squat'
 #TEST_NAME = 'solo-trot'
 #TEST_NAME = 'solo-jump'
-TEST_NAME = 'romeo-walk'
+#TEST_NAME = 'romeo-walk'
 #TEST_NAME = 'talos-walk'
 
 LINE_WIDTH = 100
@@ -55,8 +55,10 @@ if(TEST_NAME=='solo-squat'):
     motionName = 'squat'
     ctrl_type = 'tsid-quadruped'
     com_offset = np.array([0.0, -0.0, 0.0])
-    com_amp    = np.array([0.0, 0.0, 0.05])
+    com_amp    = np.array([0.0, 0.0, 0.03])
     com_freq   = np.array([0.0, .0, 2.0])
+    dt = 0.04
+    N = int(10/dt)
 if(TEST_NAME=='solo-trot'):
     robot_name = 'solo'
     motionName = 'trot'
@@ -67,7 +69,7 @@ if(TEST_NAME=='solo-jump'):
     robot_name = 'solo'
     motionName = 'jump'
     ctrl_type = 'linear'
-    dt = 0.002      # controller and simulator time step
+    dt = 0.010      # controller and simulator time step
     assert(np.floor(dt_ref/dt)==dt_ref/dt)
 elif(TEST_NAME=='romeo-walk'):
     robot_name = 'romeo'
@@ -82,7 +84,7 @@ elif(TEST_NAME=='talos-walk'):
     dt = 0.03
     
 i_min = 0
-i_max = 5
+i_max = 4
 
 SIMU_PARAMS = []
 
@@ -110,7 +112,7 @@ for i in range(i_min, i_max):
         'convergence_threshold': 1e-6
     }]
 
-i_max = 8
+i_max = 10
 
 # EULER INTEGRATOR WITH EXPLICIT INTEGRATION
 for i in range(i_min, i_max):
