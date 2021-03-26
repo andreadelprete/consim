@@ -53,21 +53,19 @@ kd_(0.0)
   int nf=0;
   int nkkt = nv+3*nf;
 
-  // x_.resize(nx);x_.setZero();
-  // f_.resize(ndx);f_.setZero();
   tau_f_.resize(nv); tau_f_.setZero();
   tau_plus_JT_f_.resize(nv); tau_plus_JT_f_.setZero();
 
-  KKT_mat_.resize(nkkt, nkkt); KKT_mat_.setZero();
-  KKT_vec_.resize(nkkt); KKT_vec_.setZero();
-  KKT_LU_ = PartialPivLU<MatrixXd>(nkkt);
+  // KKT_mat_.resize(nkkt, nkkt); KKT_mat_.setZero();
+  // KKT_vec_.resize(nkkt); KKT_vec_.setZero();
+  // KKT_LU_ = PartialPivLU<MatrixXd>(nkkt);
 
-  lambda_.resize(3 * nf); lambda_.setZero();
-  K_.resize(3 * nf); K_.setZero();
-  B_.resize(3 * nf); B_.setZero();
+  // lambda_.resize(3 * nf); lambda_.setZero();
+  // K_.resize(3 * nf); K_.setZero();
+  // B_.resize(3 * nf); B_.setZero();
   Jc_.resize(3 * nf, nv); Jc_.setZero();
   dJv_.resize(3 * nf); dJv_.setZero();
-  MinvJcT_.resize(nv, 3*nf); MinvJcT_.setZero();
+  // MinvJcT_.resize(nv, 3*nf); MinvJcT_.setZero();
 }
 
 double RigidEulerSimulator::get_avg_iteration_number() const { return avg_iteration_number_; }
@@ -107,9 +105,9 @@ void RigidEulerSimulator::computeContactForces()
       // KKT_vec_.resize(nkkt); KKT_vec_.setZero();
       // KKT_LU_ = PartialPivLU<MatrixXd>(nkkt);
 
-      lambda_.resize(3 * nactive_); lambda_.setZero();
-      K_.resize(3 * nactive_); K_.setZero();
-      B_.resize(3 * nactive_); B_.setZero();
+      // lambda_.resize(3 * nactive_); lambda_.setZero();
+      // K_.resize(3 * nactive_); K_.setZero();
+      // B_.resize(3 * nactive_); B_.setZero();
       dJv_.resize(3 * nactive_); dJv_.setZero();
       Jc_.resize(3 * nactive_, model_->nv); Jc_.setZero();
       MinvJcT_.resize(model_->nv, 3*nactive_); MinvJcT_.setZero();
@@ -118,7 +116,8 @@ void RigidEulerSimulator::computeContactForces()
     
     CONSIM_START_PROFILER("rigid_euler_simulator::contactKinematics");
     int i_active_ = 0; 
-    for(auto &cp : contacts_){
+    for(auto &cp : contacts_)
+    {
       if (!cp->active) continue;
       
       cp->firstOrderContactKinematics(*data_);

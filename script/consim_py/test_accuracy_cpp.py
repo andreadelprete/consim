@@ -137,7 +137,7 @@ SIMU_PARAMS = []
 # EXPONENTIAL INTEGRATOR WITH STANDARD SETTINGS
 for i in range(i_min, i_max):
 #    for m in [0, 2, 4, -1]:
-    for m in [1,2]:
+    for m in [2]:
         SIMU_PARAMS += [{
             'name': 'expo %4d mmm%2d'%(2**i,m),
             'method_name': 'Expo mmm%2d'%(m),
@@ -146,7 +146,18 @@ for i in range(i_min, i_max):
             'forward_dyn_method': 3,
             'max_mat_mult': m
         }]
-
+for i in range(i_min, i_max):
+    for m in [2]:
+        SIMU_PARAMS += [{
+            'name': 'expo-diag %4d mmm%2d'%(2**i,m),
+            'method_name': 'Expo-diag mmm%2d'%(m),
+            'simulator': 'exponential',
+            'ndt': 2**i,
+            'forward_dyn_method': 3,
+            'max_mat_mult': m,
+            'diagonal_matrix_exp': True
+        }]
+        
 #GROUND_TRUTH_SIMU_PARAMS['implicit-euler'] = {
 #    'name': 'ground-truth %d'%(2**i_ground_truth),
 #    'method_name': 'ground-truth-implicit-euler',

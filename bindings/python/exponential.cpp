@@ -82,7 +82,9 @@ void export_exponential()
         .def("get_dv", &ExponentialSimulator::get_dv,bp::return_value_policy<bp::copy_const_reference>(), "time derivative of tangent vector to configuration")
         .def("getMatrixMultiplications", &ExponentialSimulator::getMatrixMultiplications)
         .def("getMatrixExpL1Norm", &ExponentialSimulator::getMatrixExpL1Norm)
-        .def("assumeSlippageContinues", &ExponentialSimulator::assumeSlippageContinues);
+        .def("assumeSlippageContinues", &ExponentialSimulator::assumeSlippageContinues)
+        .def("setUseDiagonalMatrixExp", &ExponentialSimulator::setUseDiagonalMatrixExp)
+        ;
 }
 
 }

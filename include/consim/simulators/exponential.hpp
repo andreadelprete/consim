@@ -57,6 +57,7 @@ namespace consim
       double getMatrixExpL1Norm(){ return utilDense_.getL1Norm(); }
       void useMatrixBalancing(bool flag){ utilDense_.useBalancing(flag); }
       void assumeSlippageContinues(bool flag){ assumeSlippageContinues_=flag; }
+      void setUseDiagonalMatrixExp(bool flag){ use_diagonal_matrix_exp_=flag; }
 
     protected:
       /**
@@ -84,6 +85,7 @@ namespace consim
       const int ldsMaxMatMul_; 
 
       bool assumeSlippageContinues_; // flag deciding whether dp0 is used in force computation 
+      bool use_diagonal_matrix_exp_; // flag deciding whether a diagonal approximation of the matrix exponential is used
       
       Eigen::VectorXd f_;  // contact forces
       Eigen::MatrixXd Jc_; // contact Jacobian for all contacts 

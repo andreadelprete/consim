@@ -46,7 +46,8 @@ ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocc
                                             compute_predicted_forces_(compute_predicted_forces), 
                                             expMaxMatMul_(exp_max_mat_mul),
                                             ldsMaxMatMul_(lds_max_mat_mul),
-                                            assumeSlippageContinues_(true)
+                                            assumeSlippageContinues_(true),
+                                            use_diagonal_matrix_exp_(false)
 {
   dvMean_.resize(model_->nv);
   dvMean2_.resize(model_->nv);
@@ -173,12 +174,21 @@ void ExponentialSimulator::computeExpLDS(){
   }
 
   Upsilon_.noalias() =  Jc_*MinvJcT_;
-  tempStepMat_.noalias() =  Upsilon_ * K;
-  A.bottomLeftCorner(3*nactive_, 3*nactive_).noalias() = -tempStepMat_;  
-  if(assumeSlippageContinues_)
-    tempStepMat_.noalias() = Upsilon_ * B_copy; 
+  if(use_diagonal_matrix_exp_)
+    tempStepMat_.diagonal().noalias() =  Upsilon_.diagonal().cwiseProduct(K.diagonal());
   else
-    tempStepMat_.noalias() = Upsilon_ * B; 
+    tempStepMat_.noalias() =  Upsilon_ * K;
+  A.bottomLeftCorner(3*nactive_, 3*nactive_).noalias() = -tempStepMat_;  
+
+  DiagonalMatrixXd* B_to_use;
+  if(assumeSlippageContinues_)
+    B_to_use = &B_copy; 
+  else
+    B_to_use = &B; 
+  if(use_diagonal_matrix_exp_)
+    tempStepMat_.diagonal().noalias() =  Upsilon_.diagonal().cwiseProduct(B_to_use->diagonal());
+  else
+    tempStepMat_.noalias() = Upsilon_ * (*B_to_use); 
   A.bottomRightCorner(3*nactive_, 3*nactive_).noalias() = -tempStepMat_; 
   temp04_.noalias() = Jc_* dv_bar;  
   b_.noalias() = temp04_ + dJv_; 
