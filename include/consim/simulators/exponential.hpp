@@ -58,6 +58,7 @@ namespace consim
       void useMatrixBalancing(bool flag){ utilDense_.useBalancing(flag); }
       void assumeSlippageContinues(bool flag){ assumeSlippageContinues_=flag; }
       void setUseDiagonalMatrixExp(bool flag){ use_diagonal_matrix_exp_=flag; }
+      void setUpdateAFrequency(int f){ update_A_frequency_ = f; update_A_counter_ = 0; }
 
     protected:
       /**
@@ -75,8 +76,8 @@ namespace consim
 
       void resizeVectorsAndMatrices();
       // convenience method to compute terms needed in integration  
-      void computeExpLDS();
-
+      void computeExpLDS(bool update_A);
+      
       int slipping_method_; 
       bool compute_predicted_forces_;
       // expokit 
@@ -86,6 +87,8 @@ namespace consim
 
       bool assumeSlippageContinues_; // flag deciding whether dp0 is used in force computation 
       bool use_diagonal_matrix_exp_; // flag deciding whether a diagonal approximation of the matrix exponential is used
+      int update_A_frequency_;        // number of cycles after which updating the matrix A
+      int update_A_counter_;
       
       Eigen::VectorXd f_;  // contact forces
       Eigen::MatrixXd Jc_; // contact Jacobian for all contacts 

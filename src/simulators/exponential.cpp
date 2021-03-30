@@ -47,7 +47,9 @@ ExponentialSimulator::ExponentialSimulator(const pinocchio::Model &model, pinocc
                                             expMaxMatMul_(exp_max_mat_mul),
                                             ldsMaxMatMul_(lds_max_mat_mul),
                                             assumeSlippageContinues_(true),
-                                            use_diagonal_matrix_exp_(false)
+                                            use_diagonal_matrix_exp_(false),
+                                            update_A_frequency_(1),
+                                            update_A_counter_(0)
 {
   dvMean_.resize(model_->nv);
   dvMean2_.resize(model_->nv);
@@ -78,8 +80,15 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
     CONSIM_START_PROFILER("exponential_simulator::substep"); 
     if (nactive_> 0){
       Eigen::internal::set_is_malloc_allowed(false);
+      
       CONSIM_START_PROFILER("exponential_simulator::computeExpLDS");
-      computeExpLDS();
+      bool update_A = false;
+      update_A_counter_--;
+      if(update_A_counter_ <= 0){
+        update_A = true;
+        update_A_counter_ = update_A_frequency_;
+      }
+      computeExpLDS(update_A);
       CONSIM_STOP_PROFILER("exponential_simulator::computeExpLDS");
 
       CONSIM_START_PROFILER("exponential_simulator::computeIntegralsXt");
@@ -127,7 +136,7 @@ void ExponentialSimulator::step(const Eigen::VectorXd &tau){
 } // ExponentialSimulator::step
 
 
-void ExponentialSimulator::computeExpLDS(){
+void ExponentialSimulator::computeExpLDS(bool update_A){
   /**
    * computes M, nle
    * fills J, dJv, p0, p, dp, Kp0, and x0 
@@ -173,30 +182,32 @@ void ExponentialSimulator::computeExpLDS(){
     }
   }
 
-  Upsilon_.noalias() =  Jc_*MinvJcT_;
-  if(use_diagonal_matrix_exp_)
-    tempStepMat_.diagonal().noalias() =  Upsilon_.diagonal().cwiseProduct(K.diagonal());
-  else
-    tempStepMat_.noalias() =  Upsilon_ * K;
-  A.bottomLeftCorner(3*nactive_, 3*nactive_).noalias() = -tempStepMat_;  
+  if(update_A)
+  {
+    Upsilon_.noalias() =  Jc_*MinvJcT_;
+    if(use_diagonal_matrix_exp_)
+      tempStepMat_.diagonal().noalias() =  Upsilon_.diagonal().cwiseProduct(K.diagonal());
+    else
+      tempStepMat_.noalias() =  Upsilon_ * K;
+    A.bottomLeftCorner(3*nactive_, 3*nactive_).noalias() = -tempStepMat_;  
 
-  DiagonalMatrixXd* B_to_use;
-  if(assumeSlippageContinues_)
-    B_to_use = &B_copy; 
-  else
-    B_to_use = &B; 
-  if(use_diagonal_matrix_exp_)
-    tempStepMat_.diagonal().noalias() =  Upsilon_.diagonal().cwiseProduct(B_to_use->diagonal());
-  else
-    tempStepMat_.noalias() = Upsilon_ * (*B_to_use); 
-  A.bottomRightCorner(3*nactive_, 3*nactive_).noalias() = -tempStepMat_; 
+    DiagonalMatrixXd* B_to_use;
+    if(assumeSlippageContinues_)
+      B_to_use = &B_copy; 
+    else
+      B_to_use = &B; 
+    if(use_diagonal_matrix_exp_)
+      tempStepMat_.diagonal().noalias() =  Upsilon_.diagonal().cwiseProduct(B_to_use->diagonal());
+    else
+      tempStepMat_.noalias() = Upsilon_ * (*B_to_use); 
+    A.bottomRightCorner(3*nactive_, 3*nactive_).noalias() = -tempStepMat_; 
+  }
   temp04_.noalias() = Jc_* dv_bar;  
   b_.noalias() = temp04_ + dJv_; 
   a_.tail(3*nactive_) = b_;
   x0_.head(3*nactive_) = p_-p0_; 
   x0_.tail(3*nactive_) = dp_;
 }
-
 
 
 void ExponentialSimulator::computeContactForces()
@@ -219,7 +230,9 @@ void ExponentialSimulator::computeContactForces()
   CONSIM_STOP_PROFILER("exponential_simulator::contactDetection");
 
   if (nactive_>0){
+    bool size_changed = false;
     if (f_.size()!=3*nactive_){
+      size_changed = true;
       CONSIM_START_PROFILER("exponential_simulator::resizeVectorsAndMatrices");
       resizeVectorsAndMatrices();
       CONSIM_STOP_PROFILER("exponential_simulator::resizeVectorsAndMatrices");
@@ -241,6 +254,11 @@ void ExponentialSimulator::computeContactForces()
       // }
     }
     CONSIM_STOP_PROFILER("exponential_simulator::contactKinematics");
+
+    if(size_changed){
+      // force the update of A
+      update_A_counter_ = 1;
+    }
   }
 } // ExponentialSimulator::computeContactForces
 

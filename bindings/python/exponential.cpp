@@ -84,6 +84,7 @@ void export_exponential()
         .def("getMatrixExpL1Norm", &ExponentialSimulator::getMatrixExpL1Norm)
         .def("assumeSlippageContinues", &ExponentialSimulator::assumeSlippageContinues)
         .def("setUseDiagonalMatrixExp", &ExponentialSimulator::setUseDiagonalMatrixExp)
+        .def("setUpdateAFrequency", &ExponentialSimulator::setUpdateAFrequency)
         ;
 }
 

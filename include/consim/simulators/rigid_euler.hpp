@@ -46,20 +46,20 @@ namespace consim
     protected:      
       void computeContactForces();
             
-      Eigen::MatrixXd KKT_mat_;
-      Eigen::VectorXd KKT_vec_;      // Newton step expressed in tangent space
+      // Eigen::MatrixXd KKT_mat_;
+      // Eigen::VectorXd KKT_vec_;      // Newton step expressed in tangent space
 
-      Eigen::MatrixXd MinvJcT_;
+      // Eigen::MatrixXd MinvJcT_;
       Eigen::MatrixXd Jc_;
       Eigen::VectorXd dJv_;
-      DiagonalMatrixXd K_;
-      DiagonalMatrixXd B_;
-      Eigen::VectorXd lambda_;       // contact forces
+      // DiagonalMatrixXd K_;
+      // DiagonalMatrixXd B_;
+      // Eigen::VectorXd lambda_;       // contact forces
       Eigen::VectorXd tau_plus_JT_f_;
 
-      Eigen::PartialPivLU<Eigen::MatrixXd> KKT_LU_;
+      // Eigen::PartialPivLU<Eigen::MatrixXd> KKT_LU_;
 
-      std::vector<ContactPoint *> contactsCopy_;
+      // std::vector<ContactPoint *> contactsCopy_;
       double avg_iteration_number_; // average number of iterations during last call to step
       double regularization_;       // regularization parameter
       double kp_, kd_;              // feedback gains for contact stabilization

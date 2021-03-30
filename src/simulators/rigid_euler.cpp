@@ -43,7 +43,7 @@ namespace consim
 
 RigidEulerSimulator::RigidEulerSimulator(const pinocchio::Model &model, pinocchio::Data &data, float dt, int n_integration_steps):
 EulerSimulator(model, data, dt, n_integration_steps, 3, EXPLICIT),
-regularization_(1e-8),
+regularization_(1e-12),
 kp_(0.0),
 kd_(0.0)
 {
@@ -54,7 +54,7 @@ kd_(0.0)
   int nkkt = nv+3*nf;
 
   tau_f_.resize(nv); tau_f_.setZero();
-  tau_plus_JT_f_.resize(nv); tau_plus_JT_f_.setZero();
+  // tau_plus_JT_f_.resize(nv); tau_plus_JT_f_.setZero();
 
   // KKT_mat_.resize(nkkt, nkkt); KKT_mat_.setZero();
   // KKT_vec_.resize(nkkt); KKT_vec_.setZero();
@@ -96,21 +96,10 @@ void RigidEulerSimulator::computeContactForces()
   CONSIM_STOP_PROFILER("rigid_euler_simulator::contactDetection");
 
   if (nactive_>0){
-    if (lambda_.size()!=3*nactive_){
+    if (dJv_.size()!=3*nactive_){
       CONSIM_START_PROFILER("rigid_euler_simulator::resizeVectorsAndMatrices");
-      // resizeVectorsAndMatrices();
-      // nactive_ = newActive_;
-      // int nkkt = nv + 3*nactive_;
-      // KKT_mat_.resize(nkkt, nkkt); KKT_mat_.setZero();
-      // KKT_vec_.resize(nkkt); KKT_vec_.setZero();
-      // KKT_LU_ = PartialPivLU<MatrixXd>(nkkt);
-
-      // lambda_.resize(3 * nactive_); lambda_.setZero();
-      // K_.resize(3 * nactive_); K_.setZero();
-      // B_.resize(3 * nactive_); B_.setZero();
       dJv_.resize(3 * nactive_); dJv_.setZero();
       Jc_.resize(3 * nactive_, model_->nv); Jc_.setZero();
-      MinvJcT_.resize(model_->nv, 3*nactive_); MinvJcT_.setZero();
       CONSIM_STOP_PROFILER("rigid_euler_simulator::resizeVectorsAndMatrices");
     }
     
@@ -124,7 +113,7 @@ void RigidEulerSimulator::computeContactForces()
       cp->optr->computePenetration(*cp);
       cp->secondOrderContactKinematics(*data_);
       /*!< computeForce updates the anchor point */ 
-      cp->optr->contact_model_->computeForce(*cp);
+      // cp->optr->contact_model_->computeForce(*cp);
       Jc_.block(3*i_active_,0,3,model_->nv) = cp->world_J_;
       dJv_.segment<3>(3*i_active_) = cp->dJv_ - kp_*cp->delta_x + kd_*cp->v; 
 
