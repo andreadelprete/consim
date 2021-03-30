@@ -219,6 +219,10 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
             simu.setUseDiagonalMatrixExp(simu_params['diagonal_matrix_exp'])
         except:
             pass
+        try:
+            simu.setUpdateAFrequency(simu_params['update_A_frequency'])
+        except:
+            pass
     elif('euler' == simu_type):
         simu = consim.build_euler_simulator(dt, ndt, robot.model, robot.data,
                                         conf.K, conf.B, conf.mu, forward_dyn_method, integration_type)

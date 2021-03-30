@@ -67,7 +67,7 @@ PLOT_INTEGRATION_ERROR_TRAJECTORIES = 0
 PLOT_MATRIX_MULTIPLICATIONS = 0
 PLOT_MATRIX_NORMS = 0
 
-LOAD_GROUND_TRUTH_FROM_FILE = 1
+LOAD_GROUND_TRUTH_FROM_FILE = 0
 SAVE_GROUND_TRUTH_TO_FILE = 1
 RESET_STATE_ON_GROUND_TRUTH = 0  # reset the state of the system on the ground truth
 
@@ -91,10 +91,11 @@ if(TEST_NAME=='solo-squat'):
     robot_name = 'solo'
     motionName = 'squat'
     ctrl_type = 'tsid-quadruped'
-    com_offset = np.array([0.0, -0.0, 0.0])
-    com_amp    = np.array([0.0, 0.0, 0.05])
+    com_offset = np.array([0.0, -0.0, -0.03])
+    com_amp    = np.array([0.0, 0.0, 0.08])
     com_freq   = np.array([0.0, .0, 2.0])
     dt = 0.030      # controller and simulator time step
+    N = 500
 if(TEST_NAME=='solo-trot'):
     robot_name = 'solo'
     motionName = 'trot'
@@ -122,7 +123,9 @@ ground_truth_dt = 1e-3/64
 i_ground_truth = int(np.log2(dt / ground_truth_dt))
 
 i_min = 0
-i_max = i_ground_truth - 2 -1
+i_max = i_ground_truth - 2 -2
+
+i_ground_truth = i_max + 2
 
 GROUND_TRUTH_SIMU_PARAMS = {}
 GROUND_TRUTH_SIMU_PARAMS['exponential'] = {
@@ -137,26 +140,28 @@ SIMU_PARAMS = []
 # EXPONENTIAL INTEGRATOR WITH STANDARD SETTINGS
 for i in range(i_min, i_max):
 #    for m in [0, 2, 4, -1]:
-    for m in [2]:
-        SIMU_PARAMS += [{
-            'name': 'expo %4d mmm%2d'%(2**i,m),
-            'method_name': 'Expo mmm%2d'%(m),
-            'simulator': 'exponential',
-            'ndt': 2**i,
-            'forward_dyn_method': 3,
-            'max_mat_mult': m
-        }]
-for i in range(i_min, i_max):
-    for m in [2]:
-        SIMU_PARAMS += [{
-            'name': 'expo-diag %4d mmm%2d'%(2**i,m),
-            'method_name': 'Expo-diag mmm%2d'%(m),
-            'simulator': 'exponential',
-            'ndt': 2**i,
-            'forward_dyn_method': 3,
-            'max_mat_mult': m,
-            'diagonal_matrix_exp': True
-        }]
+    for m in [-1]:
+        for uaf in [1, 2, 4, 8]:
+            SIMU_PARAMS += [{
+                'name': 'expo %4d mmm%2d uaf%2d'%(2**i,m,uaf),
+                'method_name': 'Expo mmm%2d uaf%2d'%(m,uaf),
+                'simulator': 'exponential',
+                'ndt': 2**i,
+                'forward_dyn_method': 3,
+                'max_mat_mult': m,
+                'update_A_frequency': uaf
+            }]
+#for i in range(i_min, i_max):
+#    for m in [2]:
+#        SIMU_PARAMS += [{
+#            'name': 'expo-diag %4d mmm%2d'%(2**i,m),
+#            'method_name': 'Expo-diag mmm%2d'%(m),
+#            'simulator': 'exponential',
+#            'ndt': 2**i,
+#            'forward_dyn_method': 3,
+#            'max_mat_mult': m,
+#            'diagonal_matrix_exp': True
+#        }]
         
 #GROUND_TRUTH_SIMU_PARAMS['implicit-euler'] = {
 #    'name': 'ground-truth %d'%(2**i_ground_truth),
@@ -240,16 +245,16 @@ GROUND_TRUTH_SIMU_PARAMS['rigid-euler'] = {
 #        'ndt': 2**i
 #    }]
 
-for i in range(i_min, i_max):
-    kd = (2**i)/dt
-    contact_stabilization_gains = [0.5*(kd**2), kd]
-    SIMU_PARAMS += [{
-        'name': 'rig-eul %4d'%(2**i),
-        'method_name': 'rig-eul',
-        'simulator': 'rigid-euler',
-        'contact_stabilization_gains': contact_stabilization_gains,
-        'ndt': 2**i
-    }]
+#for i in range(i_min, i_max):
+#    kd = 0.00*(2**i)/dt
+#    contact_stabilization_gains = [0.5*(kd**2), kd]
+#    SIMU_PARAMS += [{
+#        'name': 'rig-eul %4d'%(2**i),
+#        'method_name': 'rig-eul',
+#        'simulator': 'rigid-euler',
+#        'contact_stabilization_gains': contact_stabilization_gains,
+#        'ndt': 2**i
+#    }]
     
 #contact_stabilization_gains = [1250, 50]
 #for i in range(i_min, i_max):
@@ -387,6 +392,7 @@ for simu_params in SIMU_PARAMS:
         gt = None
     data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, 
                                 gt, comp_times_dict[simu_params['simulator']])
+#    consim.stop_watch_report(3)
 
 # COMPUTE INTEGRATION ERRORS:
 res = compute_integration_errors(data, robot, dt)

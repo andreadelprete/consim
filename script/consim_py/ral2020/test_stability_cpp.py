@@ -84,10 +84,19 @@ elif(TEST_NAME=='talos-walk'):
     dt = 0.03
     
 i_min = 0
-i_max = 4
+i_max = 8
 
 SIMU_PARAMS = []
 
+# RK4 INTEGRATOR
+for i in range(i_min, i_max):
+    SIMU_PARAMS += [{
+        'name': 'rk4 %4d'%(2**i),
+        'method_name': 'RK4',
+        'simulator': 'rk4',
+        'ndt': 2**i,
+    }]
+    
 # EXPONENTIAL INTEGRATOR WITH STANDARD SETTINGS
 for i in range(i_min, i_max):
     SIMU_PARAMS += [{
@@ -127,16 +136,16 @@ for i in range(i_min, i_max):
     }]
 
 # EULER INTEGRATOR WITH SEMI-IMPLICIT INTEGRATION
-for i in range(i_min, i_max):
-    SIMU_PARAMS += [{
-        'name': 'euler semi%4d'%(2**i),
-        'method_name': 'euler semi',
-        'simulator': 'euler',
-        'use_exp_int': 0,
-        'ndt': 2**i,
-        'forward_dyn_method': 1,
-        'semi_implicit': 1
-    }]
+#for i in range(i_min, i_max):
+#    SIMU_PARAMS += [{
+#        'name': 'euler semi%4d'%(2**i),
+#        'method_name': 'euler semi',
+#        'simulator': 'euler',
+#        'use_exp_int': 0,
+#        'ndt': 2**i,
+#        'forward_dyn_method': 1,
+#        'semi_implicit': 1
+#    }]
 
 if(robot_name=='solo'):
     import conf_solo_cpp as conf
@@ -216,6 +225,7 @@ for simu_params in SIMU_PARAMS:
     name = simu_params['name']
     print("\nStart simulation", name)
     data[name] = run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params)
+    print("max vel %.1f"%np.max(np.abs(data[name].v)))
 
 # COMPUTE INTEGRATION ERRORS:
 #res = compute_integration_errors(data, robot, dt)

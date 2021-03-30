@@ -335,7 +335,7 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
 #                if(cp.active != results.active[ci,i]):
 #                    print("%.3f"%t, cp.name, 'changed contact state to ', cp.active, cp.x)
             
-            if(np.any(np.isnan(results.v[:,i+1])) or norm(results.v[:,i+1]) > 1e6):
+            if(np.any(np.isnan(results.v[:,i+1])) or norm(results.v[:,i+1]) > 1e5):
                 raise Exception("Time %.3f Velocities are too large: %.1f. Stop simulation."%(
                                 t, norm(results.v[:,i+1])))
     
