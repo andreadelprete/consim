@@ -256,6 +256,10 @@ def run_simulation(conf, dt, N, robot, controller, q0, v0, simu_params, ground_t
         simu = consim.build_rigid_euler_simulator(dt, ndt, robot.model, robot.data,
                                                   conf.K, conf.B, conf.mu)
         simu.set_contact_stabilization_gains(contact_stabilization_gains[0], contact_stabilization_gains[1])
+        try:
+            simu.set_integration_scheme(simu_params['integration_scheme'])
+        except:
+            pass
     else:
         raise Exception("Unknown simulation type: "+simu_type)
                                         

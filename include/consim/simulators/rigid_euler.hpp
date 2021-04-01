@@ -36,30 +36,31 @@ namespace consim
       ~RigidEulerSimulator(){};
 
       /**
-       * Implicit Euler first oder step 
+       * Rigid-contact simulation step 
       */
       void step(const Eigen::VectorXd &tau) override;
 
       double get_avg_iteration_number() const;
       void set_contact_stabilization_gains(double kp, double kd);
+      void set_integration_scheme(int value);
 
     protected:      
-      void computeContactForces();
+      void computeContactForces(const Eigen::VectorXd &x, std::vector<ContactPoint *> &contacts);
+      void computeDynamics(const Eigen::VectorXd &tau, const Eigen::VectorXd &x, Eigen::VectorXd &f);
             
-      // Eigen::MatrixXd KKT_mat_;
-      // Eigen::VectorXd KKT_vec_;      // Newton step expressed in tangent space
-
-      // Eigen::MatrixXd MinvJcT_;
+      int integration_scheme_;  // id of the integration scheme (1: Euler, 4: RK4)
       Eigen::MatrixXd Jc_;
       Eigen::VectorXd dJv_;
-      // DiagonalMatrixXd K_;
-      // DiagonalMatrixXd B_;
-      // Eigen::VectorXd lambda_;       // contact forces
-      Eigen::VectorXd tau_plus_JT_f_;
+      Eigen::VectorXd x_;       // system state
+      Eigen::VectorXd x_next_;  // next system state
+      Eigen::VectorXd f_;       // system dynamics
 
-      // Eigen::PartialPivLU<Eigen::MatrixXd> KKT_LU_;
+      std::vector<Eigen::VectorXd> xi_;
+      std::vector<Eigen::VectorXd> fi_;
+      Eigen::VectorXd rk_factors_a_;
+      Eigen::VectorXd rk_factors_b_;
 
-      // std::vector<ContactPoint *> contactsCopy_;
+      std::vector<ContactPoint *> contactsCopy_;
       double avg_iteration_number_; // average number of iterations during last call to step
       double regularization_;       // regularization parameter
       double kp_, kd_;              // feedback gains for contact stabilization

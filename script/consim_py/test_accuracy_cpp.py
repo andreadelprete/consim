@@ -94,7 +94,7 @@ if(TEST_NAME=='solo-squat'):
     com_offset = np.array([0.0, -0.0, -0.03])
     com_amp    = np.array([0.0, 0.0, 0.08])
     com_freq   = np.array([0.0, .0, 2.0])
-    dt = 0.030      # controller and simulator time step
+    dt = 0.040      # controller and simulator time step
     N = 500
 if(TEST_NAME=='solo-trot'):
     robot_name = 'solo'
@@ -123,34 +123,34 @@ ground_truth_dt = 1e-3/64
 i_ground_truth = int(np.log2(dt / ground_truth_dt))
 
 i_min = 0
-i_max = i_ground_truth - 2 -2
+i_max = i_ground_truth - 2 - 2
 
 i_ground_truth = i_max + 2
 
 GROUND_TRUTH_SIMU_PARAMS = {}
-GROUND_TRUTH_SIMU_PARAMS['exponential'] = {
-    'name': 'ground-truth %d'%(2**i_ground_truth),
-    'method_name': 'ground-truth-exponential',
-    'simulator': 'exponential',
-    'ndt': 2**i_ground_truth,
-}
+#GROUND_TRUTH_SIMU_PARAMS['exponential'] = {
+#    'name': 'ground-truth %d'%(2**i_ground_truth),
+#    'method_name': 'ground-truth-exponential',
+#    'simulator': 'exponential',
+#    'ndt': 2**i_ground_truth,
+#}
 
 SIMU_PARAMS = []
 
 # EXPONENTIAL INTEGRATOR WITH STANDARD SETTINGS
-for i in range(i_min, i_max):
-#    for m in [0, 2, 4, -1]:
-    for m in [-1]:
-        for uaf in [1, 2, 4, 8]:
-            SIMU_PARAMS += [{
-                'name': 'expo %4d mmm%2d uaf%2d'%(2**i,m,uaf),
-                'method_name': 'Expo mmm%2d uaf%2d'%(m,uaf),
-                'simulator': 'exponential',
-                'ndt': 2**i,
-                'forward_dyn_method': 3,
-                'max_mat_mult': m,
-                'update_A_frequency': uaf
-            }]
+#for i in range(i_min, i_max):
+##    for m in [0, 2, 4, -1]:
+#    for m in [-1]:
+##        for uaf in [1, 2, 4, 8]:
+#        SIMU_PARAMS += [{
+#            'name': 'expo %4d mmm%2d'%(2**i,m),
+#            'method_name': 'Expo mmm%2d'%(m),
+#            'simulator': 'exponential',
+#            'ndt': 2**i,
+#            'forward_dyn_method': 3,
+#            'max_mat_mult': m
+##            'update_A_frequency': uaf
+#        }]
 #for i in range(i_min, i_max):
 #    for m in [2]:
 #        SIMU_PARAMS += [{
@@ -211,72 +211,35 @@ GROUND_TRUTH_SIMU_PARAMS['rigid-euler'] = {
     'method_name': 'ground-truth-rigid-euler',
     'simulator': 'rigid-euler',
     'ndt': 2**i_ground_truth,
-    'contact_stabilization_gains': contact_stabilization_gains
+    'contact_stabilization_gains': contact_stabilization_gains,
+    'integration_scheme': 4
 }
 
 # RIGID EULER INTEGRATOR
-#contact_stabilization_gains = [5000, 100]
-#for i in range(i_min, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'rig-eul-LG %4d'%(2**i),
-#        'method_name': 'Rig-eul-LG',
-#        'simulator': 'rigid-euler',
-#        'contact_stabilization_gains': contact_stabilization_gains,
-#        'ndt': 2**i
-#    }]
-#
-#contact_stabilization_gains = [0.5*200**2, 200]
-#for i in range(i_min, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'rig-eul-MG %4d'%(2**i),
-#        'method_name': 'Rig-eul-MG',
-#        'simulator': 'rigid-euler',
-#        'contact_stabilization_gains': contact_stabilization_gains,
-#        'ndt': 2**i
-#    }]
-#
-#contact_stabilization_gains = [0.5*400**2, 400]
-#for i in range(i_min, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'rig-eul-HG %4d'%(2**i),
-#        'method_name': 'Rig-eul-HG',
-#        'simulator': 'rigid-euler',
-#        'contact_stabilization_gains': contact_stabilization_gains,
-#        'ndt': 2**i
-#    }]
+for i in range(i_min, i_max):
+    kd = 0.00*(2**i)/dt
+    contact_stabilization_gains = [0.5*(kd**2), kd]
+    SIMU_PARAMS += [{
+        'name': 'rig-eul %4d'%(2**i),
+        'method_name': 'rig-eul',
+        'simulator': 'rigid-euler',
+        'contact_stabilization_gains': contact_stabilization_gains,
+        'ndt': 2**i,
+        'integration_scheme': 1
+    }]
 
-#for i in range(i_min, i_max):
-#    kd = 0.00*(2**i)/dt
-#    contact_stabilization_gains = [0.5*(kd**2), kd]
-#    SIMU_PARAMS += [{
-#        'name': 'rig-eul %4d'%(2**i),
-#        'method_name': 'rig-eul',
-#        'simulator': 'rigid-euler',
-#        'contact_stabilization_gains': contact_stabilization_gains,
-#        'ndt': 2**i
-#    }]
+for i in range(i_min, i_max-2):
+    kd = 0.00*(2**i)/dt
+    contact_stabilization_gains = [0.5*(kd**2), kd]
+    SIMU_PARAMS += [{
+        'name': 'rig-rk4 %4d'%(2**i),
+        'method_name': 'rig-rk4',
+        'simulator': 'rigid-euler',
+        'contact_stabilization_gains': contact_stabilization_gains,
+        'ndt': 2**i,
+        'integration_scheme': 4
+    }]
     
-#contact_stabilization_gains = [1250, 50]
-#for i in range(i_min, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'rig-eul-MG %4d'%(2**i),
-#        'method_name': 'Rig-eul-MG',
-#        'simulator': 'rigid-euler',
-#        'contact_stabilization_gains': contact_stabilization_gains,
-#        'ndt': 2**i
-#    }]
-    
-#contact_stabilization_gains = [312, 25]
-#for i in range(i_min, i_max):
-#    SIMU_PARAMS += [{
-#        'name': 'rig-eul-LG %4d'%(2**i),
-#        'method_name': 'Rig-eul-LG',
-#        'simulator': 'rigid-euler',
-#        'contact_stabilization_gains': contact_stabilization_gains,
-#        'ndt': 2**i
-#    }]
-    
-
 i_min += 0
 i_max += 3
 i_ground_truth = i_max+2
