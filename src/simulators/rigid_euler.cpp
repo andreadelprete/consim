@@ -170,6 +170,13 @@ void RigidEulerSimulator::step(const Eigen::VectorXd &tau)
       /*!< integrate twice with explicit Euler */ 
       computeDynamics(tau, x_, f_);
     }
+    else if(integration_scheme_==2)
+    {
+      // integrate with RK2
+      computeDynamics(tau, x_, f_);
+      integrateState(*model_, x_, f_, sub_dt*0.5, xi_[1]);
+      computeDynamics(tau, xi_[1], f_);
+    }
     else if(integration_scheme_==4)
     {
       // integrate with RK4

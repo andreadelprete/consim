@@ -67,7 +67,7 @@ PLOT_INTEGRATION_ERROR_TRAJECTORIES = 0
 PLOT_MATRIX_MULTIPLICATIONS = 0
 PLOT_MATRIX_NORMS = 0
 
-LOAD_GROUND_TRUTH_FROM_FILE = 0
+LOAD_GROUND_TRUTH_FROM_FILE = 1
 SAVE_GROUND_TRUTH_TO_FILE = 1
 RESET_STATE_ON_GROUND_TRUTH = 0  # reset the state of the system on the ground truth
 
@@ -217,7 +217,7 @@ GROUND_TRUTH_SIMU_PARAMS['rigid-euler'] = {
 
 # RIGID EULER INTEGRATOR
 for i in range(i_min, i_max):
-    kd = 0.00*(2**i)/dt
+    kd = (2**i)/dt
     contact_stabilization_gains = [0.5*(kd**2), kd]
     SIMU_PARAMS += [{
         'name': 'rig-eul %4d'%(2**i),
@@ -228,8 +228,20 @@ for i in range(i_min, i_max):
         'integration_scheme': 1
     }]
 
-for i in range(i_min, i_max-2):
-    kd = 0.00*(2**i)/dt
+for i in range(i_min, i_max-3):
+    kd = (2**i)/dt
+    contact_stabilization_gains = [0.5*(kd**2), kd]
+    SIMU_PARAMS += [{
+        'name': 'rig-rk2 %4d'%(2**i),
+        'method_name': 'rig-rk2',
+        'simulator': 'rigid-euler',
+        'contact_stabilization_gains': contact_stabilization_gains,
+        'ndt': 2**i,
+        'integration_scheme': 2
+    }]
+    
+for i in range(i_min, i_max-5):
+    kd = (2**i)/dt
     contact_stabilization_gains = [0.5*(kd**2), kd]
     SIMU_PARAMS += [{
         'name': 'rig-rk4 %4d'%(2**i),
