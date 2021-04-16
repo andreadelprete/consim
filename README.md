@@ -12,7 +12,8 @@ For the python code:
 * [gepetto-viewer-corba](https://github.com/Gepetto/gepetto-viewer-corba)
 * [example-robot-data](https://github.com/Gepetto/example-robot-data)
 * [tsid](https://github.com/stack-of-tasks/tsid)
-    
+* [expokit-cpp](https://github.com/andreadelprete/expokit-cpp)
+
 ## Installation
 First you need to install all dependencies.
 To install [pinocchio](https://github.com/stack-of-tasks/pinocchio) and the other dependencies you can follow the instruction on the associated website, or you can install them
