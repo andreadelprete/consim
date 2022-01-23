@@ -7,6 +7,7 @@ import numpy as np
 from numpy.linalg import norm as norm
 
 from example_robot_data.robots_loader import loadSolo
+from example_robot_data import load 
 
 import matplotlib.pyplot as plt 
 import consim_py.utils.plot_utils as plut
@@ -116,7 +117,7 @@ PRINT_N = int(conf.PRINT_T/dt)
 exp_max_mul = 100 
 int_max_mul = 100 
 
-robot = loadSolo(False)
+robot = load('solo12') # loadSolo(False)
 nq, nv = robot.nq, robot.nv
 
 if conf.use_viewer:
@@ -269,26 +270,26 @@ for simu_params in SIMU_PARAMS:
         data[name] = run_simulation(q0, v0, simu_params, data['ground-truth-euler'])
 
 # COMPUTE INTEGRATION ERRORS:
-res = compute_integration_errors(data, robot, dt)
+# res = compute_integration_errors(data, robot, dt)
 
 # PLOT STUFF
 line_styles = 10*['-o', '--o', '-.o', ':o']
 tt = np.arange(0.0, (N_SIMULATION+1)*dt, dt)[:N_SIMULATION+1]
 
 # PLOT INTEGRATION ERRORS
-if(PLOT_INTEGRATION_ERRORS):
-    plot_multi_x_vs_y_log_scale(res.err_infnorm_avg, res.ndt, 'Mean error inf-norm')
-    plot_multi_x_vs_y_log_scale(res.err_infnorm_max, res.ndt, 'Max error inf-norm')    
+# if(PLOT_INTEGRATION_ERRORS):
+#     plot_multi_x_vs_y_log_scale(res.err_infnorm_avg, res.ndt, 'Mean error inf-norm')
+#     plot_multi_x_vs_y_log_scale(res.err_infnorm_max, res.ndt, 'Max error inf-norm')    
     
-if(PLOT_INTEGRATION_ERROR_TRAJECTORIES):
-    (ff, ax) = plut.create_empty_figure(1)
-    for (j,name) in enumerate(sorted(res.err_traj_infnorm.keys())):
-        ax.plot(tt, res.err_traj_infnorm[name], line_styles[j], alpha=0.7, label=name)
-    ax.set_xlabel('Time [s]')
-    ax.set_ylabel('Error inf-norm')
-    ax.set_yscale('log')
-    leg = ax.legend()
-    if(leg): leg.get_frame().set_alpha(0.5)
+# if(PLOT_INTEGRATION_ERROR_TRAJECTORIES):
+#     (ff, ax) = plut.create_empty_figure(1)
+#     for (j,name) in enumerate(sorted(res.err_traj_infnorm.keys())):
+#         ax.plot(tt, res.err_traj_infnorm[name], line_styles[j], alpha=0.7, label=name)
+#     ax.set_xlabel('Time [s]')
+#     ax.set_ylabel('Error inf-norm')
+#     ax.set_yscale('log')
+#     leg = ax.legend()
+#     if(leg): leg.get_frame().set_alpha(0.5)
     
         
 # FOR EACH INTEGRATION METHOD PLOT THE FORCE PREDICTIONS
@@ -342,51 +343,51 @@ if(PLOT_FORCE_PREDICTIONS):
     if(leg): leg.get_frame().set_alpha(0.5) 
        
 # PLOT THE CONTACT FORCES OF ALL INTEGRATION METHODS ON THE SAME PLOT
-if(PLOT_FORCES):        
-    nc = len(conf.contact_frames)
-    for (name, d) in data.items():
-        (ff, ax) = plut.create_empty_figure(nc, 1)
-        for i in range(nc):
-            ax[i].plot(tt, norm(d.f[0:2,i,:], axis=0) / (1e-3+d.f[2,i,:]), alpha=0.7, label=name)
-            ax[i].set_xlabel('Time [s]')
-            ax[i].set_ylabel('Force X/Z [N]')
-            leg = ax[i].legend()
-            if(leg): leg.get_frame().set_alpha(0.5)
+# if(PLOT_FORCES):        
+#     nc = len(conf.contact_frames)
+#     for (name, d) in data.items():
+#         (ff, ax) = plut.create_empty_figure(nc, 1)
+#         for i in range(nc):
+#             ax[i].plot(tt, norm(d.f[0:2,i,:], axis=0) / (1e-3+d.f[2,i,:]), alpha=0.7, label=name)
+#             ax[i].set_xlabel('Time [s]')
+#             ax[i].set_ylabel('Force X/Z [N]')
+#             leg = ax[i].legend()
+#             if(leg): leg.get_frame().set_alpha(0.5)
             
-# PLOT THE SLIPPING FLAG OF ALL INTEGRATION METHODS ON THE SAME PLOT
-if(PLOT_SLIPPING):
-    nc = len(conf.contact_frames)
-    (ff, ax) = plut.create_empty_figure(nc, 1)
-    for (name, d) in data.items():        
-        for i in range(nc):
-            ax[i].plot(tt, d.slipping[i,:], alpha=0.7, label=name)
-            ax[i].set_xlabel('Time [s]')
-    ax[0].set_ylabel('Contact Slipping Flag')
-    leg = ax[0].legend()
-    if(leg): leg.get_frame().set_alpha(0.5)
+# # PLOT THE SLIPPING FLAG OF ALL INTEGRATION METHODS ON THE SAME PLOT
+# if(PLOT_SLIPPING):
+#     nc = len(conf.contact_frames)
+#     (ff, ax) = plut.create_empty_figure(nc, 1)
+#     for (name, d) in data.items():        
+#         for i in range(nc):
+#             ax[i].plot(tt, d.slipping[i,:], alpha=0.7, label=name)
+#             ax[i].set_xlabel('Time [s]')
+#     ax[0].set_ylabel('Contact Slipping Flag')
+#     leg = ax[0].legend()
+#     if(leg): leg.get_frame().set_alpha(0.5)
 
-    (ff, ax) = plut.create_empty_figure(nc, 1)
-    for (name, d) in data.items():
-        for i in range(nc):
-            ax[i].plot(tt, d.active[i,:], alpha=0.7, label=name)
-            ax[i].set_xlabel('Time [s]')
-    ax[0].set_ylabel('Contact Active Flag')
-    leg = ax[0].legend()
-    if(leg): leg.get_frame().set_alpha(0.5)
+#     (ff, ax) = plut.create_empty_figure(nc, 1)
+#     for (name, d) in data.items():
+#         for i in range(nc):
+#             ax[i].plot(tt, d.active[i,:], alpha=0.7, label=name)
+#             ax[i].set_xlabel('Time [s]')
+#     ax[0].set_ylabel('Contact Active Flag')
+#     leg = ax[0].legend()
+#     if(leg): leg.get_frame().set_alpha(0.5)
 
        
-# PLOT THE JOINT ANGLES OF ALL INTEGRATION METHODS ON THE SAME PLOT
-if(PLOT_BASE_POS):
-    (ff, ax) = plut.create_empty_figure(3)
-    ax = ax.reshape(3)
-    j = 0
-    for (name, d) in data.items():
-        for i in range(3):
-            ax[i].plot(tt, d.q[i, :], line_styles[j], alpha=0.7, label=name)
-            ax[i].set_xlabel('Time [s]')
-            ax[i].set_ylabel('Base pos [m]')
-        j += 1
-        leg = ax[0].legend()
-        if(leg): leg.get_frame().set_alpha(0.5)
+# # PLOT THE JOINT ANGLES OF ALL INTEGRATION METHODS ON THE SAME PLOT
+# if(PLOT_BASE_POS):
+#     (ff, ax) = plut.create_empty_figure(3)
+#     ax = ax.reshape(3)
+#     j = 0
+#     for (name, d) in data.items():
+#         for i in range(3):
+#             ax[i].plot(tt, d.q[i, :], line_styles[j], alpha=0.7, label=name)
+#             ax[i].set_xlabel('Time [s]')
+#             ax[i].set_ylabel('Base pos [m]')
+#         j += 1
+#         leg = ax[0].legend()
+#         if(leg): leg.get_frame().set_alpha(0.5)
         
 plt.show()

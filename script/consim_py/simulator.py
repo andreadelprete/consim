@@ -6,7 +6,7 @@ from numpy import nan
 from scipy.linalg import expm
 from numpy.linalg import norm
 import os
-import gepetto.corbaserver
+# import gepetto.corbaserver
 import time
 import subprocess
 

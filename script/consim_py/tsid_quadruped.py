@@ -2,7 +2,7 @@ import pinocchio as se3
 import tsid
 import numpy as np
 import os
-import gepetto.corbaserver
+# import gepetto.corbaserver
 import time
 import subprocess
 
@@ -15,7 +15,7 @@ class TsidQuadruped:
         - Regularization task for contact forces
     '''
 
-    def __init__(self, conf, dt, robot, com_offset, com_frequency, com_amplitude, q0=None, viewer=True):
+    def __init__(self, conf, dt, robot, com_offset, com_frequency, com_amplitude, q0=None, viewer=False):
         self.conf = conf
         self.dt = dt
         self.robot = tsid.RobotWrapper(robot.model, False)

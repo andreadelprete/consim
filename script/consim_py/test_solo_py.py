@@ -112,7 +112,7 @@ PLOT_FORCES = 0
 PLOT_BASE_POS = 0
 PLOT_FORCE_PREDICTIONS = 1
 PLOT_INTEGRATION_ERRORS = 0
-PLOT_INTEGRATION_ERROR_TRAJECTORIES = 1
+PLOT_INTEGRATION_ERROR_TRAJECTORIES = 0
 PLOT_MAT_MULT_EXPM = 0
 PLOT_MAT_NORM_EXPM = 0
 
@@ -323,6 +323,15 @@ for name in sorted(data.keys()):
     err_traj[name] = err_per_time
     ndt[d.method_name] += [d.ndt]
 
+# RMSE computation 
+
+def compute_rmse(data, reference):
+    assert data.shape[0]==reference.shape[0] 
+    N = data.shape[0]
+    error_sum = np.sum( np.abs( data -reference )**2 )
+    return np.sqrt(error_sum/ N)
+
+
 # PLOT STUFF
 line_styles = 10*['-o', '--o', '-.o', ':o']
 tt = np.arange(0.0, (N_SIMULATION+1)*dt, dt)[:N_SIMULATION+1]
@@ -396,6 +405,8 @@ if(PLOT_FORCES):
         if(leg): leg.get_frame().set_alpha(0.5)
 
 # FOR EACH INTEGRATION METHOD PLOT THE FORCE PREDICTIONS
+plut.FIGURE_PATH="/Users/bilal/Desktop/"
+plut.SAVE_FIGURES = True 
 if(PLOT_FORCE_PREDICTIONS):
     for (name,d) in data.items():
         if('truth' in name):
@@ -403,19 +414,24 @@ if(PLOT_FORCE_PREDICTIONS):
         
         for contact_name in d.f.keys():
             tt_log = np.arange(d.f_pred[contact_name].shape[1]) * T / d.f_pred[contact_name].shape[1]
-            for i in range(3):
-                (ff, ax) = plut.create_empty_figure(1)
+            # for i in range(3):
+            i = 2 
+            (ff, ax) = plut.create_empty_figure(1)
 #            ax.plot(tt, d.f[i,:], ' o', markersize=8, label=name)
 #            ax[i].plot(tt, d.f_pred_int[2+3*i,:], ' s', markersize=8, label=name+' pred int')
 #            ax.plot(tt_log, d.f_pred[i,:], 'r v', markersize=6, label=name+' pred ')
 #            ax.plot(tt_log, d.f_inner[i,:], 'b x', markersize=6, label=name+' real ')
-                ax.plot(tt_log, d.f_pred[contact_name][i,:], 'r-v', markersize=6, label='Predicted')
-                ax.plot(tt_log, d.f_inner[contact_name][i,:], 'b--x', markersize=6, label='Real')
-                ax.set_xlabel('Time [s]')
-                ax.set_ylabel('Force [N]')
-                leg = ax.legend()
-                if(leg): leg.get_frame().set_alpha(0.5)
-       
+            ax.plot(tt_log, d.f_pred[contact_name][i,:], 'r-v', markersize=6, label='Predicted')
+            ax.plot(tt_log, d.f_inner[contact_name][i,:], 'b--x', markersize=6, label='Real')
+            ax.set_xlabel('Time [s]')
+            ax.set_ylabel('Force [N]')
+            rmse_err = compute_rmse(d.f_pred[contact_name][i,:], d.f_inner[contact_name][i,:])
+            plt.text(0.8,0.5,"$RMSE = %5.4f$"%rmse_err,horizontalalignment='center',
+            verticalalignment='center', transform = ax.transAxes)
+            leg = ax.legend()
+            if(leg): leg.get_frame().set_alpha(0.5)
+            plut.saveFigure("normal contact force with v0 = %1.3f"%v0[2])
+            # print("RMSE ERROR IS %s"%()) 
         # force prediction error of Euler, i.e. assuming force remains contact during time step
 #        ndt = int(d.f_inner[contact_name].shape[1] / (d.f[contact_name].shape[1]-1))
 #        f_pred_err_euler = np.array([d.f[contact_name][:,int(np.floor(i/ndt))] - d.f_inner[contact_name][:,i] for i in range(d.f_inner[contact_name].shape[1])]).T

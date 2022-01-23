@@ -139,7 +139,7 @@ def plot_multi_x_vs_y_log_scale(y, x, ylabel, xlabel='Number of time steps', log
     j = 0
     for name in sorted(y.keys()):
         if(len(y[name])>0):
-            ax.plot(x[name], y[name], line_styles[j], alpha=0.7, markerSize=10, label=name)
+            ax.plot(x[name], y[name], line_styles[j], alpha=0.7, markersize=10, label=name)
             j += 1
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)

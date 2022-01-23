@@ -3,7 +3,7 @@ import pinocchio as pin
 import tsid
 import numpy as np
 import os
-import gepetto.corbaserver
+# import gepetto.corbaserver
 import time
 import subprocess
 
