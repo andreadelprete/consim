@@ -57,22 +57,22 @@ for s in simulator_names:
         comp_times_dict[s][n] = n.split('::')[-1]
     
 plut.SAVE_FIGURES = 0
-PLOT_FORCES = 0
+PLOT_FORCES = 1
 PLOT_CONTACT_POINTS = 0
 PLOT_VELOCITY_NORM = 0
 PLOT_SLIPPING = 0
 PLOT_BASE_POS = 0
-PLOT_INTEGRATION_ERRORS = 1
+PLOT_INTEGRATION_ERRORS = 0
 PLOT_INTEGRATION_ERROR_TRAJECTORIES = 0
 PLOT_MATRIX_MULTIPLICATIONS = 0
 PLOT_MATRIX_NORMS = 0
 
-LOAD_GROUND_TRUTH_FROM_FILE = 1
-SAVE_GROUND_TRUTH_TO_FILE = 1
+LOAD_GROUND_TRUTH_FROM_FILE = 0
+SAVE_GROUND_TRUTH_TO_FILE = 0
 RESET_STATE_ON_GROUND_TRUTH = 0  # reset the state of the system on the ground truth
 
-TEST_NAME = 'solo-squat'
-#TEST_NAME = 'solo-trot'
+# TEST_NAME = 'solo-squat'
+TEST_NAME = 'solo-trot'
 #TEST_NAME = 'solo-jump'
 #TEST_NAME = 'romeo-walk'
 #TEST_NAME = 'talos-walk'
