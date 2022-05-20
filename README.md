@@ -49,3 +49,21 @@ To test the python version of the simulator (with matrix exponential) you can ru
 
     python scripts/test_exp_integrator_with_quadruped.py
         
+## Citing CONSIM
+
+To cite CONSIM in your academic research, please use the following bibtex line:
+
+```
+@article{Hammoud2022,
+author = {Hammoud, Bilal and Olivieri, Luca and Righetti, Ludovic and Carpentier, Justin and {Del Prete}, Andrea},
+doi = {10.1007/s11044-022-09818-z},
+issn = {1573-272X},
+journal = {Multibody System Dynamics},
+number = {4},
+pages = {443--460},
+title = {{Exponential integration for efficient and accurate multibody simulation with stiff viscoelastic contacts}},
+url = {https://doi.org/10.1007/s11044-022-09818-z},
+volume = {54},
+year = {2022}
+}
+```
