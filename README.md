@@ -8,6 +8,7 @@ For the cpp code:
 * eigen3
 * [pinocchio](https://github.com/stack-of-tasks/pinocchio)
 * [eiquadprog](https://github.com/stack-of-tasks/eiquadprog)
+
 For the python code:
 * [gepetto-viewer-corba](https://github.com/Gepetto/gepetto-viewer-corba)
 * [example-robot-data](https://github.com/Gepetto/example-robot-data)
